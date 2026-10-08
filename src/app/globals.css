@@ -1,0 +1,124 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: 38 29% 97%;
+  --foreground: 240 10% 4%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 4%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
+  --border: 240 6% 90%;
+  --warning-surface: 48 100% 96%;
+  --warning-foreground: 28 80% 25%;
+  color-scheme: light;
+}
+
+.dark {
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+  --card: 240 10% 7%;
+  --card-foreground: 0 0% 98%;
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 65%;
+  --border: 240 4% 16%;
+  --warning-surface: 28 85% 12%;
+  --warning-foreground: 45 90% 80%;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-warning-surface: hsl(var(--warning-surface));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: hsl(var(--background));
+}
+
+body {
+  margin: 0;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: Arial, "Noto Sans Thai", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+html.dark,
+html.dark body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+html.dark main {
+  background-color: hsl(var(--background));
+}
+
+html.dark main.bg-zinc-50 {
+  background-color: hsl(var(--background));
+}
+
+html.dark header {
+  background-color: hsl(var(--background));
+}
+
+html.dark .bg-white,
+html.dark .bg-zinc-50,
+html.dark .bg-slate-50 {
+  background-color: hsl(var(--card));
+}
+
+html.dark .bg-zinc-100,
+html.dark .bg-slate-100,
+html.dark .bg-slate-200 {
+  background-color: hsl(var(--muted));
+}
+
+html.dark .bg-amber-50,
+html.dark [class~="bg-amber-50/80"],
+html.dark .bg-orange-50,
+html.dark [class~="bg-orange-50/40"],
+html.dark [class~="bg-orange-50/60"] {
+  background-color: hsl(var(--warning-surface));
+}
+
+html.dark .text-amber-900,
+html.dark .text-amber-800,
+html.dark .text-orange-900,
+html.dark .text-orange-800 {
+  color: hsl(var(--warning-foreground));
+}
+
+html.dark .text-slate-950,
+html.dark .text-slate-900,
+html.dark .text-slate-800 {
+  color: hsl(var(--foreground));
+}
+
+html.dark .text-slate-700,
+html.dark .text-slate-600 {
+  color: hsl(var(--foreground));
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-400 {
+  color: hsl(var(--muted-foreground));
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-zinc-200 {
+  border-color: hsl(var(--border));
+}
