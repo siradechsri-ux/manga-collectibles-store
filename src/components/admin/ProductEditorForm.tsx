@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, BookOpen, Package, Save } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BookOpen, Package, Save, X } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
@@ -26,6 +26,7 @@ interface ProductDraft {
   preorderDeadline: string;
   expectedShippingDate: string;
   weightGrams: string;
+  images: string[];
   name: string;
   slug: string;
   series: string;
@@ -58,6 +59,7 @@ const EMPTY_DRAFT: ProductDraft = {
   preorderDeadline: "",
   expectedShippingDate: "",
   weightGrams: "250",
+  images: [],
   name: "",
   slug: "",
   series: "",
@@ -93,6 +95,7 @@ function draftFromProduct(product: AdminProduct): ProductDraft {
       preorderDeadline: product.preorderDeadline.slice(0, 10),
       expectedShippingDate: product.expectedShippingDate.slice(0, 10),
       weightGrams: String(product.weightGrams),
+      images: [...product.images],
     };
   }
   return {
@@ -116,6 +119,7 @@ function draftFromProduct(product: AdminProduct): ProductDraft {
     weightGrams: String(product.weightGrams),
     heightMm: String(product.heightMm),
     janCode: product.janCode,
+    images: [...product.images],
   };
 }
 
@@ -196,6 +200,7 @@ export default function ProductEditorForm({
           preorderDeadline: draft.mangaPreorder ? draft.preorderDeadline : "",
           expectedShippingDate: draft.mangaPreorder ? draft.expectedShippingDate : "",
           weightGrams: numeric(draft.weightGrams),
+          images: [...draft.images],
         };
       } else {
         const name = draft.name.trim();
@@ -223,8 +228,7 @@ export default function ProductEditorForm({
           weightGrams: numeric(draft.weightGrams),
           heightMm: numeric(draft.heightMm),
           janCode: draft.janCode.trim(),
-          images:
-            initialProduct?.type === "FIGURE" ? [...initialProduct.images] : [],
+          images: [...draft.images],
         };
       }
       saveAdminProduct(input, initialProduct?.id);
@@ -287,6 +291,7 @@ export default function ProductEditorForm({
                   <SelectField label="รูปแบบปก" value={draft.coverStyle} onChange={(value) => update("coverStyle", value as ProductDraft["coverStyle"])} className={fieldClass} options={[["STANDARD", "ปกธรรมดา"], ["LIMITED_SET", "Limited Set"]]} />
                   <TextField label="ราคาขาย (บาท)" required type="number" min="0.01" step="0.01" value={draft.price} onChange={(value) => update("price", value)} className={fieldClass} />
                   <TextField label="จำนวนสต็อก" required type="number" min="0" value={draft.stock} onChange={(value) => update("stock", value)} className={fieldClass} />
+                  <ImageUploadField label="รูปภาพสินค้า" images={draft.images} onChange={(images) => update("images", images)} />
                 </div>
               </FormSection>
               <FormSection title="การพรีออเดอร์">
@@ -307,6 +312,9 @@ export default function ProductEditorForm({
                   <TextField label="รหัสสินค้า JAN" value={draft.janCode} onChange={(value) => update("janCode", value)} className={fieldClass} />
                   <TextField label="รายละเอียด" value={draft.description} onChange={(value) => update("description", value)} className={fieldClass} multiline />
                 </div>
+              </FormSection>
+              <FormSection title="รูปแบบและสต็อก">
+                <ImageUploadField label="รูปภาพสินค้า" images={draft.images} onChange={(images) => update("images", images)} />
               </FormSection>
               <FormSection title="ราคาและเงื่อนไข">
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -407,6 +415,67 @@ function SelectField({
   options: readonly (readonly [string, string])[];
 }) {
   return <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className={className}>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></label>;
+}
+
+function ImageUploadField({
+  label,
+  images,
+  onChange,
+}: {
+  label: string;
+  images: string[];
+  onChange: (images: string[]) => void;
+}) {
+  const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  function handleImageChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setValidationError("请选择ไฟล์รูปภาพเท่านั้น");
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setValidationError("รูปภาพต้องไม่เกิน 3 MB");
+      return;
+    }
+
+    setValidationError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        onChange([...images, reader.result]);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="sm:col-span-2">
+      <span className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}<span className="ml-1 text-red-600">*</span></span>
+      <label htmlFor="product-image-upload" className="mt-1.5 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-5 text-center transition hover:border-orange-400 hover:bg-orange-50/40 dark:border-zinc-700 dark:bg-zinc-950/50 dark:hover:border-orange-600 dark:hover:bg-orange-950/20">
+        <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">เลือกภาพสินค้า</span>
+        <span className="mt-1 text-xs text-zinc-500">PNG, JPG หรือ GIF · ไม่เกิน 3 MB</span>
+        <input id="product-image-upload" type="file" accept="image/*" className="sr-only" onChange={handleImageChange} />
+      </label>
+      {validationError ? <p role="alert" className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">{validationError}</p> : null}
+      {images.length > 0 ? (
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {images.map((image, index) => (
+            <div key={`${image}-${index}`} className="group relative overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950">
+              <img src={image} alt={`รูปสินค้า ${index + 1}`} className="aspect-square h-full w-full object-cover" />
+              <button type="button" onClick={() => onChange(images.filter((_, imageIndex) => imageIndex !== index))} className="absolute bottom-2 right-2 rounded-full bg-red-600 p-2 text-white shadow-lg transition hover:bg-red-700" aria-label={`ลบรูปสินค้า ${index + 1}`}>
+                <X size={14} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function ToggleField({

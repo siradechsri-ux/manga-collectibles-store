@@ -36,6 +36,7 @@ const mangaProductSchema = z
     preorderDeadline: z.string(),
     expectedShippingDate: z.string(),
     weightGrams: z.number().int().nonnegative(),
+    images: z.array(z.string()),
   })
   .strict();
 
@@ -133,6 +134,7 @@ function createInitialProducts(): AdminProduct[] {
           volume.variantLabel === "Limited Set" || volume.variantLabel === "ฉบับพิเศษ"
             ? 450
             : 250,
+        images: [],
       });
     }
   }

@@ -12,7 +12,8 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   CatalogData,
   CatalogFigure,
@@ -187,13 +188,26 @@ function StorefrontHero({
 }
 
 export default function StorefrontPage() {
-  const [category, setCategory] = useState<StoreCategory>("MANGA");
+  return (
+    <Suspense fallback={<StorefrontLoading />}>
+      <StorefrontContent />
+    </Suspense>
+  );
+}
+
+function StorefrontContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const category: StoreCategory = searchParams.get("category") === "FIGURE"
+    ? "FIGURE"
+    : "MANGA";
   const [subcategory, setSubcategory] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState<StoreStatus>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const filteredManga = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
     return (catalog?.mangaSeries ?? []).filter((series) => {
@@ -223,9 +237,15 @@ export default function StorefrontPage() {
     });
   }, [catalog, searchQuery, statusFilter, subcategory]);
 
-  function browseCollection(nextCategory: StoreCategory): void {
-    setCategory(nextCategory);
+  function selectCategory(nextCategory: StoreCategory): void {
     setSubcategory("ALL");
+    setStatusFilter("ALL");
+    setSearchQuery("");
+    void router.replace(`/?category=${nextCategory}#browse-collection`);
+  }
+
+  function browseCollection(nextCategory: StoreCategory): void {
+    selectCategory(nextCategory);
     document.getElementById("browse-collection")?.scrollIntoView({
       behavior: "smooth",
       block: "start",
@@ -286,10 +306,7 @@ export default function StorefrontPage() {
                 type="button"
                 role="tab"
                 aria-selected={category === "MANGA"}
-                onClick={() => {
-                  setCategory("MANGA");
-                  setSubcategory("ALL");
-                }}
+                onClick={() => selectCategory("MANGA")}
                 className={`rounded-lg px-4 py-2.5 text-sm font-bold transition ${
                   category === "MANGA"
                     ? "bg-zinc-950 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-950"
@@ -302,10 +319,7 @@ export default function StorefrontPage() {
                 type="button"
                 role="tab"
                 aria-selected={category === "FIGURE"}
-                onClick={() => {
-                  setCategory("FIGURE");
-                  setSubcategory("ALL");
-                }}
+                onClick={() => selectCategory("FIGURE")}
                 className={`rounded-lg px-4 py-2.5 text-sm font-bold transition ${
                   category === "FIGURE"
                     ? "bg-zinc-950 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-950"
@@ -571,6 +585,17 @@ function FigureGrid({ figures }: { figures: CatalogFigure[] }) {
         );
       })}
     </div>
+  );
+}
+
+function StorefrontLoading() {
+  return (
+    <main className="min-h-screen bg-zinc-50 px-4 py-16 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl animate-pulse">
+        <div className="h-72 rounded-[2rem] bg-zinc-200 dark:bg-zinc-900" />
+        <div className="mt-10 h-10 w-64 rounded-xl bg-zinc-200 dark:bg-zinc-900" />
+      </div>
+    </main>
   );
 }
 

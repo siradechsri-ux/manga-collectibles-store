@@ -122,10 +122,10 @@ export default function StorefrontHeader() {
           <Link href="/" className="text-sm font-semibold text-zinc-700 transition hover:text-orange-700 dark:text-zinc-300">
             หน้าร้าน
           </Link>
-          <Link href="/#browse-collection" className="text-sm font-semibold text-zinc-700 transition hover:text-orange-700 dark:text-zinc-300">
+          <Link href="/?category=MANGA#browse-collection" className="text-sm font-semibold text-zinc-700 transition hover:text-orange-700 dark:text-zinc-300">
             มังงะ
           </Link>
-          <Link href="/#browse-collection" className="text-sm font-semibold text-zinc-700 transition hover:text-orange-700 dark:text-zinc-300">
+          <Link href="/?category=FIGURE#browse-collection" className="text-sm font-semibold text-zinc-700 transition hover:text-orange-700 dark:text-zinc-300">
             Figure / ของสะสม
           </Link>
           {user?.role === "STAFF" ? (
@@ -449,14 +449,14 @@ export default function StorefrontHeader() {
             </Link>
           ) : null}
           <Link
-            href="/#browse-collection"
+            href="/?category=MANGA#browse-collection"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             <BookOpen size={17} aria-hidden="true" /> มังงะทั้งหมด
           </Link>
           <Link
-            href="/#browse-collection"
+            href="/?category=FIGURE#browse-collection"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
