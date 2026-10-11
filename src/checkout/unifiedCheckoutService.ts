@@ -16,8 +16,14 @@ export const unifiedCheckoutPayloadSchema = z
             productType: z.enum([
               "MANGA_INSTOCK",
               "MANGA_PREORDER",
+              "LIGHT_NOVEL_INSTOCK",
+              "LIGHT_NOVEL_PREORDER",
               "FIGURE_FULL",
               "FIGURE_DEPOSIT",
+              "PLAMO_FULL",
+              "PLAMO_DEPOSIT",
+              "GOODS_INSTOCK",
+              "ACCESSORY_INSTOCK",
             ]),
           })
           .strict(),
@@ -281,7 +287,12 @@ function normalizeItems(
 }
 
 function isFigureType(productType: MixedCartProductType): boolean {
-  return productType === "FIGURE_FULL" || productType === "FIGURE_DEPOSIT";
+  return (
+    productType === "FIGURE_FULL" ||
+    productType === "FIGURE_DEPOSIT" ||
+    productType === "PLAMO_FULL" ||
+    productType === "PLAMO_DEPOSIT"
+  );
 }
 
 function calculateFigureBillableWeight(

@@ -6,18 +6,17 @@ import {
   CalendarClock,
   CalendarDays,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Clock3,
   Minus,
   PackageCheck,
   Plus,
-  ShoppingBag,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { joinMockWaitlist } from "../mocks/storage.mock";
+import { canShop } from "../utils/permissions";
 
 export interface FigureProduct {
   id: string;
@@ -131,11 +130,7 @@ export default function FigureDetailCard({
   onNotifyWhenAvailable,
 }: FigureDetailCardProps) {
   const { user } = useAuth();
-  const isStaffAccount =
-    user?.role === "STAFF" ||
-    user?.role === "FINANCE" ||
-    user?.role === "ADMIN";
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const userCanShop = canShop(user?.role);
   const [paymentOption, setPaymentOption] = useState<FigurePaymentOption>("FULL");
   const [quantity, setQuantity] = useState(1);
   const [now, setNow] = useState(() => Date.now());
@@ -144,11 +139,6 @@ export default function FigureDetailCard({
     isError: boolean;
   } | null>(null);
 
-  const images = useMemo(
-    () => product.images.filter((image) => image.trim().length > 0),
-    [product.images],
-  );
-  const activeImage = images[selectedImageIndex];
   const deadlineTimestamp = new Date(product.preorderDeadline).getTime();
   const hasValidDeadline = Number.isFinite(deadlineTimestamp);
   const countdown = hasValidDeadline
@@ -199,7 +189,6 @@ export default function FigureDetailCard({
   }, [deadlineTimestamp, hasValidDeadline]);
 
   useEffect(() => {
-    setSelectedImageIndex(0);
     setQuantity(1);
     setPaymentOption("FULL");
   }, [product.id]);
@@ -209,18 +198,6 @@ export default function FigureDetailCard({
       setPaymentOption("FULL");
     }
   }, [depositIsAvailable, paymentOption]);
-
-  function showPreviousImage() {
-    setSelectedImageIndex((currentIndex) =>
-      currentIndex === 0 ? images.length - 1 : currentIndex - 1,
-    );
-  }
-
-  function showNextImage() {
-    setSelectedImageIndex((currentIndex) =>
-      currentIndex === images.length - 1 ? 0 : currentIndex + 1,
-    );
-  }
 
   function decreaseQuantity() {
     setQuantity((currentQuantity) => Math.max(1, currentQuantity - 1));
@@ -280,72 +257,47 @@ export default function FigureDetailCard({
     <article className="mx-auto w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div className="grid grid-cols-1 lg:grid-cols-2">
         <section
-          className="bg-slate-50 p-4 sm:p-6 lg:p-8"
-          aria-label="แกลเลอรีรูปภาพสินค้า"
+          className="bg-slate-50 p-4 sm:p-6 lg:p-8 dark:bg-zinc-900/60"
+          aria-label="ข้อมูลจำลองสินค้า"
         >
-          <div className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-white">
-            {activeImage ? (
-              <img
-                src={activeImage}
-                alt={`${product.name} ภาพที่ ${selectedImageIndex + 1}`}
-                className="h-full w-full object-contain p-3 transition duration-500 ease-out group-hover:scale-[1.03] sm:p-6"
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-3 text-slate-400">
-                <PackageCheck size={52} strokeWidth={1.4} aria-hidden="true" />
-                <span className="text-sm">ไม่มีรูปภาพสินค้า</span>
+          <div className="flex aspect-square flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200/90 bg-gradient-to-br from-zinc-50 via-zinc-100/70 to-orange-50/40 p-6 text-zinc-900 shadow-xs dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-950 dark:text-zinc-100 sm:p-8">
+            <div className="flex items-center justify-between">
+              <span className="rounded-md bg-orange-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-orange-800 dark:bg-orange-950 dark:text-orange-300">
+                OFFICIAL COLLECTIBLE
+              </span>
+              <div className="rounded-xl bg-white/80 p-2 text-orange-600 shadow-xs backdrop-blur-xs dark:bg-zinc-800 dark:text-orange-400">
+                <PackageCheck size={22} aria-hidden="true" />
               </div>
-            )}
-
-            {images.length > 1 ? (
-              <>
-                <button
-                  type="button"
-                  onClick={showPreviousImage}
-                  aria-label="ดูรูปก่อนหน้า"
-                  className="absolute left-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
-                >
-                  <ChevronLeft size={21} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={showNextImage}
-                  aria-label="ดูรูปถัดไป"
-                  className="absolute right-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-800 shadow transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
-                >
-                  <ChevronRight size={21} aria-hidden="true" />
-                </button>
-                <span className="absolute bottom-3 right-3 rounded-full bg-slate-900/75 px-3 py-1 text-xs font-medium text-white">
-                  {selectedImageIndex + 1} / {images.length}
-                </span>
-              </>
-            ) : null}
-          </div>
-
-          {images.length > 0 ? (
-            <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
-              {images.map((image, index) => (
-                <button
-                  key={`${image}-${index}`}
-                  type="button"
-                  onClick={() => setSelectedImageIndex(index)}
-                  aria-label={`แสดงรูปที่ ${index + 1}`}
-                  aria-pressed={selectedImageIndex === index}
-                  className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white transition sm:h-20 sm:w-20 ${
-                    selectedImageIndex === index
-                      ? "border-orange-500 ring-2 ring-orange-100"
-                      : "border-transparent hover:border-slate-300"
-                  }`}
-                >
-                  <img
-                    src={image}
-                    alt={`${product.name} ภาพตัวอย่าง ${index + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                </button>
-              ))}
             </div>
-          ) : null}
+
+            <div className="my-auto py-4 text-center">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 shadow-sm dark:bg-orange-950 dark:text-orange-400">
+                <PackageCheck size={36} strokeWidth={1.5} aria-hidden="true" />
+              </div>
+              <h2 className="text-lg font-black leading-tight text-zinc-950 dark:text-zinc-50 sm:text-xl">
+                {product.name}
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400 sm:text-sm">
+                ตัวละคร: {product.character} · {product.series}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <span className="rounded-lg bg-zinc-200/80 px-2.5 py-1 text-xs font-bold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                  {product.manufacturer}
+                </span>
+                <span className="rounded-lg bg-zinc-200/80 px-2.5 py-1 text-xs font-bold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                  {product.scale}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-black/5 pt-3 text-xs font-semibold text-zinc-500 dark:border-white/10 dark:text-zinc-400">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck size={16} className="text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                <span>ของแท้ 100% ลิขสิทธิ์ถูกต้อง</span>
+              </div>
+              <span>VAT 7%</span>
+            </div>
+          </div>
         </section>
 
         <section className="flex flex-col p-5 sm:p-7 lg:p-8">
@@ -446,180 +398,199 @@ export default function FigureDetailCard({
             </div>
           ) : null}
 
-          {waitlistFeedback ? (
-            <p
-              role={waitlistFeedback.isError ? "alert" : "status"}
-              className={`mt-2 text-center text-sm font-semibold ${
-                waitlistFeedback.isError ? "text-red-700" : "text-emerald-700"
-              }`}
-            >
-              {waitlistFeedback.message}
-            </p>
-          ) : null}
-
-          <div className="mt-6">
-            <h2 className="text-sm font-bold text-slate-900">เลือกวิธีชำระเงิน</h2>
-            <div className="mt-3 grid grid-cols-1 gap-3">
-              <label
-                className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${
-                  paymentOption === "FULL"
-                    ? "border-orange-500 bg-orange-50 ring-2 ring-orange-100 dark:bg-orange-950/20 dark:ring-orange-950"
-                    : "border-slate-200 hover:border-slate-300 dark:border-zinc-700 dark:hover:border-zinc-600"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={`figure-payment-${product.id}`}
-                  value="FULL"
-                  checked={paymentOption === "FULL"}
-                  onChange={() => setPaymentOption("FULL")}
-                  className="mt-1 h-4 w-4 accent-orange-600"
-                />
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span>
-                    <span className="block text-sm font-semibold text-slate-900 dark:text-zinc-100">
-                      จ่ายเต็มจำนวน
-                    </span>
-                    <span className="mt-1 block text-xs text-slate-500 dark:text-zinc-400">
-                      ชำระราคาสินค้าเต็มจำนวน
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-sm font-bold text-slate-900">
-                    {currencyFormatter.format(fullPrice)}
-                  </span>
-                </span>
-              </label>
-
-              <label
-                className={`flex items-start gap-3 rounded-2xl border p-4 transition ${
-                  depositIsAvailable
-                    ? paymentOption === "DEPOSIT"
-                      ? "cursor-pointer border-orange-500 bg-orange-50 ring-2 ring-orange-100 dark:bg-orange-950/20 dark:ring-orange-950"
-                      : "cursor-pointer border-slate-200 hover:border-slate-300 dark:border-zinc-700 dark:hover:border-zinc-600"
-                    : "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60 dark:border-zinc-700 dark:bg-zinc-800"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={`figure-payment-${product.id}`}
-                  value="DEPOSIT"
-                  checked={paymentOption === "DEPOSIT"}
-                  onChange={() => setPaymentOption("DEPOSIT")}
-                  disabled={!depositIsAvailable}
-                  className="mt-1 h-4 w-4 accent-orange-600"
-                />
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span>
-                    <span className="block text-sm font-semibold text-slate-900 dark:text-zinc-100">
-                      วางมัดจำ
-                    </span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
-                      (ยอดคงเหลือ{" "}
-                      {currencyFormatter.format(remainingPerUnit)} ชำระเมื่อสินค้าเข้าไทย)
-                    </span>
-                    {!depositIsAvailable ? (
-                      <span className="mt-1 block text-xs text-slate-500">
-                        สินค้านี้ไม่รองรับการวางมัดจำ
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="shrink-0 text-sm font-bold text-orange-700">
-                    {currencyFormatter.format(depositAmount)}
-                  </span>
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs text-slate-500">จำนวน</p>
-              <div className="mt-1 inline-flex items-center rounded-xl border border-slate-200">
-                <button
-                  type="button"
-                  onClick={decreaseQuantity}
-                  disabled={quantity <= 1}
-                  aria-label="ลดจำนวน"
-                  className="inline-flex h-10 w-10 items-center justify-center text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          {userCanShop ? (
+            <>
+              {waitlistFeedback ? (
+                <p
+                  role={waitlistFeedback.isError ? "alert" : "status"}
+                  className={`mt-2 text-center text-sm font-semibold ${
+                    waitlistFeedback.isError ? "text-red-700 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400"
+                  }`}
                 >
-                  <Minus size={16} aria-hidden="true" />
-                </button>
-                <span
-                  className="min-w-9 text-center text-sm font-semibold text-slate-900"
-                  aria-live="polite"
-                >
-                  {quantity}
-                </span>
-                <button
-                  type="button"
-                  onClick={increaseQuantity}
-                  disabled={quantity >= maxQuantity || !itemCountIsLimited}
-                  aria-label="เพิ่มจำนวน"
-                  className="inline-flex h-10 w-10 items-center justify-center text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Plus size={16} aria-hidden="true" />
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {product.status === "IN_STOCK" ? "พร้อมส่ง" : "โควตาคงเหลือ"}{" "}
-                {Math.max(0, product.stockOrQuotaRemaining)} ชิ้น
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-slate-500">ยอดชำระค่าสินค้ารอบนี้</p>
-              <p className="mt-1 text-xl font-extrabold text-slate-950">
-                {currencyFormatter.format(selectedTotalPerUnit * quantity)}
-              </p>
-              {paymentOption === "DEPOSIT" && depositIsAvailable ? (
-                <p className="mt-1 text-xs text-slate-500">
-                  ยอดคงเหลือสินค้า{" "}
-                  {currencyFormatter.format(remainingPerUnit * quantity)}
+                  {waitlistFeedback.message}
                 </p>
               ) : null}
-            </div>
-          </div>
 
-          {isStaffAccount ? (
-            <div
-              role="status"
-              className="mt-5 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-600"
-            >
-              <ShieldCheck size={18} aria-hidden="true" />
-              บัญชีเจ้าหน้าที่ (ไม่สามารถทำรายการสั่งซื้อได้)
-            </div>
-          ) : waitlistRequired ? (
-            <button
-              type="button"
-              onClick={joinWaitlist}
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-            >
-              <Bell size={18} aria-hidden="true" />
-              ลงชื่อเข้าคิวรับสิทธิ์ (Waitlist)
-            </button>
-          ) : product.status === "PREORDER_OPEN" ? (
-            <button
-              type="button"
-              onClick={() => submitPurchase("PREORDER")}
-              disabled={!canPurchase}
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              <Check size={18} aria-hidden="true" />
-              {preorderIsOrderable
-                ? "สั่งจองล่วงหน้า (Pre-order)"
-                : product.stockOrQuotaRemaining <= 0
-                  ? "โควตาสั่งจองเต็มแล้ว"
-                  : "ปิดรับจองแล้ว"}
-            </button>
+              <div className="mt-6">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-zinc-100">เลือกวิธีชำระเงิน</h2>
+                <div className="mt-3 grid grid-cols-1 gap-3">
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${
+                      paymentOption === "FULL"
+                        ? "border-orange-500 bg-orange-50 ring-2 ring-orange-100 dark:bg-orange-950/20 dark:ring-orange-950"
+                        : "border-slate-200 hover:border-slate-300 dark:border-zinc-700 dark:hover:border-zinc-600"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`figure-payment-${product.id}`}
+                      value="FULL"
+                      checked={paymentOption === "FULL"}
+                      onChange={() => setPaymentOption("FULL")}
+                      className="mt-1 h-4 w-4 accent-orange-600"
+                    />
+                    <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                      <span>
+                        <span className="block text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                          จ่ายเต็มจำนวน
+                        </span>
+                        <span className="mt-1 block text-xs text-slate-500 dark:text-zinc-400">
+                          ชำระราคาสินค้าเต็มจำนวน
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-sm font-bold text-slate-900 dark:text-zinc-100">
+                        {currencyFormatter.format(fullPrice)}
+                      </span>
+                    </span>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-3 rounded-2xl border p-4 transition ${
+                      depositIsAvailable
+                        ? paymentOption === "DEPOSIT"
+                          ? "cursor-pointer border-orange-500 bg-orange-50 ring-2 ring-orange-100 dark:bg-orange-950/20 dark:ring-orange-950"
+                          : "cursor-pointer border-slate-200 hover:border-slate-300 dark:border-zinc-700 dark:hover:border-zinc-600"
+                        : "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60 dark:border-zinc-700 dark:bg-zinc-800"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`figure-payment-${product.id}`}
+                      value="DEPOSIT"
+                      checked={paymentOption === "DEPOSIT"}
+                      onChange={() => setPaymentOption("DEPOSIT")}
+                      disabled={!depositIsAvailable}
+                      className="mt-1 h-4 w-4 accent-orange-600"
+                    />
+                    <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                      <span>
+                        <span className="block text-sm font-semibold text-slate-900 dark:text-zinc-100">
+                          วางมัดจำ
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                          (ยอดคงเหลือ{" "}
+                          {currencyFormatter.format(remainingPerUnit)} ชำระเมื่อสินค้าเข้าไทย)
+                        </span>
+                        {!depositIsAvailable ? (
+                          <span className="mt-1 block text-xs text-slate-500 dark:text-zinc-400">
+                            สินค้านี้ไม่รองรับการวางมัดจำ
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 text-sm font-bold text-orange-700 dark:text-orange-400">
+                        {currencyFormatter.format(depositAmount)}
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">จำนวน</p>
+                  <div className="mt-1 inline-flex items-center rounded-xl border border-slate-200 dark:border-zinc-700">
+                    <button
+                      type="button"
+                      onClick={decreaseQuantity}
+                      disabled={quantity <= 1}
+                      aria-label="ลดจำนวน"
+                      className="inline-flex h-10 w-10 items-center justify-center text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      <Minus size={16} aria-hidden="true" />
+                    </button>
+                    <span
+                      className="min-w-9 text-center text-sm font-semibold text-slate-900 dark:text-zinc-100"
+                      aria-live="polite"
+                    >
+                      {quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={increaseQuantity}
+                      disabled={quantity >= maxQuantity || !itemCountIsLimited}
+                      aria-label="เพิ่มจำนวน"
+                      className="inline-flex h-10 w-10 items-center justify-center text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      <Plus size={16} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                    {product.status === "IN_STOCK" ? "พร้อมส่ง" : "โควตาคงเหลือ"}{" "}
+                    {Math.max(0, product.stockOrQuotaRemaining)} ชิ้น
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">ยอดชำระค่าสินค้ารอบนี้</p>
+                  <p className="mt-1 text-xl font-extrabold text-slate-950 dark:text-zinc-100">
+                    {currencyFormatter.format(selectedTotalPerUnit * quantity)}
+                  </p>
+                  {paymentOption === "DEPOSIT" && depositIsAvailable ? (
+                    <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                      ยอดคงเหลือสินค้า{" "}
+                      {currencyFormatter.format(remainingPerUnit * quantity)}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              {waitlistRequired ? (
+                <button
+                  type="button"
+                  onClick={joinWaitlist}
+                  className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+                >
+                  <Bell size={18} aria-hidden="true" />
+                  ลงชื่อเข้าคิวรับสิทธิ์ (Waitlist)
+                </button>
+              ) : product.status === "PREORDER_OPEN" ? (
+                <button
+                  type="button"
+                  onClick={() => submitPurchase("PREORDER")}
+                  disabled={!canPurchase}
+                  className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-zinc-800"
+                >
+                  <Check size={18} aria-hidden="true" />
+                  {preorderIsOrderable
+                    ? "สั่งจองล่วงหน้า (Pre-order)"
+                    : product.stockOrQuotaRemaining <= 0
+                      ? "โควตาสั่งจองเต็มแล้ว"
+                      : "ปิดรับจองแล้ว"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => submitPurchase("CART")}
+                  disabled={!canPurchase}
+                  className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-orange-600 dark:hover:text-white dark:disabled:bg-zinc-800"
+                >
+                  <ShoppingBag size={18} aria-hidden="true" />
+                  {canPurchase ? "หยิบใส่ตะกร้า" : "สินค้าหมด"}
+                </button>
+              )}
+            </>
           ) : (
-            <button
-              type="button"
-              onClick={() => submitPurchase("CART")}
-              disabled={!canPurchase}
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              <ShoppingBag size={18} aria-hidden="true" />
-              {canPurchase ? "หยิบใส่ตะกร้า" : "สินค้าหมด"}
-            </button>
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500 dark:text-zinc-400">ราคาสินค้า</span>
+                <span className="text-xl font-bold text-slate-900 dark:text-zinc-100">
+                  {currencyFormatter.format(fullPrice)}
+                </span>
+              </div>
+              {depositIsAvailable ? (
+                <div className="mt-3 flex items-center justify-between border-t border-slate-200/60 pt-3 text-xs text-slate-500 dark:border-zinc-800 dark:text-zinc-400">
+                  <span>ยอดมัดจำ (Pre-order)</span>
+                  <span className="font-semibold text-orange-600 dark:text-orange-400">
+                    {currencyFormatter.format(depositAmount)}
+                  </span>
+                </div>
+              ) : null}
+              <div className="mt-2 flex items-center justify-between border-t border-slate-200/60 pt-2 text-xs text-slate-500 dark:border-zinc-800 dark:text-zinc-400">
+                <span>{product.status === "IN_STOCK" ? "สต็อกพร้อมส่ง" : "โควตาคงเหลือ"}</span>
+                <span className="font-semibold text-slate-700 dark:text-zinc-300">
+                  {Math.max(0, product.stockOrQuotaRemaining)} ชิ้น
+                </span>
+              </div>
+            </div>
           )}
 
           <p className="mt-3 text-center text-xs text-slate-500">

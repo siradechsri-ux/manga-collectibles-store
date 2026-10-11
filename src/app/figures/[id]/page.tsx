@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import FigureDetailCard, {
   FigurePurchaseRequest,
 } from "../../../components/FigureDetailCard";
-import { FigureCartItem, useCart } from "../../../context/CartContext";
+import { CartItem, useCart } from "../../../context/CartContext";
 import { CatalogFigure, fetchCatalog } from "../../../lib/catalog-client";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../../../mocks/admin-products.mock";
 
@@ -26,10 +26,18 @@ export default function FigureProductPage() {
     setError(null);
     try {
       const catalog = await fetchCatalog();
-      const selectedFigure = catalog.figures.find((item) => item.slug === slug);
+      const allCollectibles = [
+        ...catalog.figures,
+        ...(catalog.plamo ?? []),
+        ...(catalog.goods ?? []),
+        ...(catalog.accessories ?? []),
+      ];
+      const selectedFigure = allCollectibles.find(
+        (item) => item.slug === slug || item.id === slug,
+      );
       if (!selectedFigure) {
         setFigure(null);
-        setError("ไม่พบข้อมูลสินค้า Figure นี้");
+        setError("ไม่พบข้อมูลสินค้าชิ้นนี้");
         return;
       }
       setFigure(selectedFigure);
@@ -37,7 +45,7 @@ export default function FigureProductPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "ไม่สามารถโหลดข้อมูล Figure ได้",
+          : "ไม่สามารถโหลดข้อมูลสินค้าได้",
       );
     } finally {
       setLoading(false);
@@ -58,10 +66,45 @@ export default function FigureProductPage() {
     };
   }, [loadFigure]);
 
-  function makeCartItem(request: FigurePurchaseRequest): FigureCartItem {
+  function makeCartItem(request: FigurePurchaseRequest): CartItem {
     const variantId = Number(request.product.id);
     if (!Number.isSafeInteger(variantId) || variantId <= 0) {
       throw new Error("รหัสสินค้าไม่ถูกต้อง ไม่สามารถเพิ่มลงตะกร้าได้");
+    }
+    const cat = figure?.category;
+    if (cat === "PLAMO" && figure) {
+      return {
+        kind: "PLAMO",
+        id: variantId,
+        name: request.product.name,
+        fullPrice: request.product.fullPrice,
+        depositAmount: request.product.depositAmount,
+        selectedPaymentType: request.paymentOption,
+        quantity: request.quantity,
+        boxDimensions: request.product.boxDimensions,
+        grade: figure.grade,
+      };
+    }
+    if (cat === "GOODS" && figure) {
+      return {
+        kind: "GOODS",
+        id: variantId,
+        name: request.product.name,
+        fullPrice: request.product.fullPrice,
+        quantity: request.quantity,
+        subcategory: figure.subcategory,
+      };
+    }
+    if (cat === "ACCESSORY" && figure) {
+      return {
+        kind: "ACCESSORY",
+        id: variantId,
+        name: request.product.name,
+        fullPrice: request.product.fullPrice,
+        quantity: request.quantity,
+        subcategory: figure.subcategory,
+        boxDimensions: request.product.boxDimensions,
+      };
     }
     return {
       kind: "FIGURE",

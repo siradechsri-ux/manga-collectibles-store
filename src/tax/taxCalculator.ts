@@ -1,4 +1,15 @@
-export type TaxableProductCategory = "BOOK" | "FIGURE";
+export type TaxableProductCategory =
+  | "BOOK"
+  | "FIGURE"
+  | "MANGA"
+  | "LIGHT_NOVEL"
+  | "GOODS"
+  | "PLAMO"
+  | "ACCESSORY";
+
+export function isVatExemptCategory(category: TaxableProductCategory): boolean {
+  return category === "BOOK" || category === "MANGA" || category === "LIGHT_NOVEL";
+}
 
 export interface TaxOrderLine {
   description: string;
@@ -62,8 +73,8 @@ export function calculateMixedTax(input: TaxCalculationInput): TaxCalculationRes
     }
     const unitPriceCents = parseCents(item.unitPrice, "ราคาสินค้า");
     const grossCents = unitPriceCents * BigInt(item.quantity);
-    const vatCategory = item.category === "BOOK" ? "VAT_EXEMPT" : "VAT_7";
-    if (item.category === "BOOK") {
+    const vatCategory = isVatExemptCategory(item.category) ? "VAT_EXEMPT" : "VAT_7";
+    if (isVatExemptCategory(item.category)) {
       nonVatCents += grossCents;
     } else {
       figureGrossCents += grossCents;

@@ -223,10 +223,37 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
     let mounted = true;
     if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
       accessTokenRef.current = null;
-      setUser(getMockUser());
+      let currentMock = getMockUser();
+      if (!currentMock) {
+        try {
+          const savedRole =
+            typeof window !== "undefined"
+              ? (window.localStorage.getItem("mock_current_role") as AuthRole | null)
+              : null;
+          if (
+            savedRole &&
+            (savedRole === "CUSTOMER" ||
+              savedRole === "STAFF" ||
+              savedRole === "FINANCE" ||
+              savedRole === "ADMIN")
+          ) {
+            currentMock = loginAsMockRole(savedRole);
+          } else {
+            currentMock = loginAsMockRole("CUSTOMER");
+          }
+        } catch {
+          currentMock = null;
+        }
+      }
+      setUser(currentMock);
       setIsLoading(false);
-      const handleStorage = (event: StorageEvent): void => {
-        if (event.key === "manga-collectibles-mock-user-v1") {
+      const handleStorage = (event: Event): void => {
+        const storageEvt = event as StorageEvent;
+        if (
+          !storageEvt.key ||
+          storageEvt.key === "manga-collectibles-mock-user-v1" ||
+          storageEvt.key === "mock_current_role"
+        ) {
           setUser(getMockUser());
         }
       };
@@ -281,6 +308,15 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
       }
       const mockUser = loginAsMockRole(role);
       setUser(mockUser);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("mock_current_role", role);
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: "manga-collectibles-mock-user-v1" }),
+        );
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: "mock_current_role" }),
+        );
+      }
       return mockUser;
     },
     [],

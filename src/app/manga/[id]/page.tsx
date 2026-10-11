@@ -16,6 +16,7 @@ export default function MangaSeriesPage() {
   const seriesId = Array.isArray(params.id) ? params.id[0] ?? "" : params.id;
   const router = useRouter();
   const { addItem } = useCart();
+  const [isNovel, setIsNovel] = useState(false);
   const [series, setSeries] = useState<CatalogMangaSeries | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,18 +27,24 @@ export default function MangaSeriesPage() {
     setError(null);
     try {
       const catalog = await fetchCatalog();
-      const selectedSeries = catalog.mangaSeries.find((item) => item.id === seriesId);
+      const selectedSeries =
+        catalog.mangaSeries.find((item) => item.id === seriesId) ??
+        catalog.lightNovelSeries?.find((item) => item.id === seriesId);
       if (!selectedSeries) {
         setSeries(null);
-        setError("ไม่พบข้อมูลมังงะเรื่องนี้");
+        setError("ไม่พบข้อมูลหนังสือเรื่องนี้");
         return;
       }
+      const isLn =
+        selectedSeries.category === "LIGHT_NOVEL" ||
+        Boolean(catalog.lightNovelSeries?.some((item) => item.id === seriesId));
+      setIsNovel(isLn);
       setSeries(selectedSeries);
     } catch (loadError) {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "ไม่สามารถโหลดข้อมูลมังงะได้",
+          : "ไม่สามารถโหลดข้อมูลหนังสือได้",
       );
     } finally {
       setLoading(false);
@@ -61,7 +68,7 @@ export default function MangaSeriesPage() {
   function addVolume(volume: VolumeItem): void {
     try {
       addItem({
-        kind: "MANGA",
+        kind: isNovel ? "LIGHT_NOVEL" : "MANGA",
         id: volume.id,
         title: series?.title ?? volume.title,
         volume: volume.volumeNumber,
@@ -82,7 +89,7 @@ export default function MangaSeriesPage() {
     try {
       for (const volume of volumes) {
         addItem({
-          kind: "MANGA",
+          kind: isNovel ? "LIGHT_NOVEL" : "MANGA",
           id: volume.id,
           title: series?.title ?? volume.title,
           volume: volume.volumeNumber,
@@ -112,7 +119,7 @@ export default function MangaSeriesPage() {
 
         {loading ? (
           <div className="mt-8 h-52 animate-pulse rounded-3xl bg-white" role="status">
-            <span className="sr-only">กำลังโหลดข้อมูลมังงะ</span>
+            <span className="sr-only">กำลังโหลดข้อมูลหนังสือ</span>
           </div>
         ) : error ? (
           <div className="mt-8 rounded-2xl border border-amber-200 bg-white p-8 text-center">
@@ -132,7 +139,7 @@ export default function MangaSeriesPage() {
               <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
                 <div>
                   <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-violet-100">
-                    <BookOpen size={14} aria-hidden="true" /> มังงะ · {series.publisher}
+                    <BookOpen size={14} aria-hidden="true" /> {isNovel ? "ไลท์โนเวล" : "มังงะ"} · {series.publisher}
                   </span>
                   <h1 className="mt-4 max-w-3xl text-3xl font-black tracking-tight sm:text-4xl">
                     {series.title}

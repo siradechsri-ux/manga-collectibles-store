@@ -29,7 +29,14 @@ const catalogSnapshotSchema = z.array(
   z
     .object({
       productVariantId: z.number().int().positive().safe(),
-      productType: z.enum(["MANGA", "FIGURE"]),
+      productType: z.enum([
+        "MANGA",
+        "FIGURE",
+        "LIGHT_NOVEL",
+        "GOODS",
+        "PLAMO",
+        "ACCESSORY",
+      ]),
       title: z.string().min(1),
       volumeNumber: z.number().int().positive().optional(),
       variantLabel: z.string().optional(),
@@ -66,8 +73,14 @@ const checkoutInputSchema = z
             productType: z.enum([
               "MANGA_INSTOCK",
               "MANGA_PREORDER",
+              "LIGHT_NOVEL_INSTOCK",
+              "LIGHT_NOVEL_PREORDER",
               "FIGURE_FULL",
               "FIGURE_DEPOSIT",
+              "PLAMO_FULL",
+              "PLAMO_DEPOSIT",
+              "GOODS_INSTOCK",
+              "ACCESSORY_INSTOCK",
             ]),
           })
           .strict(),
@@ -97,7 +110,17 @@ const checkoutInputSchema = z
 
 export interface MockCheckoutItem {
   productVariantId: number;
-  productType: "MANGA_INSTOCK" | "MANGA_PREORDER" | "FIGURE_FULL" | "FIGURE_DEPOSIT";
+  productType:
+    | "MANGA_INSTOCK"
+    | "MANGA_PREORDER"
+    | "LIGHT_NOVEL_INSTOCK"
+    | "LIGHT_NOVEL_PREORDER"
+    | "FIGURE_FULL"
+    | "FIGURE_DEPOSIT"
+    | "PLAMO_FULL"
+    | "PLAMO_DEPOSIT"
+    | "GOODS_INSTOCK"
+    | "ACCESSORY_INSTOCK";
   title: string;
   volumeNumber?: number;
   variantLabel?: string;
@@ -107,7 +130,13 @@ export interface MockCheckoutItem {
   paymentType: "FULL" | "DEPOSIT";
   balanceAmount: string;
   isPreorder: boolean;
-  productCategory: "MANGA" | "FIGURE";
+  productCategory:
+    | "MANGA"
+    | "FIGURE"
+    | "LIGHT_NOVEL"
+    | "GOODS"
+    | "PLAMO"
+    | "ACCESSORY";
 }
 
 export interface MockCheckoutResponse {
@@ -243,24 +272,42 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
     const expectedProductType =
       item.productType === "MANGA_INSTOCK" || item.productType === "MANGA_PREORDER"
         ? "MANGA"
-        : "FIGURE";
+        : item.productType === "LIGHT_NOVEL_INSTOCK" || item.productType === "LIGHT_NOVEL_PREORDER"
+          ? "LIGHT_NOVEL"
+          : item.productType === "FIGURE_FULL" || item.productType === "FIGURE_DEPOSIT"
+            ? "FIGURE"
+            : item.productType === "PLAMO_FULL" || item.productType === "PLAMO_DEPOSIT"
+              ? "PLAMO"
+              : item.productType === "GOODS_INSTOCK"
+                ? "GOODS"
+                : "ACCESSORY";
+
     if (variant.productType !== expectedProductType) {
       throw new MockCheckoutError(409, `ประเภทสินค้า variant ${item.productVariantId} ไม่ตรงกัน`);
     }
-    if (
-      (item.productType === "MANGA_PREORDER" || item.productType === "FIGURE_DEPOSIT") &&
-      !variant.isPreorder
-    ) {
+
+    const isPreorderType =
+      item.productType === "MANGA_PREORDER" ||
+      item.productType === "LIGHT_NOVEL_PREORDER" ||
+      item.productType === "FIGURE_DEPOSIT" ||
+      item.productType === "PLAMO_DEPOSIT";
+
+    const isDepositType =
+      item.productType === "FIGURE_DEPOSIT" ||
+      item.productType === "PLAMO_DEPOSIT";
+
+    if (isPreorderType && !variant.isPreorder) {
       throw new MockCheckoutError(409, "สินค้านี้ไม่เปิดรับพรีออเดอร์แล้ว");
     }
     if (
-      item.productType === "MANGA_INSTOCK" &&
+      !isPreorderType &&
+      !isDepositType &&
       (variant.isPreorder || variant.stockOrQuotaRemaining < item.quantity)
     ) {
       throw new MockCheckoutError(409, "สินค้าพร้อมส่งมีจำนวนไม่เพียงพอ");
     }
     if (
-      item.productType === "FIGURE_DEPOSIT" &&
+      isDepositType &&
       (!variant.figure ||
         variant.figure.depositAmount <= 0 ||
         variant.figure.depositAmount >= variant.figure.fullPrice)
@@ -274,27 +321,25 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
       throw new MockCheckoutError(409, "โควตาพรีออเดอร์ไม่เพียงพอ");
     }
     if (
-      item.productType === "FIGURE_FULL" &&
-      !variant.isPreorder &&
+      !isPreorderType &&
       variant.stockOrQuotaRemaining < item.quantity
     ) {
-      throw new MockCheckoutError(409, "สินค้าฟิกเกอร์มีจำนวนไม่เพียงพอ");
+      throw new MockCheckoutError(409, "สินค้ามีจำนวนไม่เพียงพอ");
     }
 
     const fullUnitCents = toCents(variant.price);
     const depositUnitCents =
-      item.productType === "FIGURE_DEPOSIT" && variant.figure
+      isDepositType && variant.figure
         ? toCents(variant.figure.depositAmount)
         : fullUnitCents;
     const balanceUnitCents =
-      item.productType === "FIGURE_DEPOSIT"
+      isDepositType
         ? fullUnitCents - depositUnitCents
         : 0;
     const lineFullCents = fullUnitCents * item.quantity;
     const lineImmediateCents = depositUnitCents * item.quantity;
     const lineBalanceCents = balanceUnitCents * item.quantity;
-    const unitPriceCents =
-      item.productType === "FIGURE_DEPOSIT" ? fullUnitCents : fullUnitCents;
+    const unitPriceCents = fullUnitCents;
     const title = `${variant.title}${
       variant.volumeNumber ? ` เล่ม ${variant.volumeNumber}` : ""
     }${variant.variantLabel ? ` (${variant.variantLabel})` : ""}`;
@@ -302,12 +347,15 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
     fullMerchandiseCents += lineFullCents;
     immediateMerchandiseCents += lineImmediateCents;
     remainingBalanceCents += lineBalanceCents;
-    if (variant.productType === "MANGA") {
+
+    // VAT 0% for MANGA and LIGHT_NOVEL; VAT 7% for FIGURE, PLAMO, GOODS, ACCESSORY
+    if (variant.productType === "MANGA" || variant.productType === "LIGHT_NOVEL") {
       mangaTaxExemptCents += lineFullCents;
     } else {
       figureTaxableGrossCents += lineFullCents;
     }
-    if (variant.figure) {
+
+    if (variant.figure && variant.figure.boxDimensions) {
       const dimensions = variant.figure.boxDimensions;
       const volumetricWeightGrams =
         (dimensions.widthCm * dimensions.lengthCm * dimensions.heightCm * 1_000) /
@@ -327,7 +375,7 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
       quantity: item.quantity,
       unitPrice: fromCents(unitPriceCents),
       lineTotal: fromCents(lineFullCents),
-      paymentType: item.productType === "FIGURE_DEPOSIT" ? "DEPOSIT" : "FULL",
+      paymentType: isDepositType ? "DEPOSIT" : "FULL",
       balanceAmount: fromCents(lineBalanceCents),
       isPreorder: variant.isPreorder,
       productCategory: variant.productType,

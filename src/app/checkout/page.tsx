@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  Boxes,
   Check,
   CreditCard,
   MapPin,
@@ -13,6 +14,7 @@ import {
   Plus,
   ShieldCheck,
   ShoppingBag,
+  Sparkles,
   Truck,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,10 +22,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import {
+  CartItem,
   FigureCartItem,
   MangaCartItem,
   useCart,
 } from "../../context/CartContext";
+import { BookCoverAddonBox } from "../../components/BookCoverAddonBox";
 import {
   CheckoutTaxItem,
   ShippingAddress,
@@ -40,6 +44,7 @@ import {
 } from "../../mocks/profile.mock";
 import { saveMockOrder } from "../../mocks/storage.mock";
 import { getCheckoutInventorySnapshot } from "../../mocks/admin-products.mock";
+import { getRoleHomeUrl } from "../../utils/permissions";
 
 type ShipmentPolicy = "SHIP_TOGETHER" | "SPLIT_SHIPMENT";
 
@@ -141,17 +146,31 @@ function getApiUrl(path: string): string {
   return `${baseUrl ?? ""}${path}`;
 }
 
-function itemTypeLabel(item: MangaCartItem | FigureCartItem): string {
+function itemTypeLabel(item: CartItem): string {
   if (item.kind === "MANGA") {
     return item.isPreorder ? "มังงะ · สั่งจองล่วงหน้า" : "มังงะ · สินค้าพร้อมส่ง";
   }
-  return item.selectedPaymentType === "DEPOSIT"
-    ? "Figure · วางมัดจำ"
-    : "Figure · ชำระเต็มจำนวน";
+  if (item.kind === "LIGHT_NOVEL") {
+    return item.isPreorder ? "ไลท์โนเวล · สั่งจองล่วงหน้า" : "ไลท์โนเวล · สินค้าพร้อมส่ง";
+  }
+  if (item.kind === "FIGURE") {
+    return item.selectedPaymentType === "DEPOSIT"
+      ? "Figure · วางมัดจำ"
+      : "Figure · ชำระเต็มจำนวน";
+  }
+  if (item.kind === "PLAMO") {
+    return item.selectedPaymentType === "DEPOSIT"
+      ? "พลาสติกโมเดล · วางมัดจำ"
+      : "พลาสติกโมเดล · ชำระเต็มจำนวน";
+  }
+  if (item.kind === "GOODS") {
+    return "กู้ดส์ & สินค้าคาแรคเตอร์ · พร้อมส่ง";
+  }
+  return "อุปกรณ์ดูแลของสะสม · พร้อมส่ง";
 }
 
-function cartItemTitle(item: MangaCartItem | FigureCartItem): string {
-  if (item.kind === "MANGA") {
+function cartItemTitle(item: CartItem): string {
+  if (item.kind === "MANGA" || item.kind === "LIGHT_NOVEL") {
     return `${item.title} เล่ม ${item.volume}${
       item.variantLabel ? ` (${item.variantLabel})` : ""
     }`;
@@ -159,24 +178,77 @@ function cartItemTitle(item: MangaCartItem | FigureCartItem): string {
   return item.name;
 }
 
-function taxInvoiceItems(items: readonly (MangaCartItem | FigureCartItem)[]): CheckoutTaxItem[] {
-  return items.map((item) =>
-    item.kind === "MANGA"
-      ? {
-          id: item.id,
-          name: cartItemTitle(item),
-          quantity: item.quantity,
-          unitPrice: item.price,
-          type: "MANGA",
-        }
-      : {
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          unitPrice: item.fullPrice,
-          type: "FIGURE",
-        },
-  );
+function taxInvoiceItems(
+  items: readonly CartItem[],
+  bookCoverAddon: boolean,
+  bookCount: number,
+): CheckoutTaxItem[] {
+  const result: CheckoutTaxItem[] = items.map((item) => {
+    if (item.kind === "MANGA") {
+      return {
+        id: item.id,
+        name: cartItemTitle(item),
+        quantity: item.quantity,
+        unitPrice: item.price,
+        type: "MANGA",
+      };
+    }
+    if (item.kind === "LIGHT_NOVEL") {
+      return {
+        id: item.id,
+        name: cartItemTitle(item),
+        quantity: item.quantity,
+        unitPrice: item.price,
+        type: "LIGHT_NOVEL",
+      };
+    }
+    if (item.kind === "FIGURE") {
+      return {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.fullPrice,
+        type: "FIGURE",
+      };
+    }
+    if (item.kind === "PLAMO") {
+      return {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.fullPrice,
+        type: "PLAMO",
+      };
+    }
+    if (item.kind === "GOODS") {
+      return {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.fullPrice,
+        type: "GOODS",
+      };
+    }
+    return {
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: item.fullPrice,
+      type: "ACCESSORY",
+    };
+  });
+
+  if (bookCoverAddon && bookCount > 0) {
+    result.push({
+      id: 99_999,
+      name: `ปกพลาสติกสำเร็จรูปถนอมหนังสือ (${bookCount} เล่ม)`,
+      quantity: bookCount,
+      unitPrice: 5,
+      type: "ACCESSORY",
+    });
+  }
+
+  return result;
 }
 
 export default function CheckoutPage() {
@@ -193,6 +265,10 @@ export default function CheckoutPage() {
     itemCount,
     immediateTotal,
     remainingBalanceTotal,
+    bookCoverAddon,
+    bookCount,
+    hasBookItems,
+    bookCoverAddonPrice,
     removeItem,
     updateQuantity,
     updateFigurePaymentType,
@@ -218,17 +294,9 @@ export default function CheckoutPage() {
     user?.role === "ADMIN";
 
   useEffect(() => {
-    if (!authLoading && isStaffAccount) {
-      const destination =
-        user.role === "ADMIN"
-          ? "/admin"
-          : user.role === "STAFF"
-            ? "/staff/packing"
-            : "/finance/slips";
-      const redirectTimeout = window.setTimeout(() => {
-        router.replace(`${destination}?notice=shopping-disabled`);
-      }, 1_200);
-      return () => window.clearTimeout(redirectTimeout);
+    if (!authLoading && isStaffAccount && user) {
+      const destination = getRoleHomeUrl(user.role);
+      router.replace(destination);
     }
   }, [authLoading, isStaffAccount, router, user]);
 
@@ -278,7 +346,10 @@ export default function CheckoutPage() {
   }, [authLoading, user]);
 
   const subtotal = immediateTotal;
-  const taxItems = useMemo(() => taxInvoiceItems(items), [items]);
+  const taxItems = useMemo(
+    () => taxInvoiceItems(items, bookCoverAddon, bookCount),
+    [items, bookCoverAddon, bookCount],
+  );
   const addressForTaxInvoice = useMemo<ShippingAddress>(
     () => ({
       addressLine: shippingAddress.addressLine,
@@ -401,19 +472,50 @@ export default function CheckoutPage() {
       }
     }
 
-    const payload = {
-      items: items.map((item) => ({
+    const payloadItems = items.map((item) => {
+      let productType:
+        | "MANGA_INSTOCK"
+        | "MANGA_PREORDER"
+        | "LIGHT_NOVEL_INSTOCK"
+        | "LIGHT_NOVEL_PREORDER"
+        | "FIGURE_FULL"
+        | "FIGURE_DEPOSIT"
+        | "PLAMO_FULL"
+        | "PLAMO_DEPOSIT"
+        | "GOODS_INSTOCK"
+        | "ACCESSORY_INSTOCK";
+
+      if (item.kind === "MANGA") {
+        productType = item.isPreorder ? "MANGA_PREORDER" : "MANGA_INSTOCK";
+      } else if (item.kind === "LIGHT_NOVEL") {
+        productType = item.isPreorder ? "LIGHT_NOVEL_PREORDER" : "LIGHT_NOVEL_INSTOCK";
+      } else if (item.kind === "FIGURE") {
+        productType = item.selectedPaymentType === "DEPOSIT" ? "FIGURE_DEPOSIT" : "FIGURE_FULL";
+      } else if (item.kind === "PLAMO") {
+        productType = item.selectedPaymentType === "DEPOSIT" ? "PLAMO_DEPOSIT" : "PLAMO_FULL";
+      } else if (item.kind === "GOODS") {
+        productType = "GOODS_INSTOCK";
+      } else {
+        productType = "ACCESSORY_INSTOCK";
+      }
+
+      return {
         productVariantId: item.id,
         quantity: item.quantity,
-        productType:
-          item.kind === "MANGA"
-            ? item.isPreorder
-              ? "MANGA_PREORDER"
-              : "MANGA_INSTOCK"
-            : item.selectedPaymentType === "DEPOSIT"
-              ? "FIGURE_DEPOSIT"
-              : "FIGURE_FULL",
-      })),
+        productType,
+      };
+    });
+
+    if (bookCoverAddon && bookCount > 0) {
+      payloadItems.push({
+        productVariantId: 99_999,
+        quantity: bookCount,
+        productType: "ACCESSORY_INSTOCK",
+      });
+    }
+
+    const payload = {
+      items: payloadItems,
       carrier,
       serviceAreaCode: parsedAddress.data.postalCode,
       shippingPolicy: shipmentPolicy,
@@ -511,17 +613,7 @@ export default function CheckoutPage() {
   }
 
   if (isStaffAccount) {
-    return (
-      <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-4 text-center">
-        <ShieldCheck className="h-10 w-10 text-amber-600" aria-hidden="true" />
-        <h1 className="mt-4 text-2xl font-extrabold text-slate-950">
-          ไม่สามารถเข้าถึงหน้าสั่งซื้อได้
-        </h1>
-        <p role="status" className="mt-2 text-sm leading-6 text-slate-600">
-          บัญชีเจ้าหน้าที่ไม่สามารถทำรายการสั่งซื้อ ระบบกำลังนำคุณไปยังหน้าทำงานที่ได้รับอนุญาต
-        </p>
-      </main>
-    );
+    return null;
   }
 
   if (items.length === 0) {
@@ -771,7 +863,9 @@ export default function CheckoutPage() {
               ) : null}
             </div>
 
-            <aside className="lg:sticky lg:top-6">
+            <aside className="lg:sticky lg:top-6 space-y-4">
+              <BookCoverAddonBox />
+
               <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
                 <div className="border-b border-zinc-100 p-5 dark:border-zinc-800">
                   <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">สรุปคำสั่งซื้อ</h2>
@@ -780,9 +874,13 @@ export default function CheckoutPage() {
                 <div className="max-h-[420px] space-y-4 overflow-y-auto p-5">
                   {items.map((item) => {
                     const fullUnitPrice =
-                      item.kind === "MANGA" ? item.price : item.fullPrice;
+                      item.kind === "MANGA" || item.kind === "LIGHT_NOVEL"
+                        ? item.price
+                        : item.fullPrice;
+                    const isDepositEligible =
+                      item.kind === "FIGURE" || item.kind === "PLAMO";
                     const immediateUnitPrice =
-                      item.kind === "FIGURE" && item.selectedPaymentType === "DEPOSIT"
+                      isDepositEligible && item.selectedPaymentType === "DEPOSIT"
                         ? item.depositAmount
                         : fullUnitPrice;
                     return (
@@ -791,8 +889,14 @@ export default function CheckoutPage() {
                         className="flex gap-3 border-b border-zinc-100 pb-4 last:border-0 last:pb-0 dark:border-zinc-800"
                       >
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                          {item.kind === "MANGA" ? (
+                          {item.kind === "MANGA" || item.kind === "LIGHT_NOVEL" ? (
                             <BookOpen aria-hidden="true" className="h-5 w-5" />
+                          ) : item.kind === "PLAMO" ? (
+                            <Boxes aria-hidden="true" className="h-5 w-5" />
+                          ) : item.kind === "GOODS" ? (
+                            <Sparkles aria-hidden="true" className="h-5 w-5" />
+                          ) : item.kind === "ACCESSORY" ? (
+                            <ShieldCheck aria-hidden="true" className="h-5 w-5" />
                           ) : (
                             <Package aria-hidden="true" className="h-5 w-5" />
                           )}
@@ -801,9 +905,7 @@ export default function CheckoutPage() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <h3 className="line-clamp-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                {item.kind === "MANGA"
-                                  ? `${item.title} เล่ม ${item.volume}`
-                                  : item.name}
+                                {cartItemTitle(item)}
                               </h3>
                               <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
                                 {itemTypeLabel(item)}
@@ -845,17 +947,17 @@ export default function CheckoutPage() {
                                 <Plus aria-hidden="true" className="h-3.5 w-3.5" />
                               </button>
                             </div>
-                            {item.kind === "FIGURE" ? (
+                            {isDepositEligible ? (
                               <select
                                 value={item.selectedPaymentType}
                                 onChange={(event) =>
                                   updateFigurePaymentType(
                                     item.id,
-                                    event.target.value as FigureCartItem["selectedPaymentType"],
+                                    event.target.value as "FULL" | "DEPOSIT",
                                   )
                                 }
                                 className="max-w-36 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-                                aria-label="เลือกวิธีชำระ Figure"
+                                aria-label="เลือกวิธีชำระ"
                               >
                                 <option value="FULL">จ่ายเต็ม</option>
                                 <option
@@ -878,7 +980,7 @@ export default function CheckoutPage() {
                               {money(fullUnitPrice * item.quantity)}
                             </span>
                           </div>
-                          {item.kind === "FIGURE" &&
+                          {isDepositEligible &&
                           item.selectedPaymentType === "DEPOSIT" ? (
                             <p className="mt-1 text-right text-xs text-amber-700 dark:text-amber-300">
                               คงเหลือ {money((item.fullPrice - item.depositAmount) * item.quantity)}
@@ -895,6 +997,15 @@ export default function CheckoutPage() {
                     <span>ยอดสินค้าที่ชำระวันนี้</span>
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">{money(subtotal)}</span>
                   </div>
+                  {bookCoverAddon && bookCount > 0 ? (
+                    <div className="flex justify-between text-xs text-emerald-700 dark:text-emerald-400">
+                      <span className="flex items-center gap-1 font-medium">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        ปกพลาสติกถนอมหนังสือ (+5 บ. x {bookCount} เล่ม)
+                      </span>
+                      <span className="font-semibold">{money(bookCoverAddonPrice)}</span>
+                    </div>
+                  ) : null}
                   <div className="flex justify-between text-sm text-zinc-600 dark:text-zinc-400">
                     <span>ค่าจัดส่ง</span>
                     <span className="text-xs text-zinc-600 dark:text-zinc-400">คำนวณตามพื้นที่</span>
@@ -912,7 +1023,7 @@ export default function CheckoutPage() {
                   </div>
                   {remainingBalanceTotal > 0 ? (
                     <div className="flex justify-between gap-3 text-sm">
-                      <span className="text-zinc-600 dark:text-zinc-400">ยอดคงค้างเมื่อ Figure ถึงไทย</span>
+                      <span className="text-zinc-600 dark:text-zinc-400">ยอดคงค้างเมื่อสินค้าถึงไทย</span>
                       <span className="font-semibold text-amber-700 dark:text-amber-300">
                         {money(remainingBalanceTotal)}
                       </span>

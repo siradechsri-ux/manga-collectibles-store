@@ -17,7 +17,13 @@ import {
 } from "../mocks/profile.mock";
 
 export type TaxInvoiceEntityType = "INDIVIDUAL" | "CORPORATION";
-export type CheckoutTaxItemType = "MANGA" | "FIGURE";
+export type CheckoutTaxItemType =
+  | "MANGA"
+  | "FIGURE"
+  | "LIGHT_NOVEL"
+  | "GOODS"
+  | "PLAMO"
+  | "ACCESSORY";
 
 export interface CheckoutTaxItem {
   id: string | number;
@@ -203,7 +209,8 @@ export function TaxInvoiceForm({
         throw new RangeError("Tax summary item quantity must be a positive integer.");
       }
       const lineCents = parseCents(item.unitPrice) * BigInt(item.quantity);
-      if (item.type === "MANGA") {
+      const isVatExempt = item.type === "MANGA" || item.type === "LIGHT_NOVEL";
+      if (isVatExempt) {
         nonVatCents += lineCents;
       } else {
         figuresCents += lineCents;

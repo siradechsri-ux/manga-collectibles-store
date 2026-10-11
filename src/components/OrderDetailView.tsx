@@ -43,7 +43,13 @@ export interface OrderTrackingLineItem {
   id: string;
   productVariantId?: number;
   title: string;
-  productType: "MANGA" | "FIGURE";
+  productType:
+    | "MANGA"
+    | "FIGURE"
+    | "LIGHT_NOVEL"
+    | "GOODS"
+    | "PLAMO"
+    | "ACCESSORY";
   volumeLabel?: string;
   quantity: number;
   imageUrl?: string;
@@ -109,6 +115,7 @@ export interface OrderDetailViewProps {
   ) => Promise<void>;
   onAdvanceShipmentStatus?: () => void;
   isMockMode?: boolean;
+  hideCustomerActions?: boolean;
 }
 
 interface CountdownParts {
@@ -212,6 +219,7 @@ export default function OrderDetailView({
   onUploadBalanceSlip,
   onAdvanceShipmentStatus,
   isMockMode = false,
+  hideCustomerActions = false,
 }: OrderDetailViewProps) {
   const [now, setNow] = useState(() => Date.now());
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -241,12 +249,40 @@ export default function OrderDetailView({
     hasValidDueDate;
   const currentTimelineIndex = getTimelineIndex(order.timelineStage);
 
-  const mangaItems = useMemo(
-    () => order.items.filter((item) => item.productType === "MANGA"),
-    [order.items],
-  );
-  const figureItems = useMemo(
-    () => order.items.filter((item) => item.productType === "FIGURE"),
+  const categoryGroups = useMemo(
+    () =>
+      [
+        {
+          key: "MANGA",
+          title: "มังงะ",
+          items: order.items.filter((item) => item.productType === "MANGA"),
+        },
+        {
+          key: "LIGHT_NOVEL",
+          title: "ไลท์โนเวล",
+          items: order.items.filter((item) => item.productType === "LIGHT_NOVEL"),
+        },
+        {
+          key: "FIGURE",
+          title: "ฟิกเกอร์",
+          items: order.items.filter((item) => item.productType === "FIGURE"),
+        },
+        {
+          key: "PLAMO",
+          title: "พลาสติกโมเดล / กันพลา",
+          items: order.items.filter((item) => item.productType === "PLAMO"),
+        },
+        {
+          key: "GOODS",
+          title: "สินค้ากู้ดส์ & ของสะสม",
+          items: order.items.filter((item) => item.productType === "GOODS"),
+        },
+        {
+          key: "ACCESSORY",
+          title: "อุปกรณ์ดูแลของสะสม",
+          items: order.items.filter((item) => item.productType === "ACCESSORY"),
+        },
+      ].filter((group) => group.items.length > 0),
     [order.items],
   );
   const inStockShipments = useMemo(
@@ -658,11 +694,11 @@ export default function OrderDetailView({
                   ไม่พบกำหนดชำระ กรุณาติดต่อฝ่ายบริการลูกค้า
                 </p>
               )}
-              {isAwaitingBalance ? (
+              {isAwaitingBalance && !hideCustomerActions ? (
                 <button
                   type="button"
                   onClick={() => setIsPaymentModalOpen(true)}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 >
                   <CreditCard size={17} aria-hidden="true" />
                   ชำระยอดคงเหลือ {currencyFormatter.format(order.remainingBalance)}
@@ -747,11 +783,11 @@ export default function OrderDetailView({
               รายการสินค้า
             </h2>
 
-            {mangaItems.length > 0 ? (
-              <div className="mt-5">
-                <h3 className="mb-3 text-sm font-bold text-slate-700">มังงะ</h3>
+            {categoryGroups.map((group) => (
+              <div key={group.key} className="mt-5">
+                <h3 className="mb-3 text-sm font-bold text-slate-700">{group.title}</h3>
                 <ul className="space-y-3">
-                  {mangaItems.map((item) => (
+                  {group.items.map((item) => (
                     <li
                       key={item.id}
                       className="flex gap-3 rounded-xl border border-slate-100 p-3"
@@ -761,6 +797,7 @@ export default function OrderDetailView({
                           <img
                             src={item.imageUrl}
                             alt={item.title}
+                            referrerPolicy="no-referrer"
                             className="h-full w-full object-cover"
                           />
                         ) : (
@@ -774,9 +811,14 @@ export default function OrderDetailView({
                           <p className="font-semibold text-slate-900">{item.title}</p>
                           <p className="mt-1 text-xs text-slate-500">
                             {item.volumeLabel ? `${item.volumeLabel} · ` : ""}
-                            {item.isPreorder ? "พรีออเดอร์" : "เล่มพร้อมส่ง"} · จำนวน{" "}
+                            {item.isPreorder ? "พรีออเดอร์" : "พร้อมส่ง"} · จำนวน{" "}
                             {item.quantity}
                           </p>
+                          {item.paymentType === "DEPOSIT" ? (
+                            <span className="mt-2 inline-flex rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800">
+                              {`วางมัดจำ · คงเหลือ ${currencyFormatter.format(item.remainingBalance)}`}
+                            </span>
+                          ) : null}
                         </div>
                         <p className="shrink-0 text-sm font-bold text-slate-900">
                           {currencyFormatter.format(item.lineTotal)}
@@ -786,56 +828,7 @@ export default function OrderDetailView({
                   ))}
                 </ul>
               </div>
-            ) : null}
-            {figureItems.length > 0 ? (
-              <div className="mt-5">
-                <h3 className="mb-3 text-sm font-bold text-slate-700">ฟิกเกอร์</h3>
-                <ul className="space-y-3">
-                  {figureItems.map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex gap-3 rounded-xl border border-slate-100 p-3"
-                    >
-                      <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                        {item.imageUrl ? (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.title}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-slate-400">
-                            <Package size={22} aria-hidden="true" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 sm:flex-row sm:items-center">
-                        <div>
-                          <p className="font-semibold text-slate-900">{item.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            จำนวน {item.quantity}
-                          </p>
-                          <span
-                            className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              item.paymentType === "DEPOSIT"
-                                ? "bg-orange-100 text-orange-800"
-                                : "bg-sky-100 text-sky-800"
-                            }`}
-                          >
-                            {item.paymentType === "DEPOSIT"
-                              ? `วางมัดจำ · คงเหลือ ${currencyFormatter.format(item.remainingBalance)}`
-                              : "จ่ายเต็มจำนวน"}
-                          </span>
-                        </div>
-                        <p className="shrink-0 text-sm font-bold text-slate-900">
-                          {currencyFormatter.format(item.lineTotal)}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+            ))}
           </section>
 
           <section

@@ -95,11 +95,16 @@ const responseSchema = z
             id: z.string(),
             title: z.string(),
             publisher: z.string(),
+            coverImage: z.string().optional(),
+            coverUrl: z.string().optional(),
+            images: z.array(z.string()).optional(),
             volumes: z.array(
               z.object({
                 id: z.number().int().positive().safe(),
                 volumeNumber: z.number().int().positive().safe(),
                 title: z.string(),
+                coverUrl: z.string().optional(),
+                images: z.array(z.string()).optional(),
                 price: z.number().positive(),
                 stock: z.number().int().nonnegative(),
                 status: z.enum(["IN_STOCK", "PREORDER", "OUT_OF_STOCK"]),

@@ -54,17 +54,24 @@ export function getMockUser(): AuthUser | null {
   try {
     const stored = window.localStorage.getItem(MOCK_AUTH_STORAGE_KEY);
     if (!stored) {
+      const storedRole = window.localStorage.getItem("mock_current_role") as AuthRole | null;
+      if (storedRole && storedRole in mockUsers) {
+        return loginAsMockRole(storedRole as keyof typeof mockUsers);
+      }
       return null;
     }
     const parsed: unknown = JSON.parse(stored);
     if (!isMockUser(parsed)) {
       window.localStorage.removeItem(MOCK_AUTH_STORAGE_KEY);
+      window.localStorage.removeItem("mock_current_role");
       return null;
     }
+    window.localStorage.setItem("mock_current_role", parsed.role);
     return parsed;
   } catch (error) {
     console.error("Could not read the Prototype user session.", error);
     window.localStorage.removeItem(MOCK_AUTH_STORAGE_KEY);
+    window.localStorage.removeItem("mock_current_role");
     return null;
   }
 }
@@ -75,6 +82,7 @@ export function loginAsMockRole(
   const user = mockUsers[role];
   try {
     window.localStorage.setItem(MOCK_AUTH_STORAGE_KEY, JSON.stringify(user));
+    window.localStorage.setItem("mock_current_role", role);
   } catch (error) {
     console.error("Could not persist the Prototype user session.", error);
     throw new Error("บันทึกบัญชีทดสอบไม่สำเร็จ", { cause: error });
@@ -112,6 +120,7 @@ export function loginMockUser(email: string): AuthUser {
   }
   try {
     window.localStorage.setItem(MOCK_AUTH_STORAGE_KEY, JSON.stringify(user));
+    window.localStorage.setItem("mock_current_role", user.role);
   } catch (error) {
     console.error("Could not persist the Prototype user session.", error);
     throw new Error("บันทึกบัญชีทดสอบไม่สำเร็จ", { cause: error });
@@ -122,6 +131,7 @@ export function loginMockUser(email: string): AuthUser {
 export function logoutMockUser(): void {
   try {
     window.localStorage.removeItem(MOCK_AUTH_STORAGE_KEY);
+    window.localStorage.removeItem("mock_current_role");
   } catch (error) {
     console.error("Could not clear the Prototype user session.", error);
     throw new Error("ออกจากระบบทดสอบไม่สำเร็จ", { cause: error });

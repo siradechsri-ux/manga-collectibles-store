@@ -106,8 +106,13 @@ export default function LoginPage() {
             ? "/staff/packing"
             : user.role === "FINANCE"
               ? "/finance/slips"
-              : "/account/orders";
-      router.replace(isMockMode ? "/" : safeRedirect ?? destination);
+              : "/";
+      const target = safeRedirect ?? destination;
+      if (typeof window !== "undefined") {
+        window.location.href = target;
+      } else {
+        router.replace(target);
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "เข้าสู่ระบบทดสอบไม่สำเร็จ",

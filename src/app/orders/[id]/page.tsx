@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, XCircle } from "lucide-react";
+import { AlertCircle, FileText, MapPin, ShieldCheck, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -99,7 +99,8 @@ export default function MockOrderDetailPage() {
         (user?.role === "CUSTOMER" && order.ownerUserId !== user.id) ||
         (user?.role !== "CUSTOMER" &&
           user?.role !== "ADMIN" &&
-          user?.role !== "STAFF")
+          user?.role !== "STAFF" &&
+          user?.role !== "FINANCE")
       ) {
         throw new Error("ไม่มีสิทธิ์เข้าถึงคำสั่งซื้อนี้");
       }
@@ -289,26 +290,30 @@ export default function MockOrderDetailPage() {
     );
   }
 
-  if (
-    !isAuthLoading &&
-    (user?.role === "CUSTOMER"
-      ? storedOrder.ownerUserId !== user.id
-      : user?.role !== "ADMIN" && user?.role !== "STAFF")
-  ) {
+  const isStaffRole =
+    user?.role === "STAFF" ||
+    user?.role === "FINANCE" ||
+    user?.role === "ADMIN";
+  const isOwnerCustomer =
+    user?.role === "CUSTOMER" && storedOrder.ownerUserId === user.id;
+
+  if (!isAuthLoading && !isStaffRole && !isOwnerCustomer) {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-4 text-center">
         <AlertCircle aria-hidden="true" className="h-10 w-10 text-red-600" />
-        <h1 className="mt-4 text-xl font-bold text-slate-900">
+        <h1 className="mt-4 text-xl font-bold text-slate-900 dark:text-zinc-100">
           ไม่มีสิทธิ์ดูคำสั่งซื้อนี้
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          ลูกค้าสามารถดูได้เฉพาะคำสั่งซื้อที่สร้างจากบัญชีของตนเอง
+        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
+          {user?.role === "CUSTOMER"
+            ? "ลูกค้าสามารถดูได้เฉพาะคำสั่งซื้อที่สร้างจากบัญชีของตนเอง"
+            : "กรุณาเข้าสู่ระบบด้วยบัญชีที่มีสิทธิ์เพื่อดูคำสั่งซื้อนี้"}
         </p>
         <Link
-          href="/account/orders"
-          className="mt-5 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+          href={user?.role === "CUSTOMER" ? "/account/orders" : "/"}
+          className="mt-5 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
         >
-          กลับไปคำสั่งซื้อของฉัน
+          {user?.role === "CUSTOMER" ? "กลับไปคำสั่งซื้อของฉัน" : "กลับสู่หน้าร้าน"}
         </Link>
       </main>
     );
@@ -321,7 +326,25 @@ export default function MockOrderDetailPage() {
   return (
     <>
       <div className="mx-auto max-w-6xl space-y-4 px-4 pt-6 sm:px-6">
-        <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-900">
+        {isStaffRole ? (
+          <div className="flex flex-col gap-2 rounded-2xl border border-sky-300 bg-sky-50 p-4 text-sky-950 sm:flex-row sm:items-center sm:justify-between dark:border-sky-850 dark:bg-sky-950/40 dark:text-sky-100">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true" />
+              <div>
+                <p className="font-bold">มุมมองเจ้าหน้าที่ตรวจสอบ (Staff/Finance View)</p>
+                <p className="mt-0.5 text-xs text-sky-800 dark:text-sky-300">
+                  กำลังตรวจสอบคำสั่งซื้อ #{order.orderNumber} ในฐานะ {user?.role}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg bg-sky-200/70 px-2.5 py-1 text-xs font-bold text-sky-900 dark:bg-sky-900/60 dark:text-sky-200">
+                สิทธิ์: {user?.role}
+              </span>
+            </div>
+          </div>
+        ) : null}
+        <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
           โหมดสาธิตเท่านั้น: สถานะและข้อมูลคำสั่งซื้อถูกเก็บไว้ในเบราว์เซอร์นี้
           ไม่มีการตัดเงินจริง
         </p>
@@ -434,6 +457,70 @@ export default function MockOrderDetailPage() {
           </div>
         ) : null}
         {cancelError ? <p role="alert" className="mb-4 text-sm font-semibold text-red-700 dark:text-red-300">{cancelError}</p> : null}
+        {/* Shipping Address & Attached Slip */}
+        <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Shipping Address */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
+              <h2 className="font-bold text-slate-900 dark:text-zinc-50">ที่อยู่จัดส่งสินค้า</h2>
+            </div>
+            <div className="mt-3 text-sm text-slate-700 dark:text-zinc-300">
+              {storedOrder.shippingAddress ? (
+                <>
+                  <p className="font-semibold text-slate-900 dark:text-zinc-100">
+                    {storedOrder.shippingAddress.recipientName} ({storedOrder.shippingAddress.recipientPhone})
+                  </p>
+                  <p className="mt-1 leading-relaxed">
+                    {[
+                      storedOrder.shippingAddress.addressLine,
+                      storedOrder.shippingAddress.addressVillage,
+                      storedOrder.shippingAddress.street,
+                      storedOrder.shippingAddress.subdistrict,
+                      storedOrder.shippingAddress.district,
+                      storedOrder.shippingAddress.province,
+                      storedOrder.shippingAddress.postalCode,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  </p>
+                </>
+              ) : (
+                <p className="text-slate-500 dark:text-zinc-400">
+                  ไม่มีข้อมูลที่อยู่จัดส่งในคำสั่งซื้อนี้
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Attached Payment Slip */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+              <h2 className="font-bold text-slate-900 dark:text-zinc-50">หลักฐานการชำระเงินที่แนบมา (Attached Slip)</h2>
+            </div>
+            <div className="mt-3 text-sm">
+              {storedOrder.detail.paymentSlipFileName ? (
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3 dark:bg-zinc-800/80">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <FileText className="h-4 w-4 shrink-0 text-slate-500 dark:text-zinc-400" aria-hidden="true" />
+                    <span className="truncate font-mono text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                      {storedOrder.detail.paymentSlipFileName}
+                    </span>
+                  </div>
+                  <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    แนบแล้ว
+                  </span>
+                </div>
+              ) : (
+                <p className="text-slate-500 dark:text-zinc-400">
+                  ไม่มีไฟล์สลิปแนบ (ชำระผ่าน PromptPay อัตโนมัติ หรือยังไม่ได้แนบหลักฐาน)
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
           <h2 className="font-bold text-slate-900 dark:text-zinc-50">สรุปภาษีจำลอง</h2>
           <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
@@ -488,8 +575,9 @@ export default function MockOrderDetailPage() {
         onUploadBalanceSlip={uploadBalanceSlip}
         onAdvanceShipmentStatus={advanceShipment}
         isMockMode={process.env.NEXT_PUBLIC_USE_MOCK === "true"}
+        hideCustomerActions={isStaffRole}
       />
-      {isCancelDialogOpen ? (
+      {isCancelDialogOpen && user?.role === "CUSTOMER" ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="cancel-detail-order-title">
           <section className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
             <h2 id="cancel-detail-order-title" className="text-lg font-extrabold text-zinc-900 dark:text-zinc-100">ยืนยันการยกเลิกคำสั่งซื้อ</h2>

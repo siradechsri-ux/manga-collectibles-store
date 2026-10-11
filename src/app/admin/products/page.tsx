@@ -8,6 +8,8 @@ import {
   Edit3,
   Package,
   Search,
+  ShieldCheck,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -24,27 +26,37 @@ import {
   type ProductStatusFilter,
 } from "../../../mocks/admin-products.mock";
 import { resetMockCommerceData } from "../../../mocks/storage.mock";
+import { canManageInventory, canViewStock } from "../../../utils/permissions";
 
 function productName(product: AdminProduct): string {
-  return product.type === "MANGA"
+  return product.type === "MANGA" || product.type === "LIGHT_NOVEL"
     ? `${product.title} · เล่ม ${product.volumeNumber}${product.variantLabel ? ` (${product.variantLabel})` : ""}`
     : product.name;
 }
 
 function productStock(product: AdminProduct): number {
-  return product.type === "MANGA"
-    ? product.stock
-    : product.stockOrQuotaRemaining;
+  if (
+    product.type === "MANGA" ||
+    product.type === "LIGHT_NOVEL" ||
+    product.type === "GOODS" ||
+    product.type === "ACCESSORY"
+  ) {
+    return product.stock;
+  }
+  return product.stockOrQuotaRemaining;
 }
 
 function productStatus(
   product: AdminProduct,
 ): Exclude<ProductStatusFilter, "ALL"> {
-  if (product.type === "MANGA") {
+  if (product.type === "MANGA" || product.type === "LIGHT_NOVEL") {
     if (product.status === "OUT_OF_STOCK" || product.stock === 0) {
       return "OUT_OF_STOCK";
     }
     return product.status;
+  }
+  if (product.type === "GOODS" || product.type === "ACCESSORY") {
+    return product.stock === 0 ? "OUT_OF_STOCK" : "IN_STOCK";
   }
   if (product.stockOrQuotaRemaining === 0 || product.status === "PREORDER_CLOSED") {
     return "OUT_OF_STOCK";
@@ -53,13 +65,58 @@ function productStatus(
 }
 
 function productPrice(product: AdminProduct): number {
-  return product.type === "MANGA" ? product.price : product.fullPrice;
+  if (
+    product.type === "MANGA" ||
+    product.type === "LIGHT_NOVEL" ||
+    product.type === "GOODS" ||
+    product.type === "ACCESSORY"
+  ) {
+    return product.price;
+  }
+  return product.fullPrice;
 }
 
 function productCode(product: AdminProduct): string {
-  return product.type === "MANGA"
-    ? product.isbn || product.id
-    : product.id.replace(/^figure-/, "").toUpperCase();
+  if (product.type === "MANGA" || product.type === "LIGHT_NOVEL") {
+    return product.isbn || product.id;
+  }
+  if (product.type === "FIGURE" || product.type === "PLAMO") {
+    return product.janCode || product.id.replace(/^[a-z]+-/, "").toUpperCase();
+  }
+  return product.id.replace(/^[a-z]+-/, "").toUpperCase();
+}
+
+function productCategoryLabel(type: AdminProduct["type"]): string {
+  switch (type) {
+    case "MANGA":
+      return "มังงะ";
+    case "LIGHT_NOVEL":
+      return "ไลท์โนเวล";
+    case "FIGURE":
+      return "Figure";
+    case "PLAMO":
+      return "Gunpla / โมเดล";
+    case "GOODS":
+      return "สินค้ากู้ดส์";
+    case "ACCESSORY":
+      return "อุปกรณ์ดูแล";
+  }
+}
+
+function productCategoryIcon(type: AdminProduct["type"]) {
+  switch (type) {
+    case "MANGA":
+    case "LIGHT_NOVEL":
+      return <BookOpen size={18} />;
+    case "FIGURE":
+      return <Package size={18} />;
+    case "PLAMO":
+      return <Boxes size={18} />;
+    case "GOODS":
+      return <Sparkles size={18} />;
+    case "ACCESSORY":
+      return <ShieldCheck size={18} />;
+  }
 }
 
 function statusLabel(status: ProductStatusFilter): string {
@@ -71,6 +128,9 @@ function statusLabel(status: ProductStatusFilter): string {
 
 export default function AdminProductsPage() {
   const { user, isLoading } = useAuth();
+  const isAdmin = canManageInventory(user?.role);
+  const canView = canViewStock(user?.role);
+
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<ProductCategoryFilter>("ALL");
@@ -94,10 +154,10 @@ export default function AdminProductsPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.role !== "ADMIN") return;
+    if (!canView) return;
     refreshProducts();
     return subscribeToAdminProducts(refreshProducts);
-  }, [refreshProducts, user?.role]);
+  }, [refreshProducts, canView]);
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -105,10 +165,18 @@ export default function AdminProductsPage() {
       if (category !== "ALL" && product.type !== category) return false;
       if (status !== "ALL" && productStatus(product) !== status) return false;
       if (!normalizedQuery) return true;
-      const searchable =
-        product.type === "MANGA"
-          ? `${product.title} ${product.publisher} ${product.isbn} ${product.volumeNumber} ${product.id}`
-          : `${product.name} ${product.series} ${product.manufacturer} ${product.janCode} ${product.id}`;
+      let searchable = "";
+      if (product.type === "MANGA" || product.type === "LIGHT_NOVEL") {
+        searchable = `${product.title} ${product.publisher} ${product.isbn} ${product.volumeNumber} ${product.id}`;
+      } else if (product.type === "PLAMO") {
+        searchable = `${product.name} ${product.series} ${product.manufacturer} ${product.grade} ${product.janCode} ${product.id}`;
+      } else if (product.type === "FIGURE") {
+        searchable = `${product.name} ${product.series} ${product.character} ${product.manufacturer} ${product.janCode} ${product.id}`;
+      } else if (product.type === "GOODS") {
+        searchable = `${product.name} ${product.series} ${product.subcategory} ${product.id}`;
+      } else {
+        searchable = `${product.name} ${product.subcategory} ${product.id}`;
+      }
       return searchable.toLocaleLowerCase().includes(normalizedQuery);
     });
   }, [category, products, query, status]);
@@ -116,18 +184,18 @@ export default function AdminProductsPage() {
   if (isLoading) {
     return (
       <main className="flex min-h-[60vh] items-center justify-center px-4">
-        <p role="status" className="text-sm text-zinc-500">กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ...</p>
+        <p role="status" className="text-sm text-zinc-500">กำลังตรวจสอบสิทธิ์การเข้าถึง...</p>
       </main>
     );
   }
 
-  if (user?.role !== "ADMIN") {
+  if (!canView) {
     return (
       <main className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center px-5 text-center">
         <AlertTriangle size={36} className="text-red-600" aria-hidden="true" />
-        <p className="mt-4 text-sm font-bold uppercase tracking-wider text-red-700">HTTP 403 · Admin Only</p>
-        <h1 className="mt-2 text-2xl font-extrabold text-zinc-950 dark:text-zinc-100">ไม่มีสิทธิ์จัดการสินค้า</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">หน้านี้อนุญาตเฉพาะผู้ดูแลระบบ</p>
+        <p className="mt-4 text-sm font-bold uppercase tracking-wider text-red-700">HTTP 403 · Access Denied</p>
+        <h1 className="mt-2 text-2xl font-extrabold text-zinc-950 dark:text-zinc-100">ไม่มีสิทธิ์ตรวจเช็กสต็อกสินค้า</h1>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">หน้านี้อนุญาตเฉพาะเจ้าหน้าที่คลังสินค้าและผู้ดูแลระบบเท่านั้น</p>
         <Link href="/" className="mt-5 rounded-xl bg-zinc-950 px-5 py-3 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-950">กลับหน้าร้าน</Link>
       </main>
     );
@@ -188,18 +256,35 @@ export default function AdminProductsPage() {
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-col gap-4 border-b border-zinc-200 pb-6 dark:border-zinc-800 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-700 dark:text-orange-300">Admin · Inventory</p>
-            <h1 className="mt-1 text-3xl font-extrabold tracking-tight">สินค้าและสต็อก</h1>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">จัดการข้อมูลสินค้า หน้าร้าน และจำนวนคงเหลือ</p>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-700 dark:text-orange-300">
+              {isAdmin ? "Admin · Inventory" : "Staff · Stock Inspection"}
+            </p>
+            <h1 className="mt-1 text-3xl font-extrabold tracking-tight">
+              {isAdmin ? "สินค้าและสต็อก" : "ตรวจเช็กสต็อกสินค้า"}
+            </h1>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              {isAdmin
+                ? "จัดการข้อมูลสินค้า หน้าร้าน และจำนวนคงเหลือ"
+                : "ตรวจสอบจำนวนสินค้าคงเหลือในคลัง (โหมดอ่านอย่างเดียว)"}
+            </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <button type="button" onClick={() => setResetConfirmOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-50 dark:border-red-900 dark:bg-zinc-900 dark:text-red-300 dark:hover:bg-red-950/40">
-              <Trash2 size={16} aria-hidden="true" /> คืนค่าข้อมูลเริ่มต้น
-            </button>
-            <Link href="/admin/products/new" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700">
-              <CirclePlus size={17} aria-hidden="true" /> เพิ่มสินค้าใหม่
-            </Link>
-          </div>
+          {isAdmin ? (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setResetConfirmOpen(true)}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-50 dark:border-red-900 dark:bg-zinc-900 dark:text-red-300 dark:hover:bg-red-950/40"
+              >
+                <Trash2 size={16} aria-hidden="true" /> คืนค่าข้อมูลเริ่มต้น
+              </button>
+              <Link
+                href="/admin/products/new"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700"
+              >
+                <CirclePlus size={17} aria-hidden="true" /> เพิ่มสินค้าใหม่
+              </Link>
+            </div>
+          ) : null}
         </header>
 
         {error ? <p role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">{error}</p> : null}
@@ -214,14 +299,18 @@ export default function AdminProductsPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <label className="relative min-w-0 flex-1">
               <span className="sr-only">ค้นหาสินค้า</span>
-              <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาชื่อสินค้า เรื่อง ISBN หรือรหัสสินค้า" className="h-11 w-full rounded-xl border border-zinc-300 bg-white pl-10 pr-3 text-sm text-zinc-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-orange-950" />
+              <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาชื่อสินค้า เรื่อง ISBN หรือรหัสสินค้า" className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500" />
             </label>
             <div className="grid grid-cols-2 gap-2 sm:flex">
               <select value={category} onChange={(event) => setCategory(event.target.value as ProductCategoryFilter)} aria-label="กรองตามประเภทสินค้า" className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-950">
                 <option value="ALL">ทุกประเภท</option>
                 <option value="MANGA">มังงะ</option>
-                <option value="FIGURE">ฟิกเกอร์ / ของสะสม</option>
+                <option value="LIGHT_NOVEL">ไลท์โนเวล</option>
+                <option value="FIGURE">Figure & โมเดล</option>
+                <option value="PLAMO">พลาสติกโมเดล / Gunpla</option>
+                <option value="GOODS">สินค้ากู้ดส์ & ของสะสม</option>
+                <option value="ACCESSORY">อุปกรณ์ดูแลของสะสม</option>
               </select>
               <select value={status} onChange={(event) => setStatus(event.target.value as ProductStatusFilter)} aria-label="กรองตามสถานะสินค้า" className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-950">
                 <option value="ALL">ทุกสถานะ</option>
@@ -243,7 +332,7 @@ export default function AdminProductsPage() {
                   <th className="px-4 py-3 text-right">ราคา</th>
                   <th className="px-4 py-3 text-right">สต็อกคงเหลือ</th>
                   <th className="px-4 py-3">สถานะ</th>
-                  <th className="px-4 py-3 text-right">จัดการ</th>
+                  {isAdmin ? <th className="px-4 py-3 text-right">จัดการ</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -255,32 +344,42 @@ export default function AdminProductsPage() {
                       <td className="px-4 py-3 font-mono text-xs text-zinc-600 dark:text-zinc-400">{productCode(product)}</td>
                       <td className="px-4 py-3">
                         <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
-                          {product.type === "MANGA" ? <BookOpen size={18} /> : <Package size={18} />}
+                          {productCategoryIcon(product.type)}
                         </span>
                       </td>
                       <td className="max-w-72 px-4 py-3">
                         <p className="line-clamp-2 font-semibold text-zinc-900 dark:text-zinc-100">{productName(product)}</p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{product.type === "MANGA" ? product.publisher : `${product.series} · ${product.manufacturer}`}</p>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          {product.type === "MANGA" || product.type === "LIGHT_NOVEL"
+                            ? product.publisher
+                            : product.type === "FIGURE" || product.type === "PLAMO"
+                              ? `${product.series} · ${product.manufacturer}`
+                              : product.type === "GOODS"
+                                ? `${product.series} · ${product.subcategory}`
+                                : product.subcategory}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{product.type === "MANGA" ? "มังงะ" : "ฟิกเกอร์"}</td>
+                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{productCategoryLabel(product.type)}</td>
                       <td className="px-4 py-3 text-right font-medium tabular-nums">{productPrice(product).toLocaleString("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right tabular-nums">
                         <span className="font-semibold">{productStock(product)}</span>
                         {productStock(product) === 0 ? <span className="ml-2 rounded-full bg-red-100 px-2 py-1 text-[10px] font-bold text-red-800 dark:bg-red-950 dark:text-red-200">สินค้าหมด</span> : productStock(product) < 5 ? <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-[10px] font-bold text-orange-800 dark:bg-orange-950 dark:text-orange-200">สต็อกต่ำ</span> : null}
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={state} /></td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
-                          <Link href={editUrl} aria-label={`แก้ไข ${productName(product)}`} title="แก้ไขสินค้า" className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-800"><Edit3 size={16} /></Link>
-                          <button type="button" aria-label={`ปรับสต็อก ${productName(product)}`} title="ปรับสต็อก" onClick={() => { setStockTarget(product); setStockDirection("ADD"); setStockQuantity("1"); }} className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 hover:text-blue-700 dark:text-zinc-300 dark:hover:bg-zinc-800"><Package size={16} /></button>
-                          <button type="button" aria-label={`ลบ ${productName(product)}`} title="ลบสินค้า" onClick={() => setDeleteTarget(product)} className="rounded-lg p-2 text-zinc-600 hover:bg-red-50 hover:text-red-700 dark:text-zinc-300 dark:hover:bg-red-950/40 dark:hover:text-red-300"><Trash2 size={16} /></button>
-                        </div>
-                      </td>
+                      {isAdmin ? (
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-1">
+                            <Link href={editUrl} aria-label={`แก้ไข ${productName(product)}`} title="แก้ไขสินค้า" className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-800"><Edit3 size={16} /></Link>
+                            <button type="button" aria-label={`ปรับสต็อก ${productName(product)}`} title="ปรับสต็อก" onClick={() => { setStockTarget(product); setStockDirection("ADD"); setStockQuantity("1"); }} className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 hover:text-blue-700 dark:text-zinc-300 dark:hover:bg-zinc-800"><Package size={16} /></button>
+                            <button type="button" aria-label={`ลบ ${productName(product)}`} title="ลบสินค้า" onClick={() => setDeleteTarget(product)} className="rounded-lg p-2 text-zinc-600 hover:bg-red-50 hover:text-red-700 dark:text-zinc-300 dark:hover:bg-red-950/40 dark:hover:text-red-300"><Trash2 size={16} /></button>
+                          </div>
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}
                 {filteredProducts.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">ไม่พบสินค้าที่ตรงกับเงื่อนไข</td></tr>
+                  <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">ไม่พบสินค้าที่ตรงกับเงื่อนไข</td></tr>
                 ) : null}
               </tbody>
             </table>

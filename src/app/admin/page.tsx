@@ -4,7 +4,7 @@ import {
   AlertTriangle,
   BellRing,
   Clock3,
-  FastForward,
+  Loader2,
   PackageCheck,
   UsersRound,
 } from "lucide-react";
@@ -53,11 +53,12 @@ export default function AdminDashboardPage() {
     );
   }, []);
 
-  function triggerArrival(): void {
+  async function triggerArrival(): Promise<void> {
     setError(null);
     setNotice(null);
     setIsTriggeringArrival(true);
     try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
       const result = markAllMockDepositOrdersArrived();
       refreshDashboard();
       setNotice(
@@ -76,11 +77,12 @@ export default function AdminDashboardPage() {
     }
   }
 
-  function simulateFourteenDays(): void {
+  async function simulateFourteenDays(): Promise<void> {
     setError(null);
     setNotice(null);
     setIsSimulatingExpiry(true);
     try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
       const result = simulateMock14DayExpiry();
       refreshDashboard();
       const summary = `ปรับสถานะออเดอร์หมดอายุแล้ว ${result.expiredCount} รายการ และโอนสิทธิ์ให้คิว Waitlist ลำดับถัดไปสำเร็จ ${result.waitlistTransfers} รายการ`;
@@ -197,14 +199,14 @@ export default function AdminDashboardPage() {
           type="button"
           onClick={simulateFourteenDays}
           disabled={isSimulatingExpiry}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-bold text-violet-900 transition hover:bg-violet-100 disabled:cursor-wait disabled:opacity-60 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-200 dark:hover:bg-violet-900/60"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-bold text-violet-900 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-200 dark:hover:bg-violet-900/60"
         >
           {isSimulatingExpiry ? (
-            <FastForward size={17} aria-hidden="true" />
+            <Loader2 size={17} className="animate-spin text-violet-700 dark:text-violet-300" aria-hidden="true" />
           ) : (
             <Clock3 size={17} aria-hidden="true" />
           )}
-          จำลองเวลา: ผ่านไป 14 วัน
+          <span>{isSimulatingExpiry ? "กำลังจำลองเวลา 14 วัน..." : "จำลองเวลา: ผ่านไป 14 วัน"}</span>
         </button>
       </div>
 
@@ -232,10 +234,16 @@ export default function AdminDashboardPage() {
             disabled={isTriggeringArrival || depositOrders.length === 0}
             className="inline-flex min-h-14 shrink-0 items-center justify-center gap-2 rounded-2xl bg-orange-400 px-6 py-4 text-sm font-extrabold text-slate-950 shadow-lg transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            <BellRing size={19} aria-hidden="true" />
-            {isTriggeringArrival
-              ? "กำลังอัปเดตคำสั่งซื้อ..."
-              : "บันทึกสินค้าถึงคลังปลายทาง"}
+            {isTriggeringArrival ? (
+              <Loader2 size={19} className="animate-spin text-slate-950" aria-hidden="true" />
+            ) : (
+              <BellRing size={19} aria-hidden="true" />
+            )}
+            <span>
+              {isTriggeringArrival
+                ? "กำลังบันทึกสินค้าถึงคลัง..."
+                : "บันทึกสินค้าถึงคลังปลายทาง"}
+            </span>
           </button>
         </div>
       </section>

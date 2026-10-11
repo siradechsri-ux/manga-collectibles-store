@@ -16,6 +16,8 @@ import {
   joinMockWaitlist,
   type MockWaitlistEntry,
 } from "../mocks/storage.mock";
+import { canShop } from "../utils/permissions";
+import { BookCoverImage } from "./ProductCard";
 
 export interface VolumeItem {
   id: number;
@@ -67,10 +69,7 @@ export default function SeriesVolumeSelector({
   onCheckoutNow,
 }: SeriesVolumeSelectorProps) {
   const { user } = useAuth();
-  const isStaffAccount =
-    user?.role === "STAFF" ||
-    user?.role === "FINANCE" ||
-    user?.role === "ADMIN";
+  const userCanShop = canShop(user?.role);
   const [selectedVolumeIds, setSelectedVolumeIds] = useState<Set<number>>(
     () => new Set(),
   );
@@ -178,26 +177,28 @@ export default function SeriesVolumeSelector({
         </div>
 
       </div>
-      <div className="mb-5 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={selectAllInStock}
-          disabled={purchasableVolumes.length === 0 || isStaffAccount}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground transition hover:border-orange-300 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <ListChecks size={16} aria-hidden="true" />
-          เลือกทุกเล่มที่มีสินค้า
-        </button>
-        <button
-          type="button"
-          onClick={clearSelection}
-          disabled={selectedVolumeIds.size === 0 || isStaffAccount}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground transition hover:border-slate-400 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <X size={16} aria-hidden="true" />
-          ล้างการเลือก
-        </button>
-      </div>
+      {userCanShop ? (
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={selectAllInStock}
+            disabled={purchasableVolumes.length === 0}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground transition hover:border-orange-300 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ListChecks size={16} aria-hidden="true" />
+            เลือกทุกเล่มที่มีสินค้า
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={selectedVolumeIds.size === 0}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground transition hover:border-slate-400 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X size={16} aria-hidden="true" />
+            ล้างการเลือก
+          </button>
+        </div>
+      ) : null}
 
       {volumes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
@@ -223,38 +224,35 @@ export default function SeriesVolumeSelector({
                       : "border-slate-200 hover:border-orange-200 hover:shadow-md"
                 }`}
               >
-                {!isOutOfStock ? (
+                {!isOutOfStock && userCanShop ? (
                   <label className="absolute left-3 top-3 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-card text-card-foreground shadow-sm ring-1 ring-border sm:left-4 sm:top-4">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleVolume(volume.id)}
-                      disabled={isStaffAccount}
                       className="h-4 w-4 cursor-pointer accent-orange-600"
                       aria-label={`เลือกมังงะเล่ม ${volume.volumeNumber}`}
                     />
                   </label>
                 ) : null}
 
-                <div className="h-36 w-24 shrink-0 overflow-hidden rounded-xl bg-muted sm:h-40 sm:w-28">
-                  {volume.coverUrl ? (
-                    <img
-                      src={volume.coverUrl}
-                      alt={`ปก ${volume.title}`}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                      <BookOpen size={28} aria-hidden="true" />
-                      <span className="px-2 text-center text-xs">ไม่มีภาพปก</span>
-                    </div>
-                  )}
+                <div className="w-24 shrink-0 sm:w-28">
+                  <BookCoverImage
+                    src={volume.coverUrl}
+                    alt={`ปก ${volume.title}`}
+                    title={volume.title}
+                    volumeNumber={volume.volumeNumber}
+                    aspectRatio="2/3"
+                  />
                 </div>
 
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <div className="mb-2 flex items-center gap-2 flex-wrap">
+                    <span className="rounded bg-orange-100 px-2 py-0.5 text-[10px] font-extrabold text-orange-800 dark:bg-orange-950 dark:text-orange-300">
+                      MANGA
+                    </span>
                     <span
-                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
                         isOutOfStock
                           ? "border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400"
                           : isPreorder
@@ -297,40 +295,38 @@ export default function SeriesVolumeSelector({
                   )}
 
                   <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-4">
-                    <p className="font-bold text-slate-900">
+                    <p className="font-bold text-foreground">
                       {currencyFormatter.format(volume.price)}
                     </p>
-                    {isStaffAccount ? (
-                      <span className="inline-flex min-h-9 items-center justify-center rounded-lg bg-slate-100 px-3 py-2 text-center text-xs font-semibold text-slate-600">
-                        บัญชีเจ้าหน้าที่ (ไม่สามารถทำรายการสั่งซื้อได้)
-                      </span>
-                    ) : isOutOfStock ? (
-                      <button
-                        type="button"
-                        onClick={() => addToWaitlist(volume)}
-                        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-700"
-                      >
-                        <Bell size={14} aria-hidden="true" />
-                        ลงชื่อเข้าคิวรับสิทธิ์
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => onAddToCart(volume)}
-                        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-                      >
-                        <ShoppingCart size={15} aria-hidden="true" />
-                        เพิ่มลงตะกร้า
-                      </button>
-                    )}
+                    {userCanShop ? (
+                      isOutOfStock ? (
+                        <button
+                          type="button"
+                          onClick={() => addToWaitlist(volume)}
+                          className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-700"
+                        >
+                          <Bell size={14} aria-hidden="true" />
+                          ลงชื่อเข้าคิวรับสิทธิ์
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onAddToCart(volume)}
+                          className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-orange-600 dark:hover:text-white"
+                        >
+                          <ShoppingCart size={15} aria-hidden="true" />
+                          เพิ่มลงตะกร้า
+                        </button>
+                      )
+                    ) : null}
                   </div>
-                  {waitlistFeedback?.volumeId === volume.id ? (
+                  {userCanShop && waitlistFeedback?.volumeId === volume.id ? (
                     <p
                       role={waitlistFeedback.isError ? "alert" : "status"}
                       className={`mt-2 text-xs font-semibold ${
                         waitlistFeedback.isError
-                          ? "text-red-700"
-                          : "text-emerald-700"
+                          ? "text-red-700 dark:text-red-400"
+                          : "text-emerald-700 dark:text-emerald-400"
                       }`}
                     >
                       {waitlistFeedback.message}
@@ -343,7 +339,7 @@ export default function SeriesVolumeSelector({
         </div>
       )}
 
-      {!isStaffAccount && selectedVolumes.length > 0 ? (
+      {userCanShop && selectedVolumes.length > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 text-card-foreground shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-md">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
             <div className="min-w-0">

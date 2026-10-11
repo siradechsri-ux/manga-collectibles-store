@@ -10,6 +10,8 @@ const volumeSchema = z
     title: z.string().min(1),
     variantLabel: z.string().optional(),
     isbn: z.string().optional(),
+    coverUrl: z.string().optional(),
+    images: z.array(z.string()).optional(),
     price: z.number().finite().positive(),
     stock: z.number().int().nonnegative(),
     weightGrams: z.number().finite().nonnegative().optional(),
@@ -23,6 +25,10 @@ const mangaSeriesSchema = z
     id: z.string().min(1),
     title: z.string().min(1),
     publisher: z.string().min(1),
+    category: z.enum(["MANGA", "LIGHT_NOVEL"]).optional(),
+    coverImage: z.string().optional(),
+    coverUrl: z.string().optional(),
+    images: z.array(z.string()).optional(),
     volumes: z.array(volumeSchema),
   })
   .strict();
@@ -39,6 +45,8 @@ const figureSchema = z
     heightMm: z.number().int().nonnegative(),
     janCode: z.string(),
     images: z.array(z.string()),
+    coverImage: z.string().optional(),
+    coverUrl: z.string().optional(),
     fullPrice: z.number().finite().positive(),
     depositAmount: z.number().finite().nonnegative(),
     preorderDeadline: z.string(),
@@ -52,6 +60,9 @@ const figureSchema = z
         heightCm: z.number().finite().positive(),
       })
       .strict(),
+    category: z.enum(["FIGURE", "PLAMO", "GOODS", "ACCESSORY"]).optional(),
+    subcategory: z.string().optional(),
+    grade: z.string().optional(),
   })
   .strict();
 
@@ -62,6 +73,10 @@ const catalogResponseSchema = z
       .object({
         mangaSeries: z.array(mangaSeriesSchema),
         figures: z.array(figureSchema),
+        lightNovelSeries: z.array(mangaSeriesSchema).optional().default([]),
+        plamo: z.array(figureSchema).optional().default([]),
+        goods: z.array(figureSchema).optional().default([]),
+        accessories: z.array(figureSchema).optional().default([]),
       })
       .strict(),
   })
@@ -86,6 +101,10 @@ export type StorefrontFigureProduct = FigureProduct & CatalogFigure;
 export interface CatalogData {
   mangaSeries: CatalogMangaSeries[];
   figures: CatalogFigure[];
+  lightNovelSeries: CatalogMangaSeries[];
+  plamo: CatalogFigure[];
+  goods: CatalogFigure[];
+  accessories: CatalogFigure[];
 }
 
 export async function fetchCatalog(): Promise<CatalogData> {

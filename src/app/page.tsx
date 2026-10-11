@@ -2,11 +2,16 @@
 
 import {
   ArrowRight,
+  BookMarked,
   BookOpen,
   Boxes,
   CalendarDays,
+  Check,
+  Package,
   RefreshCw,
   Search,
+  ShieldCheck,
+  ShoppingBag,
   Sparkles,
   Truck,
   X,
@@ -14,6 +19,7 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { useCart } from "../context/CartContext";
 import {
   CatalogData,
   CatalogFigure,
@@ -21,9 +27,26 @@ import {
   fetchCatalog,
 } from "../lib/catalog-client";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../mocks/admin-products.mock";
+import { MangaSeriesCard, CollectibleProductCard } from "../components/ProductCard";
 
-type StoreCategory = "MANGA" | "FIGURE";
+export type StoreCategory =
+  | "ALL"
+  | "MANGA"
+  | "LIGHT_NOVEL"
+  | "FIGURE"
+  | "GOODS"
+  | "ACCESSORY";
+
 type StoreStatus = "ALL" | "IN_STOCK" | "PREORDER";
+
+const CATEGORY_TABS: readonly (readonly [StoreCategory, string])[] = [
+  ["ALL", "ทั้งหมด"],
+  ["MANGA", "มังงะ"],
+  ["LIGHT_NOVEL", "ไลท์โนเวล"],
+  ["FIGURE", "Figure & โมเดล"],
+  ["GOODS", "กู้ดส์ & ของสะสม"],
+  ["ACCESSORY", "อุปกรณ์ดูแล"],
+] as const;
 
 const MANGA_FILTERS = [
   ["ALL", "ทั้งหมด"],
@@ -33,11 +56,43 @@ const MANGA_FILTERS = [
   ["LIMITED", "เล่มพิเศษ / Limited"],
 ] as const;
 
+const LIGHT_NOVEL_FILTERS = [
+  ["ALL", "ทั้งหมด"],
+  ["PHOENIX", "สำนักพิมพ์ Phoenix"],
+  ["SIAM", "สำนักพิมพ์ Siam Inter"],
+  ["REGULAR", "เล่มปกติ"],
+  ["SPECIAL_SET", "Special Set / Boxset"],
+] as const;
+
 const FIGURE_FILTERS = [
   ["ALL", "ทั้งหมด"],
-  ["NENDOROID", "Nendoroid"],
   ["SCALE", "Scale Figure"],
-  ["POP_UP_PARADE", "Pop Up Parade"],
+  ["NENDOROID", "Nendoroid"],
+  ["GUNPLA", "Gunpla / พลาสติกโมเดล"],
+] as const;
+
+const GOODS_FILTERS = [
+  ["ALL", "ทั้งหมด"],
+  ["STANDY", "สแตนดี้อะคริลิก"],
+  ["BADGE", "เข็มกลัด"],
+  ["KEYCHAIN", "พวงกุญแจ"],
+  ["SHIKISHI", "Shikishi & อาร์ตบอร์ด"],
+] as const;
+
+const ACCESSORY_FILTERS = [
+  ["ALL", "ทั้งหมด"],
+  ["BOOK_COVER", "ปกใสห่อการ์ตูน / โนเวล"],
+  ["DISPLAY_BOX", "กล่องครอบอะคริลิก"],
+] as const;
+
+const ALL_SUB_FILTERS = [
+  ["ALL", "รวมทุกประเภท"],
+  ["MANGA", "มังงะ"],
+  ["LIGHT_NOVEL", "ไลท์โนเวล"],
+  ["FIGURE", "Figure"],
+  ["PLAMO", "พลาสติกโมเดล"],
+  ["GOODS", "กู้ดส์สะสม"],
+  ["ACCESSORY", "อุปกรณ์ดูแล"],
 ] as const;
 
 function matchesMangaSubcategory(
@@ -48,46 +103,138 @@ function matchesMangaSubcategory(
   const searchable = `${series.title} ${series.publisher}`.toLocaleLowerCase();
   if (subcategory === "LIMITED") {
     return series.volumes.some((volume) =>
-      `${volume.variantLabel ?? ""} ${volume.title}`.toLocaleLowerCase().includes("limited"),
+      `${volume.variantLabel ?? ""} ${volume.title}`
+        .toLocaleLowerCase()
+        .includes("limited") ||
+      `${volume.variantLabel ?? ""} ${volume.title}`
+        .toLocaleLowerCase()
+        .includes("พิเศษ"),
     );
   }
   const keywordGroups: Record<string, readonly string[]> = {
     ACTION: ["action", "ต่อสู้", "ผจญภัย", "jujutsu", "jujutsu kaisen", "นักล่า"],
-    FANTASY: ["fantasy", "แฟนตาซี", "เวทมนตร์", "เวทมนตร์", "มหาเวทย์", "ปีศาจ"],
-    MYSTERY: ["mystery", "สืบสวน", "ลึกลับ", "นักสืบ", "ปริศนา"],
+    FANTASY: ["fantasy", "แฟนตาซี", "เวทมนตร์", "มหาเวทย์", "ปีศาจ", "alchemist"],
+    MYSTERY: ["mystery", "สืบสวน", "ลึกลับ", "นักสืบ", "ปริศนา", "เร้น"],
   };
   return (keywordGroups[subcategory] ?? []).some((keyword) =>
     searchable.includes(keyword.toLocaleLowerCase()),
   );
 }
 
-function matchesFigureSubcategory(figure: CatalogFigure, subcategory: string): boolean {
+function matchesLightNovelSubcategory(
+  series: CatalogMangaSeries,
+  subcategory: string,
+): boolean {
   if (subcategory === "ALL") return true;
-  const searchable = `${figure.name} ${figure.series} ${figure.manufacturer} ${figure.scale}`
-    .toLocaleLowerCase();
-  if (subcategory === "NENDOROID") return searchable.includes("nendoroid");
-  if (subcategory === "SCALE") return /scale|1\/\d+/i.test(searchable);
-  return searchable.includes("pop up parade");
+  if (subcategory === "PHOENIX") {
+    return series.publisher.toLocaleLowerCase().includes("phoenix");
+  }
+  if (subcategory === "SIAM") {
+    return series.publisher.toLocaleLowerCase().includes("siam");
+  }
+  if (subcategory === "REGULAR") {
+    return series.volumes.some(
+      (volume) =>
+        !volume.variantLabel ||
+        volume.variantLabel.includes("ปกติ"),
+    );
+  }
+  if (subcategory === "SPECIAL_SET") {
+    return series.volumes.some((volume) =>
+      `${volume.variantLabel ?? ""} ${volume.title}`
+        .toLocaleLowerCase()
+        .includes("special"),
+    );
+  }
+  return true;
 }
 
-function matchesStatus(
-  category: StoreCategory,
-  item: CatalogMangaSeries | CatalogFigure,
+function matchesFigureModelSubcategory(
+  item: CatalogFigure,
+  subcategory: string,
+): boolean {
+  if (subcategory === "ALL") return true;
+  const searchable = `${item.name} ${item.series} ${item.manufacturer} ${item.scale} ${item.category ?? ""} ${item.grade ?? ""}`
+    .toLocaleLowerCase();
+  if (subcategory === "GUNPLA") {
+    return (
+      item.category === "PLAMO" ||
+      searchable.includes("gundam") ||
+      searchable.includes("gunpla") ||
+      Boolean(item.grade)
+    );
+  }
+  if (subcategory === "NENDOROID") {
+    return searchable.includes("nendoroid");
+  }
+  if (subcategory === "SCALE") {
+    return (
+      /scale|1\/\d+/i.test(searchable) &&
+      item.category !== "PLAMO" &&
+      !searchable.includes("gundam")
+    );
+  }
+  return true;
+}
+
+function matchesGoodsSubcategory(
+  item: CatalogFigure,
+  subcategory: string,
+): boolean {
+  if (subcategory === "ALL") return true;
+  const itemSubcategory = item.subcategory?.toLocaleUpperCase() ?? "";
+  const searchable = `${item.name} ${item.series}`.toLocaleLowerCase();
+  if (subcategory === "STANDY") {
+    return itemSubcategory === "STANDY" || searchable.includes("สแตนดี้");
+  }
+  if (subcategory === "BADGE") {
+    return itemSubcategory === "BADGE" || searchable.includes("เข็มกลัด");
+  }
+  if (subcategory === "KEYCHAIN") {
+    return itemSubcategory === "KEYCHAIN" || searchable.includes("พวงกุญแจ");
+  }
+  if (subcategory === "SHIKISHI") {
+    return itemSubcategory === "SHIKISHI" || searchable.includes("shikishi") || searchable.includes("แผ่นภาพ");
+  }
+  return true;
+}
+
+function matchesAccessorySubcategory(
+  item: CatalogFigure,
+  subcategory: string,
+): boolean {
+  if (subcategory === "ALL") return true;
+  const itemSubcategory = item.subcategory?.toLocaleUpperCase() ?? "";
+  const searchable = `${item.name} ${item.series}`.toLocaleLowerCase();
+  if (subcategory === "BOOK_COVER") {
+    return itemSubcategory === "BOOK_COVER" || searchable.includes("ปก");
+  }
+  if (subcategory === "DISPLAY_BOX") {
+    return itemSubcategory === "DISPLAY_BOX" || searchable.includes("กล่อง");
+  }
+  return true;
+}
+
+function matchesSeriesStatus(
+  series: CatalogMangaSeries,
   status: StoreStatus,
 ): boolean {
   if (status === "ALL") return true;
-  if (category === "MANGA") {
-    const series = item as CatalogMangaSeries;
-    return series.volumes.some((volume) =>
-      status === "IN_STOCK"
-        ? volume.status === "IN_STOCK" && volume.stock > 0
-        : volume.status === "PREORDER" && volume.stock > 0,
-    );
-  }
-  const figure = item as CatalogFigure;
+  return series.volumes.some((volume) =>
+    status === "IN_STOCK"
+      ? volume.status === "IN_STOCK" && volume.stock > 0
+      : volume.status === "PREORDER",
+  );
+}
+
+function matchesFigureStatus(
+  figure: CatalogFigure,
+  status: StoreStatus,
+): boolean {
+  if (status === "ALL") return true;
   return status === "IN_STOCK"
     ? figure.status === "IN_STOCK" && figure.stockOrQuotaRemaining > 0
-    : figure.status === "PREORDER_OPEN" && figure.stockOrQuotaRemaining > 0;
+    : figure.status === "PREORDER_OPEN" || figure.status === "PREORDER_CLOSED";
 }
 
 const moneyFormatter = new Intl.NumberFormat("th-TH", {
@@ -96,34 +243,70 @@ const moneyFormatter = new Intl.NumberFormat("th-TH", {
   maximumFractionDigits: 0,
 });
 
-function getSeriesPrice(series: CatalogMangaSeries): number | null {
-  const available = series.volumes.filter((volume) => volume.status !== "OUT_OF_STOCK");
+function getSeriesStartingPrice(series: CatalogMangaSeries): number | null {
+  const available = series.volumes.filter(
+    (volume) => volume.status !== "OUT_OF_STOCK",
+  );
   return available.length > 0
     ? Math.min(...available.map((volume) => volume.price))
     : null;
 }
 
-function mangaBadge(series: CatalogMangaSeries): { label: string; style: string } {
+function bookSeriesBadge(series: CatalogMangaSeries): {
+  label: string;
+  style: string;
+} {
   if (series.volumes.some((volume) => volume.status === "PREORDER")) {
-    return { label: "Pre-order", style: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300" };
+    return {
+      label: "Pre-order",
+      style:
+        "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+    };
   }
   if (series.volumes.some((volume) => volume.status === "IN_STOCK")) {
-    return { label: "In Stock", style: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-300" };
+    return {
+      label: "In Stock",
+      style:
+        "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-300",
+    };
   }
-  return { label: "สินค้าหมด", style: "border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400" };
+  return {
+    label: "สินค้าหมด",
+    style:
+      "border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400",
+  };
 }
 
-function figureBadge(figure: CatalogFigure): { label: string; style: string } {
+function collectibleBadge(figure: CatalogFigure): {
+  label: string;
+  style: string;
+} {
   if (figure.status === "PREORDER_OPEN" && figure.depositAmount > 0) {
-    return { label: "เปิดรับมัดจำ", style: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300" };
+    return {
+      label: "เปิดรับมัดจำ",
+      style:
+        "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+    };
   }
   if (figure.status === "PREORDER_OPEN") {
-    return { label: "Pre-order", style: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300" };
+    return {
+      label: "Pre-order",
+      style:
+        "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+    };
   }
   if (figure.status === "IN_STOCK") {
-    return { label: "In Stock", style: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-300" };
+    return {
+      label: "พร้อมส่ง",
+      style:
+        "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-300",
+    };
   }
-  return { label: "ปิดรับจอง", style: "border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400" };
+  return {
+    label: "ปิดรับจอง",
+    style:
+      "border-zinc-200 bg-zinc-100 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400",
+  };
 }
 
 function StorefrontHero({
@@ -137,47 +320,75 @@ function StorefrontHero({
       <div className="absolute -bottom-36 left-1/3 -z-10 h-72 w-72 rounded-full bg-violet-500/20 blur-3xl" />
       <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-orange-100">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-xs font-bold text-orange-200">
             <Sparkles size={14} aria-hidden="true" />
-            คัดสรรเรื่องโปรดและของสะสมสำหรับคุณ
+            มังงะ · ไลท์โนเวล · ฟิกเกอร์ · กันพลา · กู้ดส์ · อุปกรณ์ดูแล
           </span>
           <h1 className="mt-5 max-w-2xl text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-            เปิดโลกมังงะ
+            อ่านสนุก ครบทุกเรื่อง
             <br />
-            <span className="text-orange-400">สะสมทุกความชอบ</span>
+            <span className="text-orange-400">สะสมของแท้ ส่งถึงบ้าน</span>
           </h1>
           <p className="mt-5 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
-            เลือกอ่านเล่มโปรด จองของสะสมรุ่นพิเศษ และช้อปได้สะดวกในที่เดียว
-            พร้อมจัดส่งถึงบ้าน
+            ศูนย์รวมมังงะ ไลท์โนเวลยกชุด ฟิกเกอร์แท้ พลาสติกโมเดลกันพลา
+            สินค้าคาแรคเตอร์ และอุปกรณ์ถนอมหนังสือสะสม คิดภาษีถูกต้อง e-Tax พร้อมจัดส่ง
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-wrap gap-2.5">
             <button
               type="button"
               onClick={() => onBrowse("MANGA")}
-              className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-950/20 transition hover:bg-orange-400"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-md transition hover:bg-orange-400"
             >
-              เลือกอ่านมังงะ <ArrowRight size={17} aria-hidden="true" />
+              <BookOpen size={15} aria-hidden="true" /> มังงะ (VAT 0%)
+            </button>
+            <button
+              type="button"
+              onClick={() => onBrowse("LIGHT_NOVEL")}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20"
+            >
+              <BookMarked size={15} aria-hidden="true" /> ไลท์โนเวล (VAT 0%)
             </button>
             <button
               type="button"
               onClick={() => onBrowse("FIGURE")}
-              className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/10"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20"
             >
-              ดู Figure / ของสะสม
+              <Boxes size={15} aria-hidden="true" /> Figure & กันพลา
+            </button>
+            <button
+              type="button"
+              onClick={() => onBrowse("GOODS")}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20"
+            >
+              <ShoppingBag size={15} aria-hidden="true" /> กู้ดส์ & สแตนดี้
+            </button>
+            <button
+              type="button"
+              onClick={() => onBrowse("ACCESSORY")}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20"
+            >
+              <ShieldCheck size={15} aria-hidden="true" /> ปกใส & กล่องครอบ
             </button>
           </div>
         </div>
         <div className="hidden lg:block">
           <div className="relative mx-auto flex h-72 max-w-md items-center justify-center">
-            <div className="absolute h-56 w-56 rotate-[-12deg] rounded-3xl border border-white/15 bg-white/5 shadow-2xl backdrop-blur" />
-            <div className="absolute ml-20 mt-8 h-56 w-44 rotate-[10deg] rounded-3xl border border-orange-300/30 bg-gradient-to-br from-orange-500/80 to-rose-700/80 shadow-2xl">
-              <div className="flex h-full flex-col justify-between p-5">
-                <Sparkles className="text-white/90" size={24} aria-hidden="true" />
-                <span className="text-right text-xs font-black tracking-[0.25em] text-white/80">
-                  COLLECT
-                  <br />
-                  YOUR STORY
+            <div className="absolute h-60 w-60 rotate-[-10deg] rounded-3xl border border-white/15 bg-white/5 shadow-2xl backdrop-blur" />
+            <div className="absolute ml-16 mt-6 h-60 w-48 rotate-[8deg] rounded-3xl border border-orange-300/30 bg-gradient-to-br from-orange-500/85 to-violet-800/85 p-5 shadow-2xl">
+              <div className="flex h-full flex-col justify-between">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white backdrop-blur">
+                  <ShieldCheck size={22} aria-hidden="true" />
                 </span>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+                    CERTIFIED STORE
+                  </span>
+                  <p className="mt-1 text-sm font-black leading-tight text-white">
+                    ของแท้ 100%
+                    <br />
+                    ห่อแน่นหนา ปลอดภัย
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -198,50 +409,71 @@ export default function StorefrontPage() {
 function StorefrontContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const category: StoreCategory = searchParams.get("category") === "FIGURE"
-    ? "FIGURE"
-    : "MANGA";
+  const isUnauthorized = searchParams.get("error") === "unauthorized";
+  const rawCategory = searchParams.get("category");
+
+  const category: StoreCategory =
+    rawCategory === "MANGA"
+      ? "MANGA"
+      : rawCategory === "LIGHT_NOVEL"
+        ? "LIGHT_NOVEL"
+        : rawCategory === "FIGURE"
+          ? "FIGURE"
+          : rawCategory === "GOODS"
+            ? "GOODS"
+            : rawCategory === "ACCESSORY"
+              ? "ACCESSORY"
+              : rawCategory === "ALL"
+                ? "ALL"
+                : "ALL";
+
+  const rawStatus = searchParams.get("status");
+  const urlStatus: StoreStatus =
+    rawStatus === "PREORDER"
+      ? "PREORDER"
+      : rawStatus === "IN_STOCK"
+        ? "IN_STOCK"
+        : "ALL";
+
   const [subcategory, setSubcategory] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState<StoreStatus>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StoreStatus>(urlStatus);
   const [searchQuery, setSearchQuery] = useState("");
   const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [addNotice, setAddNotice] = useState<string | null>(null);
 
-  const filteredManga = useMemo(() => {
-    const query = searchQuery.trim().toLocaleLowerCase();
-    return (catalog?.mangaSeries ?? []).filter((series) => {
-      const queryMatches =
-        query.length === 0 ||
-        `${series.title} ${series.publisher} ${series.volumes
-          .map((volume) => `${volume.title} ${volume.variantLabel ?? ""} ${volume.isbn ?? ""}`)
-          .join(" ")}`
-          .toLocaleLowerCase()
-          .includes(query);
-      return queryMatches &&
-        matchesMangaSubcategory(series, subcategory) &&
-        matchesStatus("MANGA", series, statusFilter);
+  const { addItem } = useCart();
+
+  useEffect(() => {
+    setStatusFilter(urlStatus);
+  }, [urlStatus]);
+
+  function handleStatusChange(nextStatus: StoreStatus): void {
+    setStatusFilter(nextStatus);
+    const params = new URLSearchParams(window.location.search);
+    if (nextStatus === "ALL") {
+      params.delete("status");
+    } else {
+      params.set("status", nextStatus);
+    }
+    const newQuery = params.toString();
+    void router.replace(`/${newQuery ? `?${newQuery}` : ""}#browse-collection`, {
+      scroll: false,
     });
-  }, [catalog, searchQuery, statusFilter, subcategory]);
-  const filteredFigures = useMemo(() => {
-    const query = searchQuery.trim().toLocaleLowerCase();
-    return (catalog?.figures ?? []).filter((figure) => {
-      const queryMatches =
-        query.length === 0 ||
-        `${figure.name} ${figure.character} ${figure.series} ${figure.manufacturer} ${figure.janCode}`
-          .toLocaleLowerCase()
-          .includes(query);
-      return queryMatches &&
-        matchesFigureSubcategory(figure, subcategory) &&
-        matchesStatus("FIGURE", figure, statusFilter);
-    });
-  }, [catalog, searchQuery, statusFilter, subcategory]);
+  }
 
   function selectCategory(nextCategory: StoreCategory): void {
     setSubcategory("ALL");
-    setStatusFilter("ALL");
     setSearchQuery("");
-    void router.replace(`/?category=${nextCategory}#browse-collection`);
+    const params = new URLSearchParams(window.location.search);
+    if (nextCategory === "ALL") {
+      params.delete("category");
+    } else {
+      params.set("category", nextCategory);
+    }
+    const newQuery = params.toString();
+    void router.replace(`/${newQuery ? `?${newQuery}` : ""}#browse-collection`);
   }
 
   function browseCollection(nextCategory: StoreCategory): void {
@@ -282,65 +514,248 @@ function StorefrontContent() {
     };
   }, []);
 
+  function handleQuickAddToCart(item: CatalogFigure): void {
+    try {
+      const id = Number(item.id);
+      if (item.category === "PLAMO") {
+        addItem({
+          kind: "PLAMO",
+          id,
+          name: item.name,
+          fullPrice: item.fullPrice,
+          depositAmount: item.depositAmount,
+          selectedPaymentType: "FULL",
+          quantity: 1,
+          boxDimensions: item.boxDimensions,
+          grade: item.grade,
+        });
+      } else if (item.category === "GOODS") {
+        addItem({
+          kind: "GOODS",
+          id,
+          name: item.name,
+          fullPrice: item.fullPrice,
+          quantity: 1,
+          subcategory: item.subcategory,
+        });
+      } else if (item.category === "ACCESSORY") {
+        addItem({
+          kind: "ACCESSORY",
+          id,
+          name: item.name,
+          fullPrice: item.fullPrice,
+          quantity: 1,
+          subcategory: item.subcategory,
+          boxDimensions: item.boxDimensions,
+        });
+      } else {
+        addItem({
+          kind: "FIGURE",
+          id,
+          name: item.name,
+          fullPrice: item.fullPrice,
+          depositAmount: item.depositAmount,
+          selectedPaymentType: "FULL",
+          quantity: 1,
+          boxDimensions: item.boxDimensions,
+        });
+      }
+      setAddNotice(`เพิ่ม "${item.name}" ลงในตะกร้าเรียบร้อยแล้ว`);
+      setTimeout(() => setAddNotice(null), 4000);
+    } catch (cartError) {
+      setAddNotice(
+        cartError instanceof Error ? cartError.message : "เพิ่มสินค้าไม่สำเร็จ",
+      );
+    }
+  }
+
+  // Filtered collections
+  const filteredManga = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    return (catalog?.mangaSeries ?? []).filter((series) => {
+      const queryMatches =
+        query.length === 0 ||
+        `${series.title} ${series.publisher} ${series.volumes
+          .map((v) => `${v.title} ${v.variantLabel ?? ""} ${v.isbn ?? ""}`)
+          .join(" ")}`
+          .toLocaleLowerCase()
+          .includes(query);
+      return (
+        queryMatches &&
+        matchesMangaSubcategory(series, subcategory) &&
+        matchesSeriesStatus(series, statusFilter)
+      );
+    });
+  }, [catalog, searchQuery, statusFilter, subcategory]);
+
+  const filteredLightNovels = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    return (catalog?.lightNovelSeries ?? []).filter((series) => {
+      const queryMatches =
+        query.length === 0 ||
+        `${series.title} ${series.publisher} ${series.volumes
+          .map((v) => `${v.title} ${v.variantLabel ?? ""} ${v.isbn ?? ""}`)
+          .join(" ")}`
+          .toLocaleLowerCase()
+          .includes(query);
+      return (
+        queryMatches &&
+        matchesLightNovelSubcategory(series, subcategory) &&
+        matchesSeriesStatus(series, statusFilter)
+      );
+    });
+  }, [catalog, searchQuery, statusFilter, subcategory]);
+
+  const filteredFiguresAndModels = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    const combined = [
+      ...(catalog?.figures ?? []),
+      ...(catalog?.plamo ?? []),
+    ];
+    return combined.filter((item) => {
+      const queryMatches =
+        query.length === 0 ||
+        `${item.name} ${item.series} ${item.character} ${item.manufacturer} ${item.janCode} ${item.grade ?? ""}`
+          .toLocaleLowerCase()
+          .includes(query);
+      return (
+        queryMatches &&
+        matchesFigureModelSubcategory(item, subcategory) &&
+        matchesFigureStatus(item, statusFilter)
+      );
+    });
+  }, [catalog, searchQuery, statusFilter, subcategory]);
+
+  const filteredGoods = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    return (catalog?.goods ?? []).filter((item) => {
+      const queryMatches =
+        query.length === 0 ||
+        `${item.name} ${item.series} ${item.character} ${item.subcategory ?? ""}`
+          .toLocaleLowerCase()
+          .includes(query);
+      return (
+        queryMatches &&
+        matchesGoodsSubcategory(item, subcategory) &&
+        matchesFigureStatus(item, statusFilter)
+      );
+    });
+  }, [catalog, searchQuery, statusFilter, subcategory]);
+
+  const filteredAccessories = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    return (catalog?.accessories ?? []).filter((item) => {
+      const queryMatches =
+        query.length === 0 ||
+        `${item.name} ${item.series} ${item.subcategory ?? ""}`
+          .toLocaleLowerCase()
+          .includes(query);
+      return (
+        queryMatches &&
+        matchesAccessorySubcategory(item, subcategory) &&
+        matchesFigureStatus(item, statusFilter)
+      );
+    });
+  }, [catalog, searchQuery, statusFilter, subcategory]);
+
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+        {isUnauthorized ? (
+          <div
+            role="alert"
+            className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+          >
+            <div className="flex items-center gap-2.5">
+              <ShieldCheck size={18} className="shrink-0 text-red-600 dark:text-red-400" />
+              <span>คุณไม่มีสิทธิ์เข้าถึงหน้าระบบดังกล่าว (ต้องใช้สิทธิ์ของเจ้าหน้าที่หรือผู้ดูแลระบบ)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.replace("/")}
+              aria-label="ปิดการแจ้งเตือน"
+              className="rounded-lg p-1 text-red-600 transition hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/50"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        ) : null}
+
         <StorefrontHero onBrowse={browseCollection} />
 
-        <section id="browse-collection" className="mt-10 scroll-mt-24" aria-labelledby="catalog-heading">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        {addNotice ? (
+          <div
+            role="status"
+            className="mt-6 flex items-center justify-between gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
+          >
+            <span className="flex items-center gap-2">
+              <Check size={16} aria-hidden="true" />
+              {addNotice}
+            </span>
+            <Link
+              href="/checkout"
+              className="rounded-lg bg-emerald-600 px-3 py-1 text-xs text-white transition hover:bg-emerald-700"
+            >
+              ไปที่ตะกร้า
+            </Link>
+          </div>
+        ) : null}
+
+        <section
+          id="browse-collection"
+          className="mt-10 scroll-mt-24"
+          aria-labelledby="catalog-heading"
+        >
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-700">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-700 dark:text-orange-400">
                 Browse collection
               </p>
-              <h2 id="catalog-heading" className="mt-1 text-2xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-100 sm:text-3xl">
-                เลือกสิ่งที่คุณชอบ
+              <h2
+                id="catalog-heading"
+                className="mt-1 text-2xl font-black tracking-tight text-zinc-950 dark:text-zinc-100 sm:text-3xl"
+              >
+                เลือกดูตามหมวดสินค้า
               </h2>
             </div>
             <div
-              className="inline-flex w-fit rounded-xl border border-zinc-200 bg-white p-1 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+              className="flex flex-wrap gap-1 rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
               role="tablist"
-              aria-label="หมวดหมู่สินค้า"
+              aria-label="หมวดหมู่สินค้าหลัก"
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={category === "MANGA"}
-                onClick={() => selectCategory("MANGA")}
-                className={`rounded-lg px-4 py-2.5 text-sm font-bold transition ${
-                  category === "MANGA"
-                    ? "bg-zinc-950 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-950"
-                    : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                }`}
-              >
-                มังงะทั้งหมด
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={category === "FIGURE"}
-                onClick={() => selectCategory("FIGURE")}
-                className={`rounded-lg px-4 py-2.5 text-sm font-bold transition ${
-                  category === "FIGURE"
-                    ? "bg-zinc-950 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-950"
-                    : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                }`}
-              >
-                Figure / ของสะสม
-              </button>
+              {CATEGORY_TABS.map(([tabKey, tabLabel]) => {
+                const isActive = category === tabKey;
+                return (
+                  <button
+                    key={tabKey}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => selectCategory(tabKey)}
+                    className={`rounded-xl px-3.5 py-2 text-xs font-bold transition sm:text-sm ${
+                      isActive
+                        ? "bg-zinc-950 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-950"
+                        : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    {tabLabel}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="mt-5 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <label className="flex min-h-11 items-center gap-3 rounded-xl border border-zinc-300 bg-zinc-50 px-3 text-zinc-500 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
-              <Search size={18} aria-hidden="true" />
+          {/* Filter Bar */}
+          <div className="mt-5 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <label className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-300 bg-white px-3 text-slate-500 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+              <Search size={18} aria-hidden="true" className="text-slate-400 dark:text-zinc-500" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="ค้นหาชื่อเรื่อง ตัวละคร หรือรหัส ISBN"
+                placeholder="ค้นหาชื่อเรื่อง ตัวละคร สำนักพิมพ์ ผู้ผลิต หรือรหัสสินค้า"
                 aria-label="ค้นหาสินค้า"
-                className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-500 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-500"
               />
               {searchQuery ? (
                 <button
@@ -353,61 +768,54 @@ function StorefrontContent() {
                 </button>
               ) : null}
             </label>
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2" aria-label="กรองประเภทย่อย">
-                {(category === "MANGA" ? MANGA_FILTERS : FIGURE_FILTERS).map(
-                  ([value, label]) => (
-                    <button
-                      type="button"
-                      key={value}
-                      aria-pressed={subcategory === value}
-                      onClick={() => setSubcategory(value)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                        subcategory === value
-                          ? "border-orange-600 bg-orange-600 text-white"
-                          : "border-zinc-300 bg-white text-zinc-700 hover:border-orange-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-orange-700"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ),
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2" aria-label="กรองสถานะสินค้า">
-                {(
-                  [
-                    ["ALL", "ทุกสถานะ"],
-                    ["IN_STOCK", "พร้อมส่ง"],
-                    ["PREORDER", "เปิดพรีออเดอร์"],
-                  ] as const
-                ).map(([value, label]) => (
+
+            <div className="flex flex-wrap items-center gap-2 pt-1" aria-label="กรองสถานะสินค้า">
+              <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">สถานะสินค้า:</span>
+              {(
+                [
+                  ["ALL", "ทุกสถานะ"],
+                  ["IN_STOCK", "พร้อมส่ง"],
+                  ["PREORDER", "เปิดพรีออเดอร์"],
+                ] as const
+              ).map(([value, label]) => {
+                const isActive = statusFilter === value;
+                return (
                   <button
                     type="button"
                     key={value}
-                    aria-pressed={statusFilter === value}
-                    onClick={() => setStatusFilter(value)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                      statusFilter === value
-                        ? "border-zinc-800 bg-zinc-800 text-white dark:border-zinc-200 dark:bg-zinc-200 dark:text-zinc-900"
-                        : "border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    aria-pressed={isActive}
+                    onClick={() => handleStatusChange(value)}
+                    className={`rounded-full border px-3.5 py-1.5 text-xs font-bold transition ${
+                      isActive
+                        ? "border-orange-600 bg-orange-600 text-white shadow-xs dark:border-orange-500 dark:bg-orange-500"
+                        : "border-zinc-300 bg-white text-zinc-700 hover:border-orange-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-orange-700"
                     }`}
                   >
                     {label}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </div>
 
+          {/* Grids Display */}
           {loading ? (
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2].map((item) => (
-                <div key={item} className="h-72 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-zinc-900" />
+                <div
+                  key={item}
+                  className="h-72 animate-pulse rounded-2xl bg-white shadow-sm dark:bg-zinc-900"
+                />
               ))}
             </div>
           ) : error ? (
             <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center dark:border-amber-900 dark:bg-amber-950/40">
-              <p className="font-semibold text-amber-950 dark:text-amber-100" role="alert">{error}</p>
+              <p
+                className="font-semibold text-amber-950 dark:text-amber-100"
+                role="alert"
+              >
+                {error}
+              </p>
               <button
                 type="button"
                 onClick={() => void loadCatalog()}
@@ -416,52 +824,205 @@ function StorefrontContent() {
                 <RefreshCw size={15} aria-hidden="true" /> ลองโหลดอีกครั้ง
               </button>
             </div>
-          ) : category === "MANGA" ? (
-            filteredManga.length > 0 ? (
-              <MangaGrid series={filteredManga} />
-            ) : (
-              <EmptyCatalog
-                label="ไม่พบสินค้าที่ตรงกับเงื่อนไขการค้นหา"
-                actionLabel="ล้างตัวกรองทั้งหมด"
-                onAction={() => {
-                  setSearchQuery("");
-                  setSubcategory("ALL");
-                  setStatusFilter("ALL");
-                }}
-              />
-            )
           ) : (
-            filteredFigures.length > 0 ? (
-              <FigureGrid figures={filteredFigures} />
-            ) : (
-              <EmptyCatalog
-                label="ไม่พบสินค้าที่ตรงกับเงื่อนไขการค้นหา"
-                actionLabel="ล้างตัวกรองทั้งหมด"
-                onAction={() => {
-                  setSearchQuery("");
-                  setSubcategory("ALL");
-                  setStatusFilter("ALL");
-                }}
-              />
-            )
+            <div className="mt-6 space-y-12">
+              {/* Category: ALL */}
+              {category === "ALL" && (
+                <>
+                  {subcategory === "ALL" || subcategory === "MANGA" ? (
+                    <CategorySection
+                      title="มังงะ (Manga Series)"
+                      subtitle="ซีรีส์มังงะเรื่องดัง ได้รับยกเว้นภาษีมูลค่าเพิ่ม (VAT 0%)"
+                      icon={<BookOpen size={20} />}
+                      count={filteredManga.length}
+                    >
+                      {filteredManga.length > 0 ? (
+                        <BookGrid series={filteredManga} type="MANGA" />
+                      ) : (
+                        <EmptyCatalog label="ไม่มีมังงะที่ตรงกับเงื่อนไข" />
+                      )}
+                    </CategorySection>
+                  ) : null}
+
+                  {subcategory === "ALL" || subcategory === "LIGHT_NOVEL" ? (
+                    <CategorySection
+                      title="ไลท์โนเวล (Light Novels)"
+                      subtitle="นวนิยายภาพไลท์โนเวล เล่มเดี่ยว & Boxset ยกเว้นภาษี (VAT 0%)"
+                      icon={<BookMarked size={20} />}
+                      count={filteredLightNovels.length}
+                    >
+                      {filteredLightNovels.length > 0 ? (
+                        <BookGrid series={filteredLightNovels} type="LIGHT_NOVEL" />
+                      ) : (
+                        <EmptyCatalog label="ไม่มีไลท์โนเวลที่ตรงกับเงื่อนไข" />
+                      )}
+                    </CategorySection>
+                  ) : null}
+
+                  {subcategory === "ALL" || subcategory === "FIGURE" || subcategory === "PLAMO" ? (
+                    <CategorySection
+                      title="Figure & พลาสติกโมเดลกันพลา"
+                      subtitle="สเกลฟิกเกอร์ ด๋อย และกันพลาแท้จากญี่ปุ่น (คิดภาษี VAT 7%)"
+                      icon={<Boxes size={20} />}
+                      count={filteredFiguresAndModels.length}
+                    >
+                      {filteredFiguresAndModels.length > 0 ? (
+                        <CollectibleGrid
+                          items={filteredFiguresAndModels}
+                          onAddToCart={handleQuickAddToCart}
+                        />
+                      ) : (
+                        <EmptyCatalog label="ไม่มี Figure หรือโมเดลที่ตรงกับเงื่อนไข" />
+                      )}
+                    </CategorySection>
+                  ) : null}
+
+                  {subcategory === "ALL" || subcategory === "GOODS" ? (
+                    <CategorySection
+                      title="สินค้าคาแรคเตอร์ & กู้ดส์ (Character Goods)"
+                      subtitle="สแตนดี้อะคริลิก เข็มกลัด พวงกุญแจ แผ่นภาพสะสมแท้ (คิดภาษี VAT 7%)"
+                      icon={<ShoppingBag size={20} />}
+                      count={filteredGoods.length}
+                    >
+                      {filteredGoods.length > 0 ? (
+                        <CollectibleGrid
+                          items={filteredGoods}
+                          onAddToCart={handleQuickAddToCart}
+                        />
+                      ) : (
+                        <EmptyCatalog label="ไม่มีสินค้ากู้ดส์ที่ตรงกับเงื่อนไข" />
+                      )}
+                    </CategorySection>
+                  ) : null}
+
+                  {subcategory === "ALL" || subcategory === "ACCESSORY" ? (
+                    <CategorySection
+                      title="อุปกรณ์ถนอมและปกป้องของสะสม (Care & Protection)"
+                      subtitle="ปกพลาสติกห่อการ์ตูน/โนเวล กล่องครอบอะคริลิกกันฝุ่น (คิดภาษี VAT 7%)"
+                      icon={<ShieldCheck size={20} />}
+                      count={filteredAccessories.length}
+                    >
+                      {filteredAccessories.length > 0 ? (
+                        <CollectibleGrid
+                          items={filteredAccessories}
+                          onAddToCart={handleQuickAddToCart}
+                        />
+                      ) : (
+                        <EmptyCatalog label="ไม่มีอุปกรณ์ดูแลที่ตรงกับเงื่อนไข" />
+                      )}
+                    </CategorySection>
+                  ) : null}
+                </>
+              )}
+
+              {/* Category: MANGA */}
+              {category === "MANGA" && (
+                filteredManga.length > 0 ? (
+                  <BookGrid series={filteredManga} type="MANGA" />
+                ) : (
+                  <EmptyCatalog
+                    label="ไม่พบมังงะที่ตรงกับเงื่อนไข"
+                    onAction={() => {
+                      setSearchQuery("");
+                      setSubcategory("ALL");
+                      setStatusFilter("ALL");
+                    }}
+                  />
+                )
+              )}
+
+              {/* Category: LIGHT_NOVEL */}
+              {category === "LIGHT_NOVEL" && (
+                filteredLightNovels.length > 0 ? (
+                  <BookGrid series={filteredLightNovels} type="LIGHT_NOVEL" />
+                ) : (
+                  <EmptyCatalog
+                    label="ไม่พบไลท์โนเวลที่ตรงกับเงื่อนไข"
+                    onAction={() => {
+                      setSearchQuery("");
+                      setSubcategory("ALL");
+                      setStatusFilter("ALL");
+                    }}
+                  />
+                )
+              )}
+
+              {/* Category: FIGURE */}
+              {category === "FIGURE" && (
+                filteredFiguresAndModels.length > 0 ? (
+                  <CollectibleGrid
+                    items={filteredFiguresAndModels}
+                    onAddToCart={handleQuickAddToCart}
+                  />
+                ) : (
+                  <EmptyCatalog
+                    label="ไม่พบ Figure หรือโมเดลที่ตรงกับเงื่อนไข"
+                    onAction={() => {
+                      setSearchQuery("");
+                      setSubcategory("ALL");
+                      setStatusFilter("ALL");
+                    }}
+                  />
+                )
+              )}
+
+              {/* Category: GOODS */}
+              {category === "GOODS" && (
+                filteredGoods.length > 0 ? (
+                  <CollectibleGrid
+                    items={filteredGoods}
+                    onAddToCart={handleQuickAddToCart}
+                  />
+                ) : (
+                  <EmptyCatalog
+                    label="ไม่พบสินค้ากู้ดส์ที่ตรงกับเงื่อนไข"
+                    onAction={() => {
+                      setSearchQuery("");
+                      setSubcategory("ALL");
+                      setStatusFilter("ALL");
+                    }}
+                  />
+                )
+              )}
+
+              {/* Category: ACCESSORY */}
+              {category === "ACCESSORY" && (
+                filteredAccessories.length > 0 ? (
+                  <CollectibleGrid
+                    items={filteredAccessories}
+                    onAddToCart={handleQuickAddToCart}
+                  />
+                ) : (
+                  <EmptyCatalog
+                    label="ไม่พบอุปกรณ์ดูแลของสะสมที่ตรงกับเงื่อนไข"
+                    onAction={() => {
+                      setSearchQuery("");
+                      setSubcategory("ALL");
+                      setStatusFilter("ALL");
+                    }}
+                  />
+                )
+              )}
+            </div>
           )}
         </section>
 
-        <section className="mt-10 grid gap-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-3 sm:p-6">
+        {/* Benefits bar */}
+        <section className="mt-14 grid gap-4 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 sm:grid-cols-3 sm:p-6">
           <StoreBenefit
             icon={<BookOpen size={20} aria-hidden="true" />}
-            title="เลือกซื้อได้ตามเล่ม"
-            text="เลือกเล่มพร้อมส่งและพรีออเดอร์ในตะกร้าเดียว"
+            title="หนังสือยกเว้นภาษี (VAT 0%)"
+            text="มังงะและไลท์โนเวลคิดอัตราภาษี 0% ตามประมวลรัษฎากร"
           />
           <StoreBenefit
-            icon={<Boxes size={20} aria-hidden="true" />}
-            title="ของสะสมคัดสรร"
-            text="ดูราคาเต็มหรือเลือกวางมัดจำสินค้าพรีออเดอร์"
+            icon={<ShieldCheck size={20} aria-hidden="true" />}
+            title="ปกป้องของสะสมสมบูรณ์แบบ"
+            text="มี Add-on ปกพลาสติกถนอมหนังสือ และกล่องครอบอะคริลิกกันฝุ่น"
           />
           <StoreBenefit
             icon={<Truck size={20} aria-hidden="true" />}
-            title="จัดส่งทั่วประเทศ"
-            text="ติดตามสถานะจัดส่งได้จากหน้ารายละเอียดคำสั่งซื้อ"
+            title="คำนวณน้ำหนักพัสดุแม่นยำ"
+            text="รองรับ Volumetric Weight สำหรับกล่องโมเดลและกันพลาขนาดใหญ่"
           />
         </section>
       </div>
@@ -469,139 +1030,87 @@ function StorefrontContent() {
   );
 }
 
-function MangaGrid({ series }: { series: CatalogMangaSeries[] }) {
-  if (series.length === 0) {
-    return <EmptyCatalog label="ยังไม่มีมังงะในร้าน" />;
-  }
-
+function CategorySection({
+  title,
+  subtitle,
+  icon,
+  count,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  count: number;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {series.map((item) => {
-        const badge = mangaBadge(item);
-        const price = getSeriesPrice(item);
-        const preorderVolume = item.volumes.find((volume) => volume.status === "PREORDER");
-        return (
-          <Link
-            key={item.id}
-            href={`/manga/${encodeURIComponent(item.id)}`}
-            className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-orange-200 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-orange-800"
-          >
-            <div className="relative flex h-52 items-end overflow-hidden bg-gradient-to-br from-indigo-950 via-violet-900 to-slate-900 p-5">
-              <div className="absolute -right-4 -top-8 h-40 w-40 rounded-full border-[18px] border-white/5" />
-              <div className="absolute right-9 top-8 rotate-6 rounded-2xl border border-white/20 bg-white/10 p-4 text-white/70 backdrop-blur">
-                <BookOpen size={42} strokeWidth={1.3} aria-hidden="true" />
-              </div>
-              <span className={`absolute left-4 top-4 rounded-full border px-3 py-1.5 text-xs font-semibold ${badge.style}`}>
-                {badge.label}
-              </span>
-              <span className="relative text-xs font-bold uppercase tracking-[0.24em] text-violet-100/75">
-                MANGA SERIES
-              </span>
-            </div>
-            <div className="p-5">
-              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{item.publisher}</p>
-              <h3 className="mt-1 line-clamp-2 min-h-12 text-lg font-extrabold leading-6 text-zinc-950 group-hover:text-orange-700 dark:text-zinc-100">
-                {item.title}
-              </h3>
-              <div className="mt-4 flex items-end justify-between gap-3">
-                <div>
-                  <p                   className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {item.volumes.length} รายการเล่ม
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                    {price === null ? "สินค้าหมด" : `เริ่มต้น ${moneyFormatter.format(price)}`}
-                  </p>
-                </div>
-                {preorderVolume ? (
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                    <CalendarDays size={14} aria-hidden="true" /> เล่มใหม่ Pre-order
-                  </span>
-                ) : null}
-              </div>
-              <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-4 text-sm font-bold text-orange-700 dark:border-zinc-800">
-                ดูรายละเอียดเรื่องนี้ <ArrowRight size={17} aria-hidden="true" />
-              </div>
-            </div>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function FigureGrid({ figures }: { figures: CatalogFigure[] }) {
-  if (figures.length === 0) {
-    return <EmptyCatalog label="ยังไม่มี Figure ในร้าน" />;
-  }
-
-  return (
-    <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {figures.map((figure) => {
-        const badge = figureBadge(figure);
-        return (
-          <Link
-            key={figure.slug}
-            href={`/figures/${encodeURIComponent(figure.slug)}`}
-            className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-orange-200 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-orange-800"
-          >
-            <div className="relative flex h-52 items-center justify-center overflow-hidden bg-gradient-to-br from-orange-50 via-rose-50 to-violet-100">
-              <div className="absolute h-36 w-36 rounded-full bg-white/70 shadow-inner" />
-              <div className="relative flex h-28 w-24 items-center justify-center rounded-[1.7rem] border border-white bg-white/70 text-orange-600 shadow-lg backdrop-blur">
-                <Sparkles size={46} strokeWidth={1.2} aria-hidden="true" />
-              </div>
-              <span className={`absolute left-4 top-4 rounded-full border px-3 py-1.5 text-xs font-semibold ${badge.style}`}>
-                {badge.label}
-              </span>
-              <span className="absolute bottom-4 right-4 rounded-lg bg-white/85 px-2.5 py-1.5 text-xs font-bold text-zinc-600 dark:bg-zinc-950/80 dark:text-zinc-300">
-                {figure.manufacturer}
-              </span>
-            </div>
-            <div className="p-5">
-              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{figure.series}</p>
-              <h3 className="mt-1 min-h-12 text-lg font-extrabold leading-6 text-zinc-950 group-hover:text-orange-700 dark:text-zinc-100">
-                {figure.name}
-              </h3>
-              <div className="mt-4 flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {figure.status === "PREORDER_OPEN" && figure.depositAmount > 0
-                      ? `มัดจำ ${moneyFormatter.format(figure.depositAmount)}`
-                      : "ราคาเต็ม"}
-                  </p>
-                  <p className="mt-1 text-lg font-extrabold text-zinc-950 dark:text-zinc-100">
-                    {moneyFormatter.format(
-                      figure.status === "PREORDER_OPEN" && figure.depositAmount > 0
-                        ? figure.depositAmount
-                        : figure.fullPrice,
-                    )}
-                  </p>
-                </div>
-                <span className="inline-flex items-center gap-1 text-sm font-bold text-orange-700">
-                  รายละเอียด <ArrowRight size={16} aria-hidden="true" />
-                </span>
-              </div>
-            </div>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function StorefrontLoading() {
-  return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-16 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl animate-pulse">
-        <div className="h-72 rounded-[2rem] bg-zinc-200 dark:bg-zinc-900" />
-        <div className="mt-10 h-10 w-64 rounded-xl bg-zinc-200 dark:bg-zinc-900" />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300">
+            {icon}
+          </span>
+          <div>
+            <h3 className="text-lg font-black tracking-tight text-zinc-950 dark:text-zinc-100">
+              {title}
+            </h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {subtitle}
+            </p>
+          </div>
+        </div>
+        <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+          {count} รายการ
+        </span>
       </div>
-    </main>
+      {children}
+    </div>
+  );
+}
+
+function BookGrid({
+  series,
+  type,
+}: {
+  series: CatalogMangaSeries[];
+  type: "MANGA" | "LIGHT_NOVEL";
+}) {
+  if (series.length === 0) return null;
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {series.map((item) => (
+        <MangaSeriesCard key={item.id} series={item} type={type} />
+      ))}
+    </div>
+  );
+}
+
+function CollectibleGrid({
+  items,
+  onAddToCart,
+}: {
+  items: CatalogFigure[];
+  onAddToCart: (item: CatalogFigure) => void;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((item) => (
+        <CollectibleProductCard
+          key={item.id}
+          item={item}
+          onAddToCart={onAddToCart}
+        />
+      ))}
+    </div>
   );
 }
 
 function EmptyCatalog({
   label,
-  actionLabel,
+  actionLabel = "ล้างตัวกรองทั้งหมด",
   onAction,
 }: {
   label: string;
@@ -611,8 +1120,13 @@ function EmptyCatalog({
   return (
     <div className="mt-6 rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-14 text-center dark:border-zinc-700 dark:bg-zinc-900">
       <Boxes className="mx-auto text-zinc-400" size={34} aria-hidden="true" />
-      <p className="mt-3 font-semibold text-zinc-700 dark:text-zinc-300" role="status">{label}</p>
-      {actionLabel && onAction ? (
+      <p
+        className="mt-3 font-semibold text-zinc-700 dark:text-zinc-300"
+        role="status"
+      >
+        {label}
+      </p>
+      {onAction ? (
         <button
           type="button"
           onClick={onAction}
@@ -640,9 +1154,24 @@ function StoreBenefit({
         {icon}
       </span>
       <div>
-        <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{title}</h3>
-        <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">{text}</p>
+        <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+          {title}
+        </h4>
+        <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+          {text}
+        </p>
       </div>
     </div>
+  );
+}
+
+function StorefrontLoading() {
+  return (
+    <main className="min-h-screen bg-zinc-50 px-4 py-16 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl animate-pulse">
+        <div className="h-72 rounded-[2rem] bg-zinc-200 dark:bg-zinc-900" />
+        <div className="mt-10 h-10 w-64 rounded-xl bg-zinc-200 dark:bg-zinc-900" />
+      </div>
+    </main>
   );
 }
