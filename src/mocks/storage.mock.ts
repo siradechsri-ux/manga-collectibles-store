@@ -1039,12 +1039,17 @@ export function advanceMockShipmentStatus(orderId: number): MockStoredOrder {
   if (!existingOrder) {
     throw new Error("ไม่พบคำสั่งซื้อจำลองในอุปกรณ์นี้");
   }
+  if (existingOrder.detail.paymentStatus !== "PAID") {
+    throw new Error("เลื่อนสถานะขนส่งได้หลังชำระเงินครบแล้วเท่านั้น");
+  }
 
   const nextStatusByCurrent = {
+    PREPARING: "IN_TRANSIT",
     IN_TRANSIT: "OUT_FOR_DELIVERY",
     OUT_FOR_DELIVERY: "DELIVERED",
   } as const;
   let advanced = false;
+  const shippedAt = new Date().toISOString();
   const shipments = existingOrder.detail.shipments.map((shipment) => {
     const currentStatus =
       shipment.trackingStatus ??
@@ -1059,22 +1064,51 @@ export function advanceMockShipmentStatus(orderId: number): MockStoredOrder {
     advanced = true;
     const trackingStatus =
       nextStatusByCurrent[currentStatus as keyof typeof nextStatusByCurrent];
+    const carrier = shipment.carrier ?? "FLASH";
+    const trackingNumber =
+      shipment.trackingNumber ??
+      `${carrier === "FLASH" ? "TH" : "THP"}${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 90 + 10)}`;
     return {
       ...shipment,
       trackingStatus,
-      status: trackingStatus === "DELIVERED" ? "DELIVERED" as const : "SHIPPED" as const,
+      status: trackingStatus === "DELIVERED" ? ("DELIVERED" as const) : ("SHIPPED" as const),
+      carrier,
+      trackingNumber,
+      shippedAt:
+        shipment.shippedAt ??
+        (trackingStatus === "IN_TRANSIT" ? shippedAt : shipment.shippedAt),
     };
   });
   if (!advanced) {
     throw new Error("ไม่มีพัสดุที่สามารถเลื่อนสถานะขนส่งได้");
   }
   const allDelivered = shipments.every((shipment) => shipment.status === "DELIVERED");
+  const anyInCarrier = shipments.some(
+    (shipment) =>
+      shipment.status === "SHIPPED" || shipment.status === "DELIVERED",
+  );
   const updatedOrder: MockStoredOrder = {
     ...existingOrder,
     detail: {
       ...existingOrder.detail,
-      status: allDelivered ? "DELIVERED" : existingOrder.detail.status,
+      status: allDelivered
+        ? ("DELIVERED" as const)
+        : anyInCarrier
+          ? ("SHIPPED" as const)
+          : existingOrder.detail.status,
+      timelineStage: anyInCarrier
+        ? ("SHIPPED" as const)
+        : existingOrder.detail.timelineStage,
       shipments,
+      timeline: existingOrder.detail.timeline.map((event) =>
+        event.stage === "SHIPPED" && anyInCarrier && event.occurredAt === null
+          ? {
+              ...event,
+              label: "จัดส่งแล้ว (จำลอง)",
+              occurredAt: shippedAt,
+            }
+          : event,
+      ),
     },
   };
   orders[orderIndex] = updatedOrder;
@@ -1337,6 +1371,23 @@ export const MOCK_PAYMENT_REJECTION_REASONS = [
 export type MockPaymentRejectionReason =
   (typeof MOCK_PAYMENT_REJECTION_REASONS)[number];
 
+export function canRejectMockOrderPayment(order: MockStoredOrder): boolean {
+  if (order.detail.paymentStatus === "DEPOSIT_FORFEITED") {
+    return false;
+  }
+  switch (order.detail.status) {
+    case "PAYMENT_REVIEW_PENDING":
+    case "PAID":
+    case "DEPOSIT_PAID":
+    case "AWAITING_BALANCE_PAYMENT":
+    case "PACKING":
+    case "ORDER_PLACED":
+      return true;
+    default:
+      return false;
+  }
+}
+
 export function rejectMockOrderPayment(
     orderId: number,
     reason: MockPaymentRejectionReason,
@@ -1350,17 +1401,14 @@ export function rejectMockOrderPayment(
     if (!existingOrder) {
       throw new Error("ไม่พบคำสั่งซื้อจำลองในอุปกรณ์นี้");
     }
-    if (
-      existingOrder.detail.status === "PAYMENT_REVIEW_PENDING" ||
-      existingOrder.detail.status === "PAYMENT_REJECTED" ||
-      existingOrder.detail.paymentStatus === "DEPOSIT_FORFEITED"
-    ) {
+    if (!canRejectMockOrderPayment(existingOrder)) {
       throw new Error("ไม่สามารถปฏิเสธสลิปของคำสั่งซื้อนี้ได้ในสถานะปัจจุบัน");
     }
     const paymentReviewStage =
-      existingOrder.detail.status === "AWAITING_BALANCE_PAYMENT"
+      existingOrder.detail.paymentReviewStage ??
+      (existingOrder.detail.status === "AWAITING_BALANCE_PAYMENT"
         ? "BALANCE"
-        : "INITIAL";
+        : "INITIAL");
     const updatedOrder: MockStoredOrder = {
       ...existingOrder,
       detail: {

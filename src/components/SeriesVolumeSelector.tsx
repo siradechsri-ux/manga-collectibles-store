@@ -88,14 +88,6 @@ export default function SeriesVolumeSelector({
       ),
     [volumes],
   );
-  const inStockVolumes = useMemo(
-    () =>
-      volumes.filter(
-        (volume) => volume.status === "IN_STOCK" && volume.stock > 0,
-      ),
-    [volumes],
-  );
-
   const selectedVolumes = useMemo(
     () => purchasableVolumes.filter((volume) => selectedVolumeIds.has(volume.id)),
     [purchasableVolumes, selectedVolumeIds],
@@ -128,7 +120,9 @@ export default function SeriesVolumeSelector({
   }
 
   function selectAllInStock(): void {
-    setSelectedVolumeIds(new Set(inStockVolumes.map((volume) => volume.id)));
+    setSelectedVolumeIds(
+      new Set(purchasableVolumes.map((volume) => volume.id)),
+    );
   }
 
   function clearSelection(): void {
@@ -188,7 +182,7 @@ export default function SeriesVolumeSelector({
         <button
           type="button"
           onClick={selectAllInStock}
-          disabled={inStockVolumes.length === 0 || isStaffAccount}
+          disabled={purchasableVolumes.length === 0 || isStaffAccount}
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground transition hover:border-orange-300 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ListChecks size={16} aria-hidden="true" />

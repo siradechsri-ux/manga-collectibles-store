@@ -402,7 +402,7 @@ export default function OrderDetailView({
   function renderShipmentCards(shipments: OrderShipment[]) {
     if (shipments.length === 0) {
       return (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
           ยังไม่มีข้อมูลการจัดส่ง
         </div>
       );
@@ -437,15 +437,15 @@ export default function OrderDetailView({
       return (
       <article
         key={shipment.id}
-        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <span
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                 shipment.shipmentType === "IN_STOCK"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-violet-50 text-violet-700"
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                  : "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
               }`}
             >
               {shipment.shipmentType === "IN_STOCK" ? (
@@ -455,8 +455,8 @@ export default function OrderDetailView({
               )}
             </span>
             <div>
-              <h4 className="font-bold text-slate-900">{shipment.label}</h4>
-              <p className="mt-1 text-xs text-slate-500">
+              <h4 className="font-bold text-slate-900 dark:text-zinc-100">{shipment.label}</h4>
+              <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
                 {shipment.shipmentType === "IN_STOCK"
                   ? "กล่องสินค้าพร้อมส่ง"
                   : "กล่องสินค้าพรีออเดอร์"}
@@ -466,10 +466,10 @@ export default function OrderDetailView({
           <span
             className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
               shipment.status === "DELIVERED"
-                ? "bg-emerald-100 text-emerald-800"
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
                 : shipment.status === "SHIPPED"
-                  ? "bg-sky-100 text-sky-800"
-                  : "bg-amber-100 text-amber-800"
+                  ? "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
+                  : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
             }`}
           >
             {shipment.status === "DELIVERED"
@@ -480,14 +480,14 @@ export default function OrderDetailView({
           </span>
         </div>
 
-        <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+        <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3 dark:border-zinc-800">
           {shipment.items.map((item) => (
             <li
               key={item.id}
               className="flex items-start justify-between gap-3 text-sm"
             >
-              <span className="text-slate-700">{item.title}</span>
-              <span className="shrink-0 text-slate-500">x{item.quantity}</span>
+              <span className="text-slate-700 dark:text-zinc-300">{item.title}</span>
+              <span className="shrink-0 text-slate-500 dark:text-zinc-400">x{item.quantity}</span>
             </li>
           ))}
         </ul>
@@ -526,7 +526,10 @@ export default function OrderDetailView({
               );
             })}
           </ol>
-          {isMockMode && onAdvanceShipmentStatus && currentStep >= 2 && currentStep < 4 ? (
+          {isMockMode &&
+          onAdvanceShipmentStatus &&
+          currentStep < 4 &&
+          order.paymentStatus === "PAID" ? (
             <button
               type="button"
               onClick={onAdvanceShipmentStatus}
@@ -538,20 +541,20 @@ export default function OrderDetailView({
         </section>
 
         {shipment.trackingNumber && shipment.carrier ? (
-          <div className="mt-4 rounded-xl bg-slate-50 p-3">
-            <p className="text-xs text-slate-500">
+          <div className="mt-4 rounded-xl bg-slate-50 p-3 dark:bg-zinc-800/70">
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
               {getCarrierName(shipment.carrier)} ·{" "}
               {formatDateTime(shipment.shippedAt)}
             </p>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <span className="break-all font-mono text-sm font-bold text-slate-900">
+              <span className="break-all font-mono text-sm font-bold text-slate-900 dark:text-zinc-100">
                 {shipment.trackingNumber}
               </span>
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={() => void copyTrackingNumber(shipment.trackingNumber!)}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-slate-300"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-slate-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-500"
                 >
                   {copiedTrackingNumber === shipment.trackingNumber ? (
                     <Check size={14} aria-hidden="true" />
@@ -584,15 +587,15 @@ export default function OrderDetailView({
     <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-12 sm:px-6 lg:px-8">
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-500">รายละเอียดคำสั่งซื้อ</p>
-          <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
+          <p className="text-sm font-medium text-slate-500 dark:text-zinc-400">รายละเอียดคำสั่งซื้อ</p>
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl dark:text-zinc-50">
             {order.orderNumber}
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-slate-500 dark:text-zinc-400">
             สั่งซื้อเมื่อ {formatDateTime(order.createdAt)}
           </p>
         </div>
-        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
           <Clock3 size={16} aria-hidden="true" />
           {order.status === "AWAITING_BALANCE_PAYMENT"
             ? "รอชำระยอดคงเหลือ"

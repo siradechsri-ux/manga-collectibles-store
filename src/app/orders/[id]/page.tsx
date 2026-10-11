@@ -434,30 +434,30 @@ export default function MockOrderDetailPage() {
           </div>
         ) : null}
         {cancelError ? <p role="alert" className="mb-4 text-sm font-semibold text-red-700 dark:text-red-300">{cancelError}</p> : null}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="font-bold text-slate-900">สรุปภาษีจำลอง</h2>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="font-bold text-slate-900 dark:text-zinc-50">สรุปภาษีจำลอง</h2>
           <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-            <p className="text-slate-600">
+            <p className="text-slate-600 dark:text-zinc-400">
               มังงะยกเว้น VAT:{" "}
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-slate-900 dark:text-zinc-100">
                 ฿{storedOrder.taxSummary?.mangaVatExemptAmount ?? "0.00"}
               </span>
             </p>
-            <p className="text-slate-600">
+            <p className="text-slate-600 dark:text-zinc-400">
               ฐานภาษี Figure และค่าจัดส่ง:{" "}
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-slate-900 dark:text-zinc-100">
                 ฿{storedOrder.taxSummary?.vatBaseAmount ?? "0.00"}
               </span>
             </p>
-            <p className="text-slate-600">
+            <p className="text-slate-600 dark:text-zinc-400">
               VAT 7% (รวมในยอด):{" "}
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-slate-900 dark:text-zinc-100">
                 ฿{storedOrder.taxSummary?.vatAmount ?? "0.00"}
               </span>
             </p>
-            <p className="text-slate-600">
+            <p className="text-slate-600 dark:text-zinc-400">
               ใบกำกับภาษี:{" "}
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-slate-900 dark:text-zinc-100">
                 {storedOrder.taxSummary?.taxInvoiceRequested
                   ? "ร้องขอแล้ว"
                   : "ไม่ได้ร้องขอ"}
@@ -465,15 +465,15 @@ export default function MockOrderDetailPage() {
             </p>
           </div>
           {storedOrder.taxSummary?.taxInvoiceCustomer ? (
-            <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm">
-              <p className="font-semibold text-slate-900">
+            <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm dark:bg-zinc-800">
+              <p className="font-semibold text-slate-900 dark:text-zinc-100">
                 {storedOrder.taxSummary.taxInvoiceCustomer.companyOrName}
               </p>
-              <p className="mt-1 text-slate-600">
+              <p className="mt-1 text-slate-600 dark:text-zinc-400">
                 เลขประจำตัวผู้เสียภาษี{" "}
                 {storedOrder.taxSummary.taxInvoiceCustomer.maskedTaxId}
               </p>
-              <p className="mt-1 text-slate-600">
+              <p className="mt-1 text-slate-600 dark:text-zinc-400">
                 {storedOrder.taxSummary.taxInvoiceCustomer.address}
               </p>
             </div>

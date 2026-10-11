@@ -104,7 +104,7 @@ export default function StaffPackingPage() {
   if (isLoading) {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-5xl items-center justify-center px-4">
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-slate-500 dark:text-zinc-400">
           กำลังตรวจสอบสิทธิ์พนักงาน...
         </p>
       </main>
@@ -114,19 +114,19 @@ export default function StaffPackingPage() {
   if (user?.role !== "STAFF" && user?.role !== "ADMIN") {
     return (
       <main className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center px-5 text-center">
-        <span className="rounded-2xl bg-red-50 p-4 text-red-700">
+        <span className="rounded-2xl bg-red-50 p-4 text-red-700 dark:bg-red-950/40 dark:text-red-300">
           <AlertTriangle size={32} aria-hidden="true" />
         </span>
-        <p className="mt-5 text-sm font-bold uppercase tracking-wider text-red-700">
+        <p className="mt-5 text-sm font-bold uppercase tracking-wider text-red-700 dark:text-red-400">
           HTTP 403 · Access Denied
         </p>
-        <h1 className="mt-2 text-2xl font-extrabold text-slate-950">
+        <h1 className="mt-2 text-2xl font-extrabold text-slate-950 dark:text-zinc-50">
           หน้านี้สำหรับพนักงานคลังสินค้าเท่านั้น
         </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
+        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-zinc-400">
           ต้องเป็น STAFF หรือ ADMIN เพื่อเข้าถึงหน้าจัดการคลังสินค้า
         </p>
-        <Link href="/" className="mt-5 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white">
+        <Link href="/" className="mt-5 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-950">
           กลับหน้าร้าน
         </Link>
       </main>
@@ -138,42 +138,42 @@ export default function StaffPackingPage() {
       {shoppingDisabledNotice ? (
         <p
           role="status"
-          className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900"
+          className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
         >
           บัญชีเจ้าหน้าที่ไม่สามารถทำรายการสั่งซื้อได้
         </p>
       ) : null}
-      <header className="flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between dark:border-zinc-800">
         <div>
-          <p className="text-sm font-bold text-orange-700">STAFF · WAREHOUSE</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-950">
+          <p className="text-sm font-bold text-orange-700 dark:text-orange-300">STAFF · WAREHOUSE</p>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-950 dark:text-zinc-50">
             คลังสินค้าและจัดส่ง
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
             รายการที่แสดงเป็น Mock Order ที่ชำระครบและรอแพ็กจัดส่ง
           </p>
         </div>
-        <div className="rounded-xl bg-orange-50 px-4 py-3 text-sm font-bold text-orange-900">
+        <div className="rounded-xl bg-orange-50 px-4 py-3 text-sm font-bold text-orange-900 dark:bg-orange-950/40 dark:text-orange-200">
           รอแพ็ก {orders.length} คำสั่งซื้อ
         </div>
       </header>
 
       {error ? (
-        <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">
+        <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800 dark:bg-red-950/40 dark:text-red-200">
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+        <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
           {notice}
         </p>
       ) : null}
 
       {orders.length === 0 ? (
-        <section className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <section className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-zinc-700 dark:bg-zinc-900">
           <PackageCheck className="mx-auto h-10 w-10 text-slate-400" aria-hidden="true" />
-          <h2 className="mt-3 font-bold text-slate-900">ไม่มีคำสั่งซื้อรอแพ็ก</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <h2 className="mt-3 font-bold text-slate-900 dark:text-zinc-100">ไม่มีคำสั่งซื้อรอแพ็ก</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
             เมื่อมีคำสั่งซื้อที่ชำระครบ รายการจะแสดงในหน้านี้
           </p>
         </section>
@@ -184,34 +184,34 @@ export default function StaffPackingPage() {
             return (
               <article
                 key={order.detail.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg font-extrabold text-slate-950">
+                      <h2 className="text-lg font-extrabold text-slate-950 dark:text-zinc-50">
                         {order.detail.orderNumber}
                       </h2>
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-extrabold text-emerald-800">
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                         PAID
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
                       Order ID {order.detail.id} · {order.detail.items.length} รายการ
                     </p>
                     <ul className="mt-4 space-y-2">
                       {order.detail.items.map((item) => (
                         <li key={item.id} className="flex justify-between gap-4 text-sm">
-                          <span className="text-slate-700">
+                          <span className="text-slate-700 dark:text-zinc-300">
                             {item.title} × {item.quantity}
                           </span>
-                          <span className="shrink-0 font-semibold text-slate-900">
+                          <span className="shrink-0 font-semibold text-slate-900 dark:text-zinc-100">
                             ฿{item.lineTotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                           </span>
                         </li>
                       ))}
                     </ul>
-                    <p className="mt-4 text-sm font-extrabold text-slate-950">
+                    <p className="mt-4 text-sm font-extrabold text-slate-950 dark:text-zinc-50">
                       ยอดชำระแล้ว ฿{order.detail.paidAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                     </p>
                   </div>
@@ -221,7 +221,7 @@ export default function StaffPackingPage() {
                       type="button"
                       onClick={() => scanOrder(order.detail.id)}
                       disabled={scanned}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 text-sm font-bold text-orange-900 hover:bg-orange-100 disabled:border-emerald-200 disabled:bg-emerald-50 disabled:text-emerald-800"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 text-sm font-bold text-orange-900 hover:bg-orange-100 disabled:border-emerald-200 disabled:bg-emerald-50 disabled:text-emerald-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-200 dark:hover:bg-orange-950/70 disabled:dark:border-emerald-900 disabled:dark:bg-emerald-950/40 disabled:dark:text-emerald-300"
                     >
                       {scanned ? <Check size={17} /> : <ScanLine size={17} />}
                       {scanned ? "สแกนผ่านแล้ว" : "สแกนบาร์โค้ดผ่าน"}
@@ -230,7 +230,7 @@ export default function StaffPackingPage() {
                       type="button"
                       onClick={() => printShippingLabel(order)}
                       disabled={!scanned}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
                     >
                       <Printer size={17} />
                       พิมพ์ใบปะหน้า
@@ -239,7 +239,7 @@ export default function StaffPackingPage() {
                       type="button"
                       onClick={() => shipOrder(order.detail.id)}
                       disabled={!scanned}
-                      className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
                     >
                       จัดส่งแล้ว
                     </button>

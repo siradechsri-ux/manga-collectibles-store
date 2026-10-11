@@ -13,6 +13,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import {
   listMockOrders,
   approveMockOrderPaymentReview,
+  canRejectMockOrderPayment,
   MOCK_ORDERS_UPDATED_EVENT,
   MOCK_PAYMENT_REJECTION_REASONS,
   rejectMockOrderPayment,
@@ -90,7 +91,7 @@ export default function FinanceSlipsPage() {
   if (isLoading) {
     return (
       <main className="flex min-h-[60vh] items-center justify-center px-4">
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-slate-500 dark:text-zinc-400">
           กำลังตรวจสอบสิทธิ์ฝ่ายการเงิน...
         </p>
       </main>
@@ -101,16 +102,16 @@ export default function FinanceSlipsPage() {
     return (
       <main className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center px-5 text-center">
         <AlertTriangle size={34} className="text-red-600" aria-hidden="true" />
-        <p className="mt-4 text-sm font-bold uppercase tracking-wider text-red-700">
+        <p className="mt-4 text-sm font-bold uppercase tracking-wider text-red-700 dark:text-red-400">
           HTTP 403 · Finance Only
         </p>
-        <h1 className="mt-2 text-2xl font-extrabold text-slate-950">
+        <h1 className="mt-2 text-2xl font-extrabold text-slate-950 dark:text-zinc-50">
           ไม่มีสิทธิ์เข้าถึงรายการตรวจสอบยอดเงิน
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
           ต้องเป็น FINANCE หรือ ADMIN เพื่อเข้าถึงรายการตรวจสอบการชำระเงิน
         </p>
-        <Link href="/" className="mt-5 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white">
+        <Link href="/" className="mt-5 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-950">
           กลับหน้าร้าน
         </Link>
       </main>
@@ -122,17 +123,17 @@ export default function FinanceSlipsPage() {
       {shoppingDisabledNotice ? (
         <p
           role="status"
-          className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900"
+          className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
         >
           บัญชีเจ้าหน้าที่ไม่สามารถทำรายการสั่งซื้อได้
         </p>
       ) : null}
-      <header className="border-b border-slate-200 pb-6">
-        <p className="text-sm font-extrabold text-emerald-700">FINANCE · SLIP REVIEW</p>
-        <h1 className="mt-1 text-3xl font-extrabold text-slate-950">
+      <header className="border-b border-slate-200 pb-6 dark:border-zinc-800">
+        <p className="text-sm font-extrabold text-emerald-700 dark:text-emerald-300">FINANCE · SLIP REVIEW</p>
+        <h1 className="mt-1 text-3xl font-extrabold text-slate-950 dark:text-zinc-50">
           ตรวจสอบยอดเงิน
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
           รายงานรายการชำระเงินจำลองที่ผ่านการยืนยันใน Prototype
         </p>
       </header>
@@ -148,30 +149,30 @@ export default function FinanceSlipsPage() {
       ) : null}
 
       {orders.length === 0 ? (
-        <section className="mt-7 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <section className="mt-7 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-zinc-700 dark:bg-zinc-900">
           <ReceiptText className="mx-auto h-10 w-10 text-slate-400" aria-hidden="true" />
-          <h2 className="mt-3 font-bold text-slate-900">ยังไม่มีรายการชำระที่ตรวจสอบแล้ว</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <h2 className="mt-3 font-bold text-slate-900 dark:text-zinc-100">ยังไม่มีรายการชำระที่ตรวจสอบแล้ว</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
             เมื่อมีการจำลองชำระเงิน รายการจะแสดงในรายงานนี้
           </p>
         </section>
       ) : (
-        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="divide-y divide-slate-100">
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="divide-y divide-slate-100 dark:divide-zinc-800">
             {orders.map((order) => (
               <article
                 key={order.detail.id}
                 className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 rounded-xl bg-emerald-50 p-2 text-emerald-700">
+                  <span className="mt-0.5 rounded-xl bg-emerald-50 p-2 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
                     <BadgeCheck size={20} aria-hidden="true" />
                   </span>
                   <div>
-                    <h2 className="font-bold text-slate-950">
+                    <h2 className="font-bold text-slate-950 dark:text-zinc-50">
                       {order.detail.orderNumber}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-slate-600 dark:text-zinc-400">
                       {order.detail.items.map((item) => item.title).join(", ")}
                     </p>
                     <p className={`mt-1 text-xs font-semibold ${
@@ -192,7 +193,7 @@ export default function FinanceSlipsPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-                  <p className="text-sm font-extrabold text-slate-950">
+                  <p className="text-sm font-extrabold text-slate-950 dark:text-zinc-50">
                     ฿{order.detail.paidAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                   </p>
                   {order.detail.status === "PAYMENT_REVIEW_PENDING" ? (
@@ -205,7 +206,7 @@ export default function FinanceSlipsPage() {
                       อนุมัติ
                     </button>
                   ) : null}
-                  {order.detail.status !== "PAYMENT_REJECTED" ? (
+                  {canRejectMockOrderPayment(order) ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -220,7 +221,7 @@ export default function FinanceSlipsPage() {
                   ) : null}
                   <Link
                     href={`/orders/${order.detail.id}`}
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                   >
                     เปิด Order
                   </Link>

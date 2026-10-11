@@ -100,7 +100,7 @@ export default function AdminDashboardPage() {
   if (isLoading) {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-6xl items-center justify-center px-4">
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-slate-500 dark:text-zinc-400">
           กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ...
         </p>
       </main>
@@ -111,16 +111,16 @@ export default function AdminDashboardPage() {
     return (
       <main className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center px-5 text-center">
         <AlertTriangle size={34} className="text-red-600" aria-hidden="true" />
-        <p className="mt-4 text-sm font-bold uppercase tracking-wider text-red-700">
+        <p className="mt-4 text-sm font-bold uppercase tracking-wider text-red-700 dark:text-red-400">
           HTTP 403 · Admin Only
         </p>
-        <h1 className="mt-2 text-2xl font-extrabold text-slate-950">
+        <h1 className="mt-2 text-2xl font-extrabold text-slate-950 dark:text-zinc-50">
           ไม่มีสิทธิ์เข้าถึงระบบจัดการ
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
           สลับ Role เป็น ADMIN ผ่านแถบสลับบทบาททดสอบเพื่อเปิดหน้าจำลองนี้
         </p>
-        <Link href="/" className="mt-5 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white">
+        <Link href="/" className="mt-5 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-950">
           กลับหน้าร้าน
         </Link>
       </main>
@@ -138,49 +138,49 @@ export default function AdminDashboardPage() {
 
   return (
     <main className="mx-auto min-h-[75vh] max-w-7xl px-4 py-8 pb-28 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 md:flex-row md:items-end md:justify-between">
+      <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 md:flex-row md:items-end md:justify-between dark:border-zinc-800">
         <div>
-          <p className="text-sm font-extrabold tracking-wide text-violet-700">
+          <p className="text-sm font-extrabold tracking-wide text-violet-700 dark:text-violet-300">
             ADMIN · STORE CONTROL
           </p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-950">
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-950 dark:text-zinc-50">
             ระบบจัดการหลังบ้าน
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
             สินค้าพรีออเดอร์, คำสั่งซื้อที่รอชำระยอดคงเหลือ และคิว Waitlist
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 text-center">
-          <div className="rounded-xl bg-violet-50 px-4 py-3">
-            <p className="text-2xl font-extrabold text-violet-900">
+          <div className="rounded-xl bg-violet-50 px-4 py-3 dark:bg-violet-950/50">
+            <p className="text-2xl font-extrabold text-violet-900 dark:text-violet-100">
               {depositOrders.length}
             </p>
-            <p className="text-xs font-semibold text-violet-700">รอสินค้าเข้าไทย</p>
+            <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">รอสินค้าเข้าไทย</p>
           </div>
-          <div className="rounded-xl bg-red-50 px-4 py-3">
-            <p className="text-2xl font-extrabold text-red-900">
+          <div className="rounded-xl bg-red-50 px-4 py-3 dark:bg-red-950/40">
+            <p className="text-2xl font-extrabold text-red-900 dark:text-red-200">
               {awaitingBalanceOrders.length}
             </p>
-            <p className="text-xs font-semibold text-red-700">รอจ่ายยอดคงเหลือ</p>
+            <p className="text-xs font-semibold text-red-700 dark:text-red-300">รอจ่ายยอดคงเหลือ</p>
           </div>
         </div>
       </header>
 
       {error ? (
-        <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">
+        <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800 dark:bg-red-950/40 dark:text-red-200">
           {error}
         </p>
       ) : null}
       {shoppingDisabledNotice ? (
         <p
           role="status"
-          className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900"
+          className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
         >
           บัญชีเจ้าหน้าที่ไม่สามารถทำรายการสั่งซื้อได้
         </p>
       ) : null}
       {notice ? (
-        <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+        <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
           {notice}
         </p>
       ) : null}
@@ -208,7 +208,7 @@ export default function AdminDashboardPage() {
         </button>
       </div>
 
-      <section className="mt-7 rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-900 p-6 text-white shadow-lg sm:p-8">
+      <section className="mt-7 rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-900 p-6 text-white shadow-lg sm:p-8 dark:border-violet-800">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-violet-100 ring-1 ring-white/15">
@@ -241,20 +241,20 @@ export default function AdminDashboardPage() {
       </section>
 
       <div className="mt-7 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-extrabold text-slate-950">
+              <h2 className="text-lg font-extrabold text-slate-950 dark:text-zinc-50">
                 คำสั่งซื้อพรีออเดอร์
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
                 ตรวจสถานะมัดจำและการเรียกเก็บยอดรอบสอง
               </p>
             </div>
-            <Clock3 className="text-violet-700" aria-hidden="true" />
+            <Clock3 className="text-violet-700 dark:text-violet-300" aria-hidden="true" />
           </div>
           {orders.length === 0 ? (
-            <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+            <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-zinc-800 dark:text-zinc-400">
               ยังไม่มีคำสั่งซื้อจำลอง สั่งซื้อสินค้าด้วยบัญชีลูกค้าเพื่อเริ่มทดสอบ
             </p>
           ) : (
@@ -262,23 +262,23 @@ export default function AdminDashboardPage() {
               {orders.map((order) => (
                 <article
                   key={order.detail.id}
-                  className="rounded-xl border border-slate-200 p-4"
+                  className="rounded-xl border border-slate-200 p-4 dark:border-zinc-800"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <Link
                       href={`/orders/${order.detail.id}`}
-                      className="font-bold text-slate-900 underline decoration-slate-300 underline-offset-4 hover:text-violet-800"
+                      className="font-bold text-slate-900 underline decoration-slate-300 underline-offset-4 hover:text-violet-800 dark:text-zinc-100 dark:decoration-zinc-600 dark:hover:text-violet-300"
                     >
                       {order.detail.orderNumber}
                     </Link>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
                       {order.detail.status}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-slate-600">
+                  <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
                     {order.detail.items.map((item) => item.title).join(", ")}
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                  <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-zinc-100">
                     มัดจำแล้ว ฿{order.detail.paidAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                     {" · "}คงเหลือ ฿{order.detail.remainingBalance.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                   </p>
@@ -288,44 +288,44 @@ export default function AdminDashboardPage() {
           )}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-extrabold text-slate-950">
+              <h2 className="text-lg font-extrabold text-slate-950 dark:text-zinc-50">
                 คิว Waitlist · ของหลุดจอง
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
                 รายชื่อจำลองเรียงตามลำดับคิวของสินค้า
               </p>
             </div>
-            <UsersRound className="text-violet-700" aria-hidden="true" />
+            <UsersRound className="text-violet-700 dark:text-violet-300" aria-hidden="true" />
           </div>
           <div className="mt-5 space-y-3">
             {waitlist.map((entry) => (
               <article
                 key={entry.id}
-                className="flex items-start gap-3 rounded-xl border border-slate-200 p-4"
+                className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 dark:border-zinc-800"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm font-extrabold text-violet-900">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm font-extrabold text-violet-900 dark:bg-violet-950 dark:text-violet-200">
                   #{entry.queuePosition}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-bold text-slate-900">{entry.customerName}</p>
+                    <p className="font-bold text-slate-900 dark:text-zinc-100">{entry.customerName}</p>
                     <span
                       className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
                         entry.status === "OFFERED"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-slate-100 text-slate-700"
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                          : "bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300"
                       }`}
                     >
                       {entry.status}
                     </span>
                   </div>
-                  <p className="mt-1 break-all text-xs text-slate-500">
+                  <p className="mt-1 break-all text-xs text-slate-500 dark:text-zinc-400">
                     {entry.customerEmail}
                   </p>
-                  <p className="mt-1 text-xs text-violet-800">{entry.productName}</p>
+                  <p className="mt-1 text-xs text-violet-800 dark:text-violet-300">{entry.productName}</p>
                 </div>
               </article>
             ))}
