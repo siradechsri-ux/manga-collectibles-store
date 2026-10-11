@@ -23,6 +23,8 @@ export type OrderTrackingStatus =
   | "ORDER_PLACED"
   | "DEPOSIT_PAID"
   | "AWAITING_BALANCE_PAYMENT"
+  | "PAYMENT_REJECTED"
+  | "PAYMENT_REVIEW_PENDING"
   | "PAID"
   | "PACKING"
   | "SHIPPED"
@@ -62,6 +64,7 @@ export interface OrderShipment {
   label: string;
   shipmentType: "IN_STOCK" | "PREORDER";
   status: "PREPARING" | "SHIPPED" | "DELIVERED";
+  trackingStatus?: "PREPARING" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED";
   carrier: ShipmentCarrier | null;
   trackingNumber: string | null;
   shippedAt: string | null;
@@ -79,6 +82,9 @@ export interface OrderTrackingDetail {
   status: OrderTrackingStatus;
   timelineStage: OrderTimelineStage;
   paymentStatus: "UNPAID" | "PAID" | "DEPOSIT_PAID" | "DEPOSIT_FORFEITED";
+  paymentRejectionReason?: string | null;
+  paymentReviewStage?: "INITIAL" | "BALANCE";
+  paymentSlipFileName?: string | null;
   totalAmount: number;
   paidAmount: number;
   remainingBalance: number;
@@ -101,6 +107,8 @@ export interface OrderDetailViewProps {
   onUploadBalanceSlip: (
     request: BalanceSlipUploadRequest,
   ) => Promise<void>;
+  onAdvanceShipmentStatus?: () => void;
+  isMockMode?: boolean;
 }
 
 interface CountdownParts {
@@ -202,6 +210,8 @@ export default function OrderDetailView({
   promptPayQrCodeUrl,
   getPaymentQrCodeUrl,
   onUploadBalanceSlip,
+  onAdvanceShipmentStatus,
+  isMockMode = false,
 }: OrderDetailViewProps) {
   const [now, setNow] = useState(() => Date.now());
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -398,7 +408,33 @@ export default function OrderDetailView({
       );
     }
 
-    return shipments.map((shipment) => (
+    const shippingSteps = [
+      "ชำระเงินสำเร็จ",
+      "กำลังจัดเตรียมพัสดุ",
+      "เข้าระบบขนส่ง",
+      "พัสดุอยู่ระหว่างนำจ่าย",
+      "จัดส่งสำเร็จ",
+    ];
+
+    return shipments.map((shipment) => {
+      const trackingStatus =
+        shipment.trackingStatus ??
+        (shipment.status === "DELIVERED"
+          ? "DELIVERED"
+          : shipment.status === "SHIPPED"
+            ? "IN_TRANSIT"
+            : "PREPARING");
+      const currentStep =
+        trackingStatus === "DELIVERED"
+          ? 4
+          : trackingStatus === "OUT_FOR_DELIVERY"
+            ? 3
+            : trackingStatus === "IN_TRANSIT"
+              ? 2
+              : shipment.status === "PREPARING"
+                ? 1
+                : 0;
+      return (
       <article
         key={shipment.id}
         className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -456,6 +492,51 @@ export default function OrderDetailView({
           ))}
         </ul>
 
+        <section
+          className="mt-4 border-t border-slate-100 pt-4 dark:border-zinc-700"
+          aria-label="ไทม์ไลน์สถานะจัดส่ง"
+        >
+          <ol className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+            {shippingSteps.map((step, index) => {
+              const isComplete = index <= currentStep;
+              return (
+                <li
+                  key={step}
+                  className="flex items-center gap-2 sm:flex-col sm:items-start"
+                >
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      isComplete
+                        ? "bg-sky-600 text-white"
+                        : "bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400"
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+                  <span
+                    className={`text-xs font-semibold ${
+                      isComplete
+                        ? "text-sky-800 dark:text-sky-300"
+                        : "text-slate-500 dark:text-zinc-400"
+                    }`}
+                  >
+                    {step}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          {isMockMode && onAdvanceShipmentStatus && currentStep >= 2 && currentStep < 4 ? (
+            <button
+              type="button"
+              onClick={onAdvanceShipmentStatus}
+              className="mt-4 inline-flex min-h-10 items-center rounded-lg border border-violet-300 px-3 py-2 text-xs font-bold text-violet-800 transition hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/40"
+            >
+              [จำลอง] ขยับสถานะขนส่งถัดไป
+            </button>
+          ) : null}
+        </section>
+
         {shipment.trackingNumber && shipment.carrier ? (
           <div className="mt-4 rounded-xl bg-slate-50 p-3">
             <p className="text-xs text-slate-500">
@@ -495,7 +576,8 @@ export default function OrderDetailView({
           </div>
         ) : null}
       </article>
-    ));
+      );
+    });
   }
 
   return (
@@ -514,6 +596,10 @@ export default function OrderDetailView({
           <Clock3 size={16} aria-hidden="true" />
           {order.status === "AWAITING_BALANCE_PAYMENT"
             ? "รอชำระยอดคงเหลือ"
+            : order.status === "PAYMENT_REJECTED"
+              ? "สลิปถูกปฏิเสธ"
+              : order.status === "PAYMENT_REVIEW_PENDING"
+                ? "รอตรวจสอบสลิป"
             : order.status === "DEPOSIT_FORFEITED"
               ? "หมดเขตชำระยอดคงเหลือ"
               : order.status === "DELIVERED"

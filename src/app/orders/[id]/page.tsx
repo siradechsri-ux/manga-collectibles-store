@@ -12,9 +12,11 @@ import type {
 } from "../../../components/OrderDetailView";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
+  advanceMockShipmentStatus,
   getMockOrder,
   cancelMockOrder,
   markMockOrderArrived,
+  resubmitMockOrderSlip,
   type MockStoredOrder,
   updateMockOrderPayment,
 } from "../../../mocks/storage.mock";
@@ -60,6 +62,9 @@ export default function MockOrderDetailPage() {
   const [isMarkingArrived, setIsMarkingArrived] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [replacementSlip, setReplacementSlip] = useState<File | null>(null);
+  const [replacementSlipError, setReplacementSlipError] = useState<string | null>(null);
+  const [replacementSlipNotice, setReplacementSlipNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
@@ -199,6 +204,61 @@ export default function MockOrderDetailPage() {
     }
   }
 
+  function handleReplacementSlip(file: File | undefined): void {
+    setReplacementSlipError(null);
+    setReplacementSlipNotice(null);
+    if (!file) {
+      setReplacementSlip(null);
+      return;
+    }
+    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
+      setReplacementSlip(null);
+      setReplacementSlipError("กรุณาเลือกไฟล์รูปภาพที่มีขนาดไม่เกิน 5 MB");
+      return;
+    }
+    setReplacementSlip(file);
+  }
+
+  function submitReplacementSlip(): void {
+    setReplacementSlipError(null);
+    setReplacementSlipNotice(null);
+    if (!user || user.role !== "CUSTOMER" || !replacementSlip) {
+      setReplacementSlipError("กรุณาเข้าสู่ระบบในฐานะลูกค้าและเลือกไฟล์สลิป");
+      return;
+    }
+    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+      setReplacementSlipError("การส่งสลิปใหม่ใช้ได้เฉพาะโหมด Prototype");
+      return;
+    }
+    try {
+      const updated = resubmitMockOrderSlip(
+        Number(orderId),
+        user.id,
+        replacementSlip.name,
+      );
+      setStoredOrder(updated);
+      setReplacementSlip(null);
+      setReplacementSlipNotice("ส่งสลิปใหม่ให้ฝ่ายการเงินตรวจสอบแล้ว");
+    } catch (submitError) {
+      setReplacementSlipError(
+        submitError instanceof Error ? submitError.message : "ส่งสลิปใหม่ไม่สำเร็จ",
+      );
+    }
+  }
+
+  function advanceShipment(): void {
+    setActionError(null);
+    try {
+      setStoredOrder(advanceMockShipmentStatus(Number(orderId)));
+    } catch (shipmentError) {
+      setActionError(
+        shipmentError instanceof Error
+          ? shipmentError.message
+          : "เปลี่ยนสถานะขนส่งไม่สำเร็จ",
+      );
+    }
+  }
+
   if (isLoading || isAuthLoading) {
     return (
       <main className="flex min-h-[60vh] items-center justify-center px-4">
@@ -301,6 +361,57 @@ export default function MockOrderDetailPage() {
       </div>
 
       <section className="mx-auto mt-4 max-w-6xl px-4 sm:px-6">
+        {order.status === "PAYMENT_REJECTED" && user?.role === "CUSTOMER" ? (
+          <section className="mb-4 rounded-2xl border border-red-300 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/40">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-700 dark:text-red-300" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <h2 className="font-bold text-red-900 dark:text-red-100">สลิปถูกปฏิเสธ</h2>
+                <p className="mt-1 text-sm text-red-800 dark:text-red-200">
+                  เหตุผล: {order.paymentRejectionReason ?? "กรุณาตรวจสอบรายละเอียดกับฝ่ายการเงิน"}
+                </p>
+                <label className="mt-4 block text-sm font-semibold text-red-950 dark:text-red-100" htmlFor="replacement-payment-slip">
+                  แนบหลักฐานการชำระเงินใหม่
+                </label>
+                <input
+                  id="replacement-payment-slip"
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => handleReplacementSlip(event.currentTarget.files?.[0])}
+                  className="mt-2 block w-full rounded-lg border border-red-300 bg-white p-2 text-sm text-slate-900 file:mr-3 file:rounded-md file:border-0 file:bg-red-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-red-800 dark:border-red-800 dark:bg-zinc-900 dark:text-zinc-100 dark:file:bg-red-950 dark:file:text-red-200"
+                />
+                {replacementSlip ? (
+                  <p className="mt-2 text-xs text-red-800 dark:text-red-200">
+                    ไฟล์ที่เลือก: {replacementSlip.name}
+                  </p>
+                ) : null}
+                {replacementSlipError ? (
+                  <p role="alert" className="mt-2 text-sm font-semibold text-red-700 dark:text-red-300">
+                    {replacementSlipError}
+                  </p>
+                ) : null}
+                {replacementSlipNotice ? (
+                  <p role="status" className="mt-2 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                    {replacementSlipNotice}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={submitReplacementSlip}
+                  disabled={!replacementSlip || process.env.NEXT_PUBLIC_USE_MOCK !== "true"}
+                  className="mt-3 inline-flex min-h-10 items-center justify-center rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  ยืนยันส่งตรวจอีกครั้ง
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+        {order.status === "PAYMENT_REVIEW_PENDING" && user?.role === "CUSTOMER" ? (
+          <p role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            ได้รับสลิปใหม่แล้ว กำลังรอฝ่ายการเงินตรวจสอบ
+          </p>
+        ) : null}
         {order.status === "UNPAID" && user?.role === "CUSTOMER" ? (
           <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-red-200 bg-white p-4 dark:border-red-900 dark:bg-zinc-900 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -375,6 +486,8 @@ export default function MockOrderDetailPage() {
         promptPayQrCodeUrl={storedOrder.paymentQrCodeDataUrl}
         getPaymentQrCodeUrl={getBalanceQrCodeUrl}
         onUploadBalanceSlip={uploadBalanceSlip}
+        onAdvanceShipmentStatus={advanceShipment}
+        isMockMode={process.env.NEXT_PUBLIC_USE_MOCK === "true"}
       />
       {isCancelDialogOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="cancel-detail-order-title">

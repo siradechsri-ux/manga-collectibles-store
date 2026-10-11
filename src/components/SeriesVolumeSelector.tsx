@@ -6,8 +6,10 @@ import {
   BookOpen,
   CalendarDays,
   Check,
+  ListChecks,
   PackageCheck,
   ShoppingCart,
+  X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -22,6 +24,7 @@ export interface VolumeItem {
   variantLabel?: string;
   coverUrl?: string;
   price: number;
+  weightGrams?: number;
   stock: number;
   status: "IN_STOCK" | "PREORDER" | "OUT_OF_STOCK";
   expectedShippingDate?: string;
@@ -85,6 +88,13 @@ export default function SeriesVolumeSelector({
       ),
     [volumes],
   );
+  const inStockVolumes = useMemo(
+    () =>
+      volumes.filter(
+        (volume) => volume.status === "IN_STOCK" && volume.stock > 0,
+      ),
+    [volumes],
+  );
 
   const selectedVolumes = useMemo(
     () => purchasableVolumes.filter((volume) => selectedVolumeIds.has(volume.id)),
@@ -96,9 +106,14 @@ export default function SeriesVolumeSelector({
     [selectedVolumes],
   );
 
-  const allSelected =
-    purchasableVolumes.length > 0 &&
-    purchasableVolumes.every((volume) => selectedVolumeIds.has(volume.id));
+  const selectedWeightGrams = useMemo(
+    () =>
+      selectedVolumes.reduce(
+        (total, volume) => total + (volume.weightGrams ?? 0),
+        0,
+      ),
+    [selectedVolumes],
+  );
 
   function toggleVolume(volumeId: number) {
     setSelectedVolumeIds((currentSelection) => {
@@ -112,16 +127,12 @@ export default function SeriesVolumeSelector({
     });
   }
 
-  function toggleSelectAll() {
-    setSelectedVolumeIds((currentSelection) => {
-      if (allSelected) {
-        return new Set();
-      }
-      return new Set([
-        ...currentSelection,
-        ...purchasableVolumes.map((volume) => volume.id),
-      ]);
-    });
+  function selectAllInStock(): void {
+    setSelectedVolumeIds(new Set(inStockVolumes.map((volume) => volume.id)));
+  }
+
+  function clearSelection(): void {
+    setSelectedVolumeIds(new Set());
   }
 
   function addToWaitlist(volume: VolumeItem): void {
@@ -172,15 +183,25 @@ export default function SeriesVolumeSelector({
           </p>
         </div>
 
+      </div>
+      <div className="mb-5 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={toggleSelectAll}
-          disabled={purchasableVolumes.length === 0 || isStaffAccount}
-          className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground transition hover:border-orange-300 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
-          aria-pressed={allSelected}
+          onClick={selectAllInStock}
+          disabled={inStockVolumes.length === 0 || isStaffAccount}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground transition hover:border-orange-300 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {allSelected ? <Check size={16} aria-hidden="true" /> : null}
-          {allSelected ? "ยกเลิกเลือกทั้งหมด" : "เลือกทั้งหมด (Select All)"}
+          <ListChecks size={16} aria-hidden="true" />
+          เลือกทุกเล่มที่มีสินค้า
+        </button>
+        <button
+          type="button"
+          onClick={clearSelection}
+          disabled={selectedVolumeIds.size === 0 || isStaffAccount}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-card-foreground transition hover:border-slate-400 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <X size={16} aria-hidden="true" />
+          ล้างการเลือก
         </button>
       </div>
 
@@ -337,6 +358,10 @@ export default function SeriesVolumeSelector({
               </p>
               <p className="text-sm font-bold text-orange-600 dark:text-orange-400">
                 ยอดรวม {currencyFormatter.format(selectedTotal)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                น้ำหนักรวม {selectedWeightGrams.toLocaleString("th-TH")} กรัม (
+                {(selectedWeightGrams / 1_000).toFixed(2)} กก.)
               </p>
             </div>
             <button

@@ -12,6 +12,7 @@ const volumeSchema = z
     isbn: z.string().optional(),
     price: z.number().finite().positive(),
     stock: z.number().int().nonnegative(),
+    weightGrams: z.number().finite().nonnegative().optional(),
     status: z.enum(["IN_STOCK", "PREORDER", "OUT_OF_STOCK"]),
     expectedShippingDate: z.string().optional(),
   })

@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   BellRing,
   Clock3,
+  FastForward,
   PackageCheck,
   UsersRound,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import {
   type MockStoredOrder,
   type MockWaitlistEntry,
   getMockWaitlistEntries,
+  simulateMock14DayExpiry,
   MOCK_WAITLIST_UPDATED_EVENT,
 } from "../../mocks/storage.mock";
 
@@ -25,6 +27,7 @@ export default function AdminDashboardPage() {
   const [waitlist, setWaitlist] = useState<MockWaitlistEntry[]>([]);
   const [shoppingDisabledNotice, setShoppingDisabledNotice] = useState(false);
   const [isTriggeringArrival, setIsTriggeringArrival] = useState(false);
+  const [isSimulatingExpiry, setIsSimulatingExpiry] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,6 +73,27 @@ export default function AdminDashboardPage() {
       );
     } finally {
       setIsTriggeringArrival(false);
+    }
+  }
+
+  function simulateFourteenDays(): void {
+    setError(null);
+    setNotice(null);
+    setIsSimulatingExpiry(true);
+    try {
+      const result = simulateMock14DayExpiry();
+      refreshDashboard();
+      const summary = `ปรับสถานะออเดอร์หมดอายุแล้ว ${result.expiredCount} รายการ และโอนสิทธิ์ให้คิว Waitlist ลำดับถัดไปสำเร็จ ${result.waitlistTransfers} รายการ`;
+      setNotice(summary);
+      window.alert(summary);
+    } catch (simulationError) {
+      setError(
+        simulationError instanceof Error
+          ? simulationError.message
+          : "จำลองวันหมดอายุและจัดสรรคิว Waitlist ไม่สำเร็จ",
+      );
+    } finally {
+      setIsSimulatingExpiry(false);
     }
   }
 
@@ -161,13 +185,28 @@ export default function AdminDashboardPage() {
         </p>
       ) : null}
 
-      <Link
-        href="/admin/products"
-        className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-800 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-orange-800 dark:hover:bg-zinc-800"
-      >
-        <PackageCheck size={17} aria-hidden="true" />
-        จัดการสินค้าและสต็อก
-      </Link>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link
+          href="/admin/products"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-800 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-orange-800 dark:hover:bg-zinc-800"
+        >
+          <PackageCheck size={17} aria-hidden="true" />
+          จัดการสินค้าและสต็อก
+        </Link>
+        <button
+          type="button"
+          onClick={simulateFourteenDays}
+          disabled={isSimulatingExpiry}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-bold text-violet-900 transition hover:bg-violet-100 disabled:cursor-wait disabled:opacity-60 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-200 dark:hover:bg-violet-900/60"
+        >
+          {isSimulatingExpiry ? (
+            <FastForward size={17} aria-hidden="true" />
+          ) : (
+            <Clock3 size={17} aria-hidden="true" />
+          )}
+          จำลองเวลา: ผ่านไป 14 วัน
+        </button>
+      </div>
 
       <section className="mt-7 rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-950 via-violet-900 to-indigo-900 p-6 text-white shadow-lg sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">

@@ -37,6 +37,8 @@ const mockStoredOrderSchema = z
           "ORDER_PLACED",
           "DEPOSIT_PAID",
           "AWAITING_BALANCE_PAYMENT",
+          "PAYMENT_REJECTED",
+          "PAYMENT_REVIEW_PENDING",
           "PAID",
           "PACKING",
           "SHIPPED",
@@ -55,6 +57,9 @@ const mockStoredOrderSchema = z
           "DEPOSIT_PAID",
           "DEPOSIT_FORFEITED",
         ]),
+        paymentRejectionReason: z.string().nullable().optional(),
+        paymentReviewStage: z.enum(["INITIAL", "BALANCE"]).optional(),
+        paymentSlipFileName: z.string().nullable().optional(),
         totalAmount: z.number().finite().nonnegative(),
         paidAmount: z.number().finite().nonnegative(),
         remainingBalance: z.number().finite().nonnegative(),
@@ -97,6 +102,9 @@ const mockStoredOrderSchema = z
               label: z.string(),
               shipmentType: z.enum(["IN_STOCK", "PREORDER"]),
               status: z.enum(["PREPARING", "SHIPPED", "DELIVERED"]),
+              trackingStatus: z
+                .enum(["PREPARING", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"])
+                .optional(),
               carrier: z.enum(["FLASH", "THAI_POST"]).nullable(),
               trackingNumber: z.string().nullable(),
               shippedAt: z.string().datetime({ offset: true }).nullable(),
@@ -809,6 +817,8 @@ export function updateMockOrderPayment(
         }))
       : existingOrder.detail.items,
     ...(isBalancePayment ? { balanceDueDate: null } : {}),
+    paymentRejectionReason: null,
+    paymentSlipFileName: null,
     timeline: existingOrder.detail.timeline.map((event) =>
       event.stage === "DEPOSIT_PAID"
         ? {
@@ -962,7 +972,13 @@ export function markAllMockDepositOrdersArrived(): {
   return { updatedOrders: changedOrders, updatedCount: changedOrders.length };
 }
 
-export function markMockOrderShipped(orderId: number): MockStoredOrder {
+export function markMockOrderShipped(
+  orderId: number,
+  carrier: OrderShipment["carrier"] = "FLASH",
+): MockStoredOrder {
+  if (carrier !== "FLASH" && carrier !== "THAI_POST") {
+    throw new Error("ไม่รองรับบริษัทขนส่งที่เลือก");
+  }
   const orders = readAllOrders();
   const orderIndex = orders.findIndex((order) => order.detail.id === orderId);
   const existingOrder = orders[orderIndex];
@@ -983,8 +999,9 @@ export function markMockOrderShipped(orderId: number): MockStoredOrder {
         ? {
             ...shipment,
             status: "SHIPPED" as const,
-            carrier: "FLASH" as const,
-            trackingNumber: `DEMO${String(orderId).slice(-6)}${String(index + 1).padStart(2, "0")}`,
+            trackingStatus: "IN_TRANSIT" as const,
+            carrier,
+            trackingNumber: `${carrier === "FLASH" ? "TH" : "THP"}${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 90 + 10)}`,
             shippedAt,
           }
         : shipment,
@@ -1015,6 +1032,56 @@ export function markMockOrderShipped(orderId: number): MockStoredOrder {
   return updatedOrder;
 }
 
+export function advanceMockShipmentStatus(orderId: number): MockStoredOrder {
+  const orders = readAllOrders();
+  const orderIndex = orders.findIndex((order) => order.detail.id === orderId);
+  const existingOrder = orders[orderIndex];
+  if (!existingOrder) {
+    throw new Error("ไม่พบคำสั่งซื้อจำลองในอุปกรณ์นี้");
+  }
+
+  const nextStatusByCurrent = {
+    IN_TRANSIT: "OUT_FOR_DELIVERY",
+    OUT_FOR_DELIVERY: "DELIVERED",
+  } as const;
+  let advanced = false;
+  const shipments = existingOrder.detail.shipments.map((shipment) => {
+    const currentStatus =
+      shipment.trackingStatus ??
+      (shipment.status === "DELIVERED"
+        ? "DELIVERED"
+        : shipment.status === "SHIPPED"
+          ? "IN_TRANSIT"
+          : "PREPARING");
+    if (advanced || !(currentStatus in nextStatusByCurrent)) {
+      return shipment;
+    }
+    advanced = true;
+    const trackingStatus =
+      nextStatusByCurrent[currentStatus as keyof typeof nextStatusByCurrent];
+    return {
+      ...shipment,
+      trackingStatus,
+      status: trackingStatus === "DELIVERED" ? "DELIVERED" as const : "SHIPPED" as const,
+    };
+  });
+  if (!advanced) {
+    throw new Error("ไม่มีพัสดุที่สามารถเลื่อนสถานะขนส่งได้");
+  }
+  const allDelivered = shipments.every((shipment) => shipment.status === "DELIVERED");
+  const updatedOrder: MockStoredOrder = {
+    ...existingOrder,
+    detail: {
+      ...existingOrder.detail,
+      status: allDelivered ? "DELIVERED" : existingOrder.detail.status,
+      shipments,
+    },
+  };
+  orders[orderIndex] = updatedOrder;
+  writeAllOrders(orders);
+  return updatedOrder;
+}
+
 export interface MockWaitlistEntry {
   id: number;
   productId?: string;
@@ -1025,6 +1092,7 @@ export interface MockWaitlistEntry {
   queuePosition: number;
   status: "WAITING" | "OFFERED";
   createdAt: string;
+  offeredOrderId?: number;
 }
 
 export const MOCK_WAITLIST_STORAGE_KEY = "mock_waitlist";
@@ -1041,6 +1109,7 @@ const waitlistEntrySchema = z
     queuePosition: z.number().int().positive(),
     status: z.enum(["WAITING", "OFFERED"]),
     createdAt: z.string().datetime({ offset: true }),
+    offeredOrderId: z.number().int().positive().safe().optional(),
   })
   .strict();
 
@@ -1141,6 +1210,242 @@ export function getMockWaitlistEntries(): MockWaitlistEntry[] {
     console.error("Could not read mock waitlist entries.", error);
     throw new Error("อ่านข้อมูลคิว Waitlist ไม่สำเร็จ", { cause: error });
   }
+}
+
+function writeMockWaitlistEntries(entries: MockWaitlistEntry[]): void {
+    if (typeof window === "undefined") {
+      throw new Error("Mock Waitlist สามารถบันทึกได้จากเบราว์เซอร์เท่านั้น");
+}
+    const validatedEntries = waitlistEntriesSchema.parse(entries);
+    try {
+      window.localStorage.setItem(
+        MOCK_WAITLIST_STORAGE_KEY,
+        JSON.stringify(validatedEntries),
+      );
+      window.dispatchEvent(new CustomEvent(MOCK_WAITLIST_UPDATED_EVENT));
+    } catch (error) {
+      console.error("Could not save mock waitlist entries.", error);
+      throw new Error("บันทึกข้อมูลคิว Waitlist ไม่สำเร็จ", { cause: error });
+    }
+  }
+
+export function simulateMock14DayExpiry(): {
+    expiredCount: number;
+    waitlistTransfers: number;
+  } {
+    if (typeof window === "undefined") {
+      throw new Error("จำลองวันหมดอายุได้จากเบราว์เซอร์เท่านั้น");
+}
+    const orders = readAllOrders();
+    const waitlist = getMockWaitlistEntries();
+    const expiringOrders = orders.filter(
+      (order) =>
+        order.detail.status === "AWAITING_BALANCE_PAYMENT" &&
+        order.detail.paymentStatus === "DEPOSIT_PAID" &&
+        order.detail.remainingBalance > 0,
+    );
+    let waitlistTransfers = 0;
+    let nextWaitlist = [...waitlist];
+    const updatedOrders = orders.map((order) => {
+      if (!expiringOrders.some((candidate) => candidate.detail.id === order.detail.id)) {
+        return order;
+      }
+
+      const figureItems = order.detail.items.filter(
+        (item) => item.productType === "FIGURE",
+      );
+      let transferredReservation = false;
+      for (const item of figureItems) {
+        const itemName = item.title.trim().toLocaleLowerCase();
+        const candidateIndex = nextWaitlist
+          .map((entry, index) => ({ entry, index }))
+          .filter(
+            ({ entry }) =>
+              entry.status === "WAITING" &&
+              (entry.productId === `figure-${item.productVariantId}` ||
+                entry.productId === String(item.productVariantId) ||
+                entry.productName.trim().toLocaleLowerCase() === itemName),
+          )
+          .sort(
+            (left, right) =>
+              left.entry.queuePosition - right.entry.queuePosition ||
+              left.entry.createdAt.localeCompare(right.entry.createdAt),
+          )[0];
+        if (!candidateIndex) {
+          continue;
+        }
+
+        nextWaitlist[candidateIndex.index] = {
+          ...candidateIndex.entry,
+          status: "OFFERED",
+          offeredOrderId: order.detail.id,
+        };
+        const affectedProductId = candidateIndex.entry.productId;
+        if (affectedProductId) {
+          nextWaitlist = nextWaitlist.map((entry) =>
+            entry.productId === affectedProductId &&
+            entry.status === "WAITING" &&
+            entry.queuePosition > candidateIndex.entry.queuePosition
+              ? { ...entry, queuePosition: entry.queuePosition - 1 }
+              : entry,
+          );
+        }
+        transferredReservation = true;
+        waitlistTransfers += 1;
+        break;
+      }
+
+      if (!transferredReservation && order.inventoryReserved) {
+        const reservedItems = order.detail.items.flatMap((item) =>
+          item.productVariantId
+            ? [{
+                productVariantId: item.productVariantId,
+                quantity: item.quantity,
+                isPreorder: item.isPreorder,
+              }]
+            : [],
+        );
+        restoreAdminProductInventory(reservedItems);
+      }
+
+      return {
+        ...order,
+        inventoryReserved: false,
+        detail: {
+          ...order.detail,
+          status: "DEPOSIT_FORFEITED" as const,
+          paymentStatus: "DEPOSIT_FORFEITED" as const,
+          remainingBalance: 0,
+          balanceDueDate: null,
+        },
+      };
+    });
+
+    if (expiringOrders.length > 0) {
+      writeMockWaitlistEntries(nextWaitlist);
+      writeAllOrders(updatedOrders);
+    }
+    return { expiredCount: expiringOrders.length, waitlistTransfers };
+  }
+
+export const MOCK_PAYMENT_REJECTION_REASONS = [
+    "ยอดเงินไม่ตรงกับคำสั่งซื้อ",
+    "สลิปซ้ำ / เคยใช้แล้ว",
+    "รูปภาพไม่ชัดเจน / ไม่พบ QR",
+  ] as const;
+
+export type MockPaymentRejectionReason =
+  (typeof MOCK_PAYMENT_REJECTION_REASONS)[number];
+
+export function rejectMockOrderPayment(
+    orderId: number,
+    reason: MockPaymentRejectionReason,
+  ): MockStoredOrder {
+    if (!MOCK_PAYMENT_REJECTION_REASONS.includes(reason)) {
+      throw new Error("กรุณาเลือกเหตุผลการปฏิเสธสลิปที่ถูกต้อง");
+    }
+    const orders = readAllOrders();
+    const orderIndex = orders.findIndex((order) => order.detail.id === orderId);
+    const existingOrder = orders[orderIndex];
+    if (!existingOrder) {
+      throw new Error("ไม่พบคำสั่งซื้อจำลองในอุปกรณ์นี้");
+    }
+    if (
+      existingOrder.detail.status === "PAYMENT_REVIEW_PENDING" ||
+      existingOrder.detail.status === "PAYMENT_REJECTED" ||
+      existingOrder.detail.paymentStatus === "DEPOSIT_FORFEITED"
+    ) {
+      throw new Error("ไม่สามารถปฏิเสธสลิปของคำสั่งซื้อนี้ได้ในสถานะปัจจุบัน");
+    }
+    const paymentReviewStage =
+      existingOrder.detail.status === "AWAITING_BALANCE_PAYMENT"
+        ? "BALANCE"
+        : "INITIAL";
+    const updatedOrder: MockStoredOrder = {
+      ...existingOrder,
+      detail: {
+        ...existingOrder.detail,
+        status: "PAYMENT_REJECTED",
+        paymentRejectionReason: reason,
+        paymentReviewStage,
+      },
+    };
+    orders[orderIndex] = updatedOrder;
+    writeAllOrders(orders);
+    return updatedOrder;
+}
+
+export function resubmitMockOrderSlip(
+    orderId: number,
+    ownerUserId: number,
+    fileName: string,
+  ): MockStoredOrder {
+    const orders = readAllOrders();
+    const orderIndex = orders.findIndex((order) => order.detail.id === orderId);
+    const existingOrder = orders[orderIndex];
+    if (!existingOrder || existingOrder.ownerUserId !== ownerUserId) {
+      throw new Error("ไม่พบคำสั่งซื้อหรือไม่มีสิทธิ์ส่งสลิปใหม่");
+    }
+    if (existingOrder.detail.status !== "PAYMENT_REJECTED") {
+      throw new Error("คำสั่งซื้อนี้ไม่ได้อยู่ในสถานะปฏิเสธสลิป");
+    }
+    const normalizedFileName = fileName.trim();
+    if (!normalizedFileName || normalizedFileName.length > 255) {
+      throw new Error("ชื่อไฟล์สลิปไม่ถูกต้อง");
+    }
+    const updatedOrder: MockStoredOrder = {
+      ...existingOrder,
+      detail: {
+        ...existingOrder.detail,
+        status: "PAYMENT_REVIEW_PENDING",
+        paymentSlipFileName: normalizedFileName,
+      },
+    };
+    orders[orderIndex] = updatedOrder;
+    writeAllOrders(orders);
+    return updatedOrder;
+}
+
+export function approveMockOrderPaymentReview(orderId: number): MockStoredOrder {
+    const orders = readAllOrders();
+    const orderIndex = orders.findIndex((order) => order.detail.id === orderId);
+    const existingOrder = orders[orderIndex];
+    if (!existingOrder || existingOrder.detail.status !== "PAYMENT_REVIEW_PENDING") {
+      throw new Error("ไม่พบสลิปที่รอการตรวจสอบ");
+    }
+    const stage = existingOrder.detail.paymentReviewStage ?? "INITIAL";
+    const isDeposit = existingOrder.detail.items.some(
+      (item) => item.paymentType === "DEPOSIT",
+    );
+    const paymentStatus =
+      stage === "INITIAL" && isDeposit ? "DEPOSIT_PAID" as const : "PAID" as const;
+    const now = new Date().toISOString();
+    const updatedOrder: MockStoredOrder = {
+      ...existingOrder,
+      detail: {
+        ...existingOrder.detail,
+        status: paymentStatus,
+        paymentStatus,
+        paidAmount:
+          stage === "BALANCE"
+            ? existingOrder.detail.totalAmount
+            : Number(existingOrder.immediateAmount),
+        remainingBalance: stage === "BALANCE" || !isDeposit
+          ? 0
+          : existingOrder.detail.remainingBalance,
+        balanceDueDate: stage === "BALANCE" ? null : existingOrder.detail.balanceDueDate,
+        paymentRejectionReason: null,
+        paymentSlipFileName: null,
+        timeline: existingOrder.detail.timeline.map((event) =>
+          event.stage === "DEPOSIT_PAID"
+            ? { ...event, label: "ฝ่ายการเงินอนุมัติสลิปจำลอง", occurredAt: now }
+            : event,
+        ),
+      },
+    };
+    orders[orderIndex] = updatedOrder;
+    writeAllOrders(orders);
+    return updatedOrder;
 }
 
 export function joinMockWaitlist(input: {

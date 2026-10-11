@@ -235,6 +235,7 @@ function productToCatalog(products: AdminProduct[]): CatalogData {
         isbn: product.isbn,
         price: product.price,
         stock: product.stock,
+        weightGrams: product.weightGrams,
         status: product.status,
         ...(product.expectedShippingDate
           ? { expectedShippingDate: toIsoOrEmpty(product.expectedShippingDate) }

@@ -9,6 +9,7 @@ import {
   markMockOrderShipped,
   type MockStoredOrder,
 } from "../../../mocks/storage.mock";
+import type { ShipmentCarrier } from "../../../components/OrderDetailView";
 
 export default function StaffPackingPage() {
   const { user, isLoading } = useAuth();
@@ -18,9 +19,11 @@ export default function StaffPackingPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [labelOrder, setLabelOrder] = useState<MockStoredOrder | null>(null);
+  const [shippingOrderId, setShippingOrderId] = useState<number | null>(null);
+  const [shippingCarrier, setShippingCarrier] = useState<ShipmentCarrier>("FLASH");
 
   const refreshOrders = useCallback((): void => {
-    if (user?.role === "STAFF") {
+    if (user?.role === "STAFF" || user?.role === "ADMIN") {
       setOrders(
         listMockOrders().filter(
           (order) =>
@@ -69,8 +72,15 @@ export default function StaffPackingPage() {
       setError("ต้องสแกนบาร์โค้ดก่อนอัปเดตสถานะจัดส่ง");
       return;
     }
+    setShippingCarrier("FLASH");
+    setShippingOrderId(orderId);
+  }
+
+  function confirmShipment(): void {
+    if (shippingOrderId === null) return;
+    const orderId = shippingOrderId;
     try {
-      const shippedOrder = markMockOrderShipped(orderId);
+      const shippedOrder = markMockOrderShipped(orderId, shippingCarrier);
       setOrders((current) =>
         current.filter((order) => order.detail.id !== shippedOrder.detail.id),
       );
@@ -81,6 +91,7 @@ export default function StaffPackingPage() {
           )?.trackingNumber ?? "สร้างแล้ว"
         }`,
       );
+      setShippingOrderId(null);
     } catch (shipError) {
       setError(
         shipError instanceof Error
@@ -230,7 +241,7 @@ export default function StaffPackingPage() {
                       disabled={!scanned}
                       className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      อัปเดตเป็นจัดส่งแล้ว
+                      จัดส่งแล้ว
                     </button>
                   </div>
                 </div>
@@ -327,6 +338,57 @@ export default function StaffPackingPage() {
                 พิมพ์เอกสาร
               </button>
             </footer>
+          </section>
+        </div>
+      ) : null}
+      {shippingOrderId !== null ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shipping-carrier-title"
+        >
+          <section className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
+            <h2 id="shipping-carrier-title" className="text-lg font-extrabold text-zinc-950 dark:text-zinc-100">
+              เลือกบริษัทขนส่ง
+            </h2>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+              ระบบจะสร้างเลขพัสดุจำลองและเปลี่ยนสถานะเป็นเข้าระบบขนส่ง
+            </p>
+            <label htmlFor="shipping-carrier" className="mt-4 block text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+              บริษัทขนส่ง
+            </label>
+            <select
+              id="shipping-carrier"
+              value={shippingCarrier}
+              onChange={(event) =>
+                setShippingCarrier(
+                  event.currentTarget.value === "THAI_POST"
+                    ? "THAI_POST"
+                    : "FLASH",
+                )
+              }
+              className="mt-2 min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            >
+              <option value="FLASH">Flash Express</option>
+              <option value="THAI_POST">Thailand Post EMS</option>
+            </select>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShippingOrderId(null)}
+                className="min-h-10 rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={confirmShipment}
+                className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+              >
+                ยืนยันจัดส่ง
+              </button>
+            </div>
           </section>
         </div>
       ) : null}
