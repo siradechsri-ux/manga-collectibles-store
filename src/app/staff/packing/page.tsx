@@ -256,8 +256,8 @@ export default function StaffPackingPage() {
           aria-modal="true"
           aria-labelledby="shipping-label-title"
         >
-          <section className="w-full max-w-xl rounded-2xl bg-white p-6 text-zinc-950 shadow-2xl print-label print:max-w-none print:rounded-none print:p-0 print:shadow-none">
-            <header className="flex items-start justify-between border-b-2 border-zinc-950 pb-4">
+          <section className="w-full max-w-xl rounded-2xl bg-white! p-6 text-zinc-950! shadow-2xl print-label print:max-w-none print:rounded-none print:p-0 print:shadow-none">
+            <header className="flex items-start justify-between bg-white! border-b-2 border-zinc-950 pb-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em]">Shipping label</p>
                 <h2 id="shipping-label-title" className="mt-1 text-xl font-extrabold">
