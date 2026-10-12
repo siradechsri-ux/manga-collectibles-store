@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Check, PackageCheck, Printer, ScanLine } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, PackageCheck, Printer, ScanLine } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -11,8 +11,10 @@ import type { ShipmentCarrier } from "../../../components/OrderDetailView";
 export default function StaffPackingPage() {
   const { user, isLoading } = useAuth();
   const [orders, setOrders] = useState<MockStoredOrder[]>([]);
+  const [ordersPage, setOrdersPage] = useState(1);
   const [shoppingDisabledNotice, setShoppingDisabledNotice] = useState(false);
   const [scannedOrderIds, setScannedOrderIds] = useState<number[]>([]);
+  const [expandedOrderIds, setExpandedOrderIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [labelOrder, setLabelOrder] = useState<MockStoredOrder | null>(null);
@@ -44,6 +46,20 @@ export default function StaffPackingPage() {
         "shopping-disabled",
     );
   }, []);
+
+  const ordersPerPage = 5;
+  const totalOrderPages = Math.max(1, Math.ceil(orders.length / ordersPerPage));
+  const currentOrdersPage = Math.min(ordersPage, totalOrderPages);
+  const pageStart = Math.max(1, Math.min(currentOrdersPage - 2, totalOrderPages - 4));
+  const pageEnd = Math.min(totalOrderPages, pageStart + 4);
+  const pageNumbers = Array.from(
+    { length: pageEnd - pageStart + 1 },
+    (_, index) => pageStart + index,
+  );
+  const visibleOrders = orders.slice(
+    (currentOrdersPage - 1) * ordersPerPage,
+    currentOrdersPage * ordersPerPage,
+  );
 
   function scanOrder(orderId: number): void {
     setError(null);
@@ -178,8 +194,9 @@ export default function StaffPackingPage() {
         </section>
       ) : (
         <div className="mt-6 space-y-4">
-          {orders.map((order) => {
+          {visibleOrders.map((order) => {
             const scanned = scannedOrderIds.includes(order.detail.id);
+            const detailsExpanded = expandedOrderIds.includes(order.detail.id);
             return (
               <article
                 key={order.detail.id}
@@ -198,18 +215,36 @@ export default function StaffPackingPage() {
                     <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
                       Order ID {order.detail.id} · {order.detail.items.length} รายการ
                     </p>
-                    <ul className="mt-4 space-y-2">
-                      {order.detail.items.map((item) => (
-                        <li key={item.id} className="flex justify-between gap-4 text-sm">
-                          <span className="text-slate-700 dark:text-zinc-300">
-                            {item.title} × {item.quantity}
-                          </span>
-                          <span className="shrink-0 font-semibold text-slate-900 dark:text-zinc-100">
-                            ฿{item.lineTotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    <button
+                      type="button"
+                      aria-expanded={detailsExpanded}
+                      aria-controls={`order-items-${order.detail.id}`}
+                      onClick={() =>
+                        setExpandedOrderIds((current) =>
+                          detailsExpanded
+                            ? current.filter((id) => id !== order.detail.id)
+                            : [...current, order.detail.id],
+                        )
+                      }
+                      className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    >
+                      {detailsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      {detailsExpanded ? "ซ่อนรายละเอียดสินค้า" : `ดูรายละเอียดสินค้า (${order.detail.items.length})`}
+                    </button>
+                    {detailsExpanded ? (
+                      <ul id={`order-items-${order.detail.id}`} className="mt-3 space-y-2">
+                        {order.detail.items.map((item) => (
+                          <li key={item.id} className="flex justify-between gap-4 text-sm">
+                            <span className="text-slate-700 dark:text-zinc-300">
+                              {item.title} × {item.quantity}
+                            </span>
+                            <span className="shrink-0 font-semibold text-slate-900 dark:text-zinc-100">
+                              ฿{item.lineTotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     <p className="mt-4 text-sm font-extrabold text-slate-950 dark:text-zinc-50">
                       ยอดชำระแล้ว ฿{order.detail.paidAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                     </p>
@@ -247,6 +282,71 @@ export default function StaffPackingPage() {
               </article>
             );
           })}
+          {totalOrderPages > 1 ? (
+            <nav
+              aria-label="แบ่งหน้าคำสั่งซื้อ"
+              className="flex flex-wrap items-center justify-center gap-2 pt-2"
+            >
+              <button
+                type="button"
+                onClick={() => setOrdersPage(currentOrdersPage - 1)}
+                disabled={currentOrdersPage === 1}
+                aria-label="หน้าก่อนหน้า"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-200"
+              >
+                <ChevronLeft size={18} aria-hidden="true" />
+              </button>
+              {pageStart > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setOrdersPage(1)}
+                    className="h-10 min-w-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 dark:border-zinc-700 dark:text-zinc-200"
+                  >
+                    1
+                  </button>
+                  <span className="px-1 text-slate-500 dark:text-zinc-400" aria-hidden="true">…</span>
+                </>
+              ) : null}
+              {pageNumbers.map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => setOrdersPage(pageNumber)}
+                  aria-label={`หน้า ${pageNumber}`}
+                  aria-current={currentOrdersPage === pageNumber ? "page" : undefined}
+                  className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-semibold ${
+                    currentOrdersPage === pageNumber
+                      ? "border-orange-600 bg-orange-600 text-white"
+                      : "border-slate-200 text-slate-700 dark:border-zinc-700 dark:text-zinc-200"
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              ))}
+              {pageEnd < totalOrderPages ? (
+                <>
+                  <span className="px-1 text-slate-500 dark:text-zinc-400" aria-hidden="true">…</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrdersPage(totalOrderPages)}
+                    className="h-10 min-w-10 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 dark:border-zinc-700 dark:text-zinc-200"
+                  >
+                    {totalOrderPages}
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setOrdersPage(currentOrdersPage + 1)}
+                disabled={currentOrdersPage === totalOrderPages}
+                aria-label="หน้าถัดไป"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-200"
+              >
+                <ChevronRight size={18} aria-hidden="true" />
+              </button>
+            </nav>
+          ) : null}
         </div>
       )}
       {labelOrder ? (
@@ -256,7 +356,7 @@ export default function StaffPackingPage() {
           aria-modal="true"
           aria-labelledby="shipping-label-title"
         >
-          <section className="w-full max-w-xl rounded-2xl bg-white! p-6 text-zinc-950! shadow-2xl print-label print:max-w-none print:rounded-none print:p-0 print:shadow-none">
+          <section className="max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto overscroll-contain rounded-2xl bg-white! p-6 text-zinc-950! shadow-2xl print-label print:max-h-none print:max-w-none print:overflow-visible print:rounded-none print:p-0 print:shadow-none">
             <header className="flex items-start justify-between bg-white! border-b-2 border-zinc-950 pb-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em]">Shipping label</p>
@@ -320,7 +420,7 @@ export default function StaffPackingPage() {
               />
               <p className="mt-1 font-mono text-sm font-bold">{labelOrder.detail.orderNumber}</p>
             </div>
-            <footer className="flex justify-end gap-2 print:hidden">
+            <footer className="sticky bottom-0 -mx-6 flex justify-end gap-2 border-t border-zinc-200 bg-white! px-6 pb-1 pt-3 print:hidden">
               <button
                 type="button"
                 onClick={() => setLabelOrder(null)}

@@ -5,6 +5,7 @@ import {
   BookMarked,
   BookOpen,
   Boxes,
+  Check,
   LogIn,
   Minus,
   Package,
@@ -164,6 +165,10 @@ function itemUnitPrice(item: CartItem): number {
   return item.fullPrice;
 }
 
+function cartItemKey(item: CartItem): string {
+  return `${item.kind}-${item.id}`;
+}
+
 export default function CartDrawer({
   isOpen,
   onClose,
@@ -184,7 +189,36 @@ export default function CartDrawer({
     updateQuantity,
     removeItem,
     updateFigurePaymentType,
+    clearCart,
   } = useCart();
+  const [selectedCartItemKeys, setSelectedCartItemKeys] = useState<string[]>([]);
+  const canManageCartSelection = user?.role === "CUSTOMER";
+  const selectedItems = items.filter((item) =>
+    selectedCartItemKeys.includes(cartItemKey(item)),
+  );
+  const allItemsSelected =
+    items.length > 0 && selectedItems.length === items.length;
+
+  function toggleCartItemSelection(item: CartItem): void {
+    const key = cartItemKey(item);
+    setSelectedCartItemKeys((current) =>
+      current.includes(key)
+        ? current.filter((selectedKey) => selectedKey !== key)
+        : [...current, key],
+    );
+  }
+
+  function removeSelectedItems(): void {
+    for (const item of selectedItems) {
+      removeItem(item.kind, item.id);
+    }
+    setSelectedCartItemKeys([]);
+  }
+
+  function removeAllItems(): void {
+    clearCart();
+    setSelectedCartItemKeys([]);
+  }
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
@@ -264,15 +298,68 @@ export default function CartDrawer({
             </div>
           ) : (
             <div className="space-y-4">
+              {canManageCartSelection ? (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedCartItemKeys(
+                        allItemsSelected ? [] : items.map(cartItemKey),
+                      )
+                    }
+                    aria-pressed={allItemsSelected}
+                    className="text-xs font-semibold text-zinc-600 underline decoration-zinc-300 underline-offset-4 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+                  >
+                    {allItemsSelected ? "ยกเลิกเลือกทั้งหมด" : "เลือกสินค้าทั้งหมด"}
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={removeSelectedItems}
+                      disabled={selectedItems.length === 0}
+                      className="inline-flex min-h-8 items-center gap-1.5 text-xs font-bold text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-red-400"
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                      ลบที่เลือก ({selectedItems.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={removeAllItems}
+                      className="inline-flex min-h-8 items-center gap-1.5 text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                      ลบทั้งหมด
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {items.map((item) => {
                   const unitPrice = itemUnitPrice(item);
                   const lineTotal = unitPrice * item.quantity;
+                  const isSelected = selectedCartItemKeys.includes(
+                    cartItemKey(item),
+                  );
                   return (
                     <article
                       key={`${item.kind}-${item.id}`}
                       className="flex gap-3 py-3.5 first:pt-0 last:pb-0"
                     >
+                      {canManageCartSelection ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleCartItemSelection(item)}
+                          aria-label={`${isSelected ? "ยกเลิกเลือก" : "เลือก"} ${itemTitle(item)}`}
+                          aria-pressed={isSelected}
+                          className={`mt-5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition ${
+                            isSelected
+                              ? "border-orange-600 bg-orange-600 text-white"
+                              : "border-zinc-300 bg-white text-transparent hover:border-orange-500 dark:border-zinc-600 dark:bg-zinc-950"
+                          }`}
+                        >
+                          <Check size={12} strokeWidth={3} aria-hidden="true" />
+                        </button>
+                      ) : null}
                       <CartItemThumbnail item={item} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
