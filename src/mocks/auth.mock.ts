@@ -52,9 +52,12 @@ export function getMockUser(): AuthUser | null {
   }
 
   try {
+    const storedRole = window.localStorage.getItem("mock_current_role");
+    if (storedRole === "GUEST") {
+      return null;
+    }
     const stored = window.localStorage.getItem(MOCK_AUTH_STORAGE_KEY);
     if (!stored) {
-      const storedRole = window.localStorage.getItem("mock_current_role") as AuthRole | null;
       if (storedRole && storedRole in mockUsers) {
         return loginAsMockRole(storedRole as keyof typeof mockUsers);
       }
@@ -131,7 +134,7 @@ export function loginMockUser(email: string): AuthUser {
 export function logoutMockUser(): void {
   try {
     window.localStorage.removeItem(MOCK_AUTH_STORAGE_KEY);
-    window.localStorage.removeItem("mock_current_role");
+    window.localStorage.setItem("mock_current_role", "GUEST");
   } catch (error) {
     console.error("Could not clear the Prototype user session.", error);
     throw new Error("ออกจากระบบทดสอบไม่สำเร็จ", { cause: error });

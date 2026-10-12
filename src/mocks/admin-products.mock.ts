@@ -30,17 +30,20 @@ const mangaProductSchema = z
     title: z.string().min(1),
     publisher: z.string().min(1),
     volumeNumber: z.number().int().positive(),
-    isbn: z.string(),
-    synopsis: z.string(),
-    coverStyle: z.enum(["STANDARD", "LIMITED_SET"]),
+    isbn: z.string().optional().default(""),
+    synopsis: z.string().optional().default(""),
+    coverStyle: z.enum(["STANDARD", "LIMITED_SET"]).default("STANDARD"),
     variantLabel: z.string().optional(),
     price: z.number().positive(),
     stock: z.number().int().nonnegative(),
     status: z.enum(["IN_STOCK", "PREORDER", "OUT_OF_STOCK"]),
-    preorderDeadline: z.string(),
-    expectedShippingDate: z.string(),
+    preorderDeadline: z.string().optional().default(""),
+    expectedShippingDate: z.string().optional().default(""),
     weightGrams: z.number().int().nonnegative(),
     images: z.array(z.string()),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
+    coverUrl: z.string().nullable().optional(),
   })
   .strict();
 
@@ -52,17 +55,20 @@ const lightNovelProductSchema = z
     title: z.string().min(1),
     publisher: z.string().min(1),
     volumeNumber: z.number().int().positive(),
-    isbn: z.string(),
-    synopsis: z.string(),
-    format: z.enum(["REGULAR", "SPECIAL_SET"]),
+    isbn: z.string().optional().default(""),
+    synopsis: z.string().optional().default(""),
+    format: z.enum(["REGULAR", "SPECIAL_SET"]).default("REGULAR"),
     variantLabel: z.string().optional(),
     price: z.number().positive(),
     stock: z.number().int().nonnegative(),
     status: z.enum(["IN_STOCK", "PREORDER", "OUT_OF_STOCK"]),
-    preorderDeadline: z.string(),
-    expectedShippingDate: z.string(),
+    preorderDeadline: z.string().optional().default(""),
+    expectedShippingDate: z.string().optional().default(""),
     weightGrams: z.number().int().nonnegative(),
     images: z.array(z.string()),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
+    coverUrl: z.string().nullable().optional(),
   })
   .strict();
 
@@ -76,18 +82,21 @@ const figureProductSchema = z
     character: z.string(),
     manufacturer: z.string().min(1),
     scale: z.string().min(1),
-    description: z.string(),
+    description: z.string().optional().default(""),
     fullPrice: z.number().positive(),
     depositAmount: z.number().nonnegative(),
-    preorderDeadline: z.string(),
-    releaseMonthYear: z.string(),
+    preorderDeadline: z.string().optional().default(""),
+    releaseMonthYear: z.string().optional().default(""),
     status: z.enum(["PREORDER_OPEN", "PREORDER_CLOSED", "IN_STOCK"]),
     stockOrQuotaRemaining: z.number().int().nonnegative(),
     boxDimensions: dimensionsSchema,
-    weightGrams: z.number().int().nonnegative(),
-    heightMm: z.number().int().nonnegative(),
-    janCode: z.string(),
+    weightGrams: z.number().int().nonnegative().optional().default(500),
+    heightMm: z.number().int().nonnegative().optional().default(100),
+    janCode: z.string().optional().default(""),
     images: z.array(z.string()),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
+    coverUrl: z.string().nullable().optional(),
   })
   .strict();
 
@@ -100,17 +109,20 @@ const plamoProductSchema = z
     series: z.string(),
     manufacturer: z.string().min(1),
     grade: z.string().min(1),
-    description: z.string(),
+    description: z.string().optional().default(""),
     fullPrice: z.number().positive(),
     depositAmount: z.number().nonnegative(),
-    preorderDeadline: z.string(),
-    releaseMonthYear: z.string(),
+    preorderDeadline: z.string().optional().default(""),
+    releaseMonthYear: z.string().optional().default(""),
     status: z.enum(["PREORDER_OPEN", "PREORDER_CLOSED", "IN_STOCK"]),
     stockOrQuotaRemaining: z.number().int().nonnegative(),
     boxDimensions: dimensionsSchema,
-    weightGrams: z.number().int().nonnegative(),
-    janCode: z.string(),
+    weightGrams: z.number().int().nonnegative().optional().default(500),
+    janCode: z.string().optional().default(""),
     images: z.array(z.string()),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
+    coverUrl: z.string().nullable().optional(),
   })
   .strict();
 
@@ -121,13 +133,17 @@ const goodsProductSchema = z
     slug: z.string().min(1),
     name: z.string().min(1),
     series: z.string(),
-    subcategory: z.enum(["STANDY", "BADGE", "KEYCHAIN", "SHIKISHI", "OTHER"]),
-    description: z.string(),
+    subcategory: z.enum(["STANDY", "BADGE", "KEYCHAIN", "SHIKISHI", "OTHER"]).or(z.string()).default("OTHER"),
+    description: z.string().optional().default(""),
     price: z.number().positive(),
+    fullPrice: z.number().positive().optional(),
     stock: z.number().int().nonnegative(),
     status: z.enum(["IN_STOCK", "OUT_OF_STOCK"]),
     weightGrams: z.number().int().nonnegative(),
     images: z.array(z.string()),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
+    coverUrl: z.string().nullable().optional(),
   })
   .strict();
 
@@ -138,14 +154,18 @@ const accessoryProductSchema = z
     slug: z.string().min(1),
     name: z.string().min(1),
     series: z.string(),
-    subcategory: z.enum(["BOOK_COVER", "DISPLAY_BOX", "OTHER"]),
-    description: z.string(),
+    subcategory: z.enum(["BOOK_COVER", "DISPLAY_BOX", "CARE_TOOL", "OTHER"]).or(z.string()).default("OTHER"),
+    description: z.string().optional().default(""),
     price: z.number().positive(),
+    fullPrice: z.number().positive().optional(),
     stock: z.number().int().nonnegative(),
     status: z.enum(["IN_STOCK", "OUT_OF_STOCK"]),
     weightGrams: z.number().int().nonnegative(),
     boxDimensions: dimensionsSchema.optional(),
     images: z.array(z.string()),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
+    coverUrl: z.string().nullable().optional(),
   })
   .strict();
 
@@ -186,6 +206,10 @@ export type ProductCategoryFilter =
 
 export type ProductStatusFilter = "ALL" | "IN_STOCK" | "PREORDER" | "OUT_OF_STOCK";
 
+export const MOCK_VERSION = "v9_100pct_accurate_images_verified";
+export const MOCK_DATA_VERSION_KEY = "MOCK_DATA_VERSION";
+export const STORAGE_VERSION = MOCK_VERSION;
+export const STORAGE_VERSION_KEY = MOCK_DATA_VERSION_KEY;
 export const ADMIN_PRODUCTS_STORAGE_KEY = "mock_products";
 export const ADMIN_PRODUCTS_UPDATED_EVENT = "mock-products-updated";
 
@@ -361,7 +385,14 @@ function createInitialProducts(): AdminProduct[] {
       slug: item.slug,
       name: item.name,
       series: item.series,
-      subcategory: (item.subcategory as AccessoryProduct["subcategory"]) ?? "OTHER",
+      subcategory:
+        item.subcategory === "BOOK_COVER"
+          ? "BOOK_COVER"
+          : item.subcategory === "DISPLAY_BOX"
+            ? "DISPLAY_BOX"
+            : item.subcategory === "CARE_TOOL"
+              ? "CARE_TOOL"
+              : "OTHER",
       description: "",
       price: item.fullPrice,
       stock: item.stockOrQuotaRemaining,
@@ -369,6 +400,8 @@ function createInitialProducts(): AdminProduct[] {
       weightGrams: item.subcategory === "DISPLAY_BOX" ? 400 : 80,
       boxDimensions: { ...item.boxDimensions },
       images: [...item.images],
+      coverImage: item.coverImage ?? item.images[0] ?? null,
+      imageUrl: item.coverUrl ?? item.images[0] ?? null,
     });
   }
 
@@ -378,6 +411,18 @@ function createInitialProducts(): AdminProduct[] {
 function readProducts(): AdminProduct[] {
   if (typeof window === "undefined") return createInitialProducts();
   try {
+    const currentVersion = window.localStorage.getItem(MOCK_DATA_VERSION_KEY);
+    if (currentVersion !== MOCK_VERSION) {
+      window.localStorage.removeItem(ADMIN_PRODUCTS_STORAGE_KEY);
+      window.localStorage.setItem(MOCK_DATA_VERSION_KEY, MOCK_VERSION);
+      const initialProducts = adminProductsSchema.parse(createInitialProducts());
+      window.localStorage.setItem(
+        ADMIN_PRODUCTS_STORAGE_KEY,
+        JSON.stringify(initialProducts),
+      );
+      return initialProducts;
+    }
+
     const stored = window.localStorage.getItem(ADMIN_PRODUCTS_STORAGE_KEY);
     if (stored === null) {
       const initialProducts = adminProductsSchema.parse(createInitialProducts());

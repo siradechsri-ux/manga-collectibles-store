@@ -19,8 +19,7 @@ const rememberEmailKey = "manga-store-remembered-email";
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, quickLogin, isAuthenticated, isLoading } = useAuth();
-  const isMockMode = process.env.NEXT_PUBLIC_USE_MOCK === "true";
+  const { login, isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -75,47 +74,10 @@ export default function LoginPage() {
             : user.role === "FINANCE"
               ? "/finance/slips"
               : "/account/orders";
-      router.replace(
-        isMockMode ? "/" : safeRedirect ?? defaultPath,
-      );
+      router.replace(safeRedirect ?? defaultPath);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleQuickLogin(
-    role: "CUSTOMER" | "ADMIN" | "STAFF" | "FINANCE",
-  ) {
-    setErrorMessage(null);
-    setIsSubmitting(true);
-    try {
-      const user = await quickLogin(role);
-      const redirectPath = searchParams.get("redirect");
-      const safeRedirect =
-        redirectPath?.startsWith("/") && !redirectPath.startsWith("//")
-          ? redirectPath
-          : null;
-      const destination =
-        user.role === "ADMIN"
-          ? "/admin"
-          : user.role === "STAFF"
-            ? "/staff/packing"
-            : user.role === "FINANCE"
-              ? "/finance/slips"
-              : "/";
-      const target = safeRedirect ?? destination;
-      if (typeof window !== "undefined") {
-        window.location.href = target;
-      } else {
-        router.replace(target);
-      }
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "เข้าสู่ระบบทดสอบไม่สำเร็จ",
       );
     } finally {
       setIsSubmitting(false);
@@ -161,54 +123,6 @@ export default function LoginPage() {
           >
             {errorMessage}
           </div>
-        ) : null}
-
-        {isMockMode ? (
-          <section
-            aria-labelledby="quick-test-login-heading"
-            className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-4"
-          >
-            <h2
-              id="quick-test-login-heading"
-              className="text-sm font-extrabold text-violet-950"
-            >
-              เข้าสู่ระบบทดสอบ: ลูกค้า / ผู้ดูแลระบบ / พนักงาน
-            </h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => void handleQuickLogin("CUSTOMER")}
-                className="min-h-10 rounded-xl border border-violet-200 bg-white px-3 text-sm font-bold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-              >
-                เข้าสู่ระบบเป็นลูกค้า
-              </button>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => void handleQuickLogin("ADMIN")}
-                className="min-h-10 rounded-xl border border-violet-200 bg-white px-3 text-sm font-bold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-              >
-                เข้าสู่ระบบเป็น Admin
-              </button>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => void handleQuickLogin("STAFF")}
-                className="min-h-10 rounded-xl border border-violet-200 bg-white px-3 text-sm font-bold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
-              >
-                เข้าสู่ระบบเป็น Staff
-              </button>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => void handleQuickLogin("FINANCE")}
-                className="min-h-10 rounded-xl border border-emerald-200 bg-white px-3 text-sm font-bold text-emerald-900 hover:bg-emerald-100 disabled:opacity-50 sm:col-span-2"
-              >
-                เข้าสู่ระบบเป็นฝ่ายการเงิน
-              </button>
-            </div>
-          </section>
         ) : null}
 
         <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">

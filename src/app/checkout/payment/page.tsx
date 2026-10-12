@@ -83,7 +83,7 @@ function formatBaht(value: string): string {
 function CheckoutPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { authenticatedFetch, isAuthenticated, isLoading } = useAuth();
+  const { authenticatedFetch, isAuthenticated, isLoading, user } = useAuth();
   const orderIdValue = searchParams.get("orderId") ?? "";
   const amount = searchParams.get("amount") ?? "";
   const orderNumber = searchParams.get("orderNumber") ?? "";
@@ -103,6 +103,13 @@ function CheckoutPaymentContent() {
   const [error, setError] = useState<string | null>(null);
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
   const orderIdValid = orderIdSchema.safeParse(orderIdValue).success;
+
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !user)) {
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      router.replace(`/login?redirect=${encodeURIComponent(`/checkout/payment${search}`)}`);
+    }
+  }, [isLoading, isAuthenticated, user, router]);
 
   useEffect(() => {
     if (!orderIdValid) {
@@ -165,8 +172,8 @@ function CheckoutPaymentContent() {
   async function submitSlip(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
-    if (!isAuthenticated && !useMockMode) {
-      setError("กรุณาเข้าสู่ระบบใหม่ก่อนส่งสลิป");
+    if (!isAuthenticated || !user) {
+      setError("กรุณาเข้าสู่ระบบด้วยบัญชีที่ทำการสั่งซื้อก่อนส่งสลิปชำระเงิน");
       return;
     }
     if (!orderIdValid) {
@@ -421,14 +428,20 @@ function CheckoutPaymentContent() {
                   {error}
                 </p>
               ) : null}
-              {!isAuthenticated && !useMockMode ? (
-                <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-                  กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าของคำสั่งซื้อเพื่อส่งสลิป
-                </p>
+              {!isAuthenticated || !user ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  <p>คุณยังไม่ได้เข้าสู่ระบบ กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าของคำสั่งซื้อเพื่อดำเนินการชำระเงิน</p>
+                  <Link
+                    href={`/login?redirect=/checkout/payment${typeof window !== "undefined" ? window.location.search : ""}`}
+                    className="mt-1.5 inline-flex items-center gap-1 font-bold text-orange-700 underline hover:text-orange-800"
+                  >
+                    เข้าสู่ระบบ
+                  </Link>
+                </div>
               ) : null}
               <button
                 type="submit"
-                disabled={uploading || (!isAuthenticated && !useMockMode)}
+                disabled={uploading || !isAuthenticated || !user}
                 className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {uploading ? "กำลังตรวจสอบสลิป..." : "ส่งสลิปเพื่อตรวจสอบ"}

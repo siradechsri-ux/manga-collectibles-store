@@ -20,6 +20,7 @@ import {
   type MockStoredOrder,
   updateMockOrderPayment,
 } from "../../../mocks/storage.mock";
+import { OrderService } from "../../../services/order.service";
 
 const orderIdSchema = z.string().regex(/^[1-9]\d*$/);
 const slipResultSchema = z
@@ -67,6 +68,7 @@ export default function MockOrderDetailPage() {
   const [replacementSlipNotice, setReplacementSlipNotice] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
       setError("หน้ารายละเอียดนี้ใช้ได้เฉพาะในโหมด Prototype");
       setIsLoading(false);
@@ -78,14 +80,26 @@ export default function MockOrderDetailPage() {
       return;
     }
 
-    const order = getMockOrder(Number(orderId));
-    if (!order) {
-      setError("ไม่พบคำสั่งซื้อในอุปกรณ์นี้");
-      setIsLoading(false);
-      return;
-    }
-    setStoredOrder(order);
-    setIsLoading(false);
+    void OrderService.getOrderById(Number(orderId))
+      .then((order) => {
+        if (!isMounted) return;
+        if (!order) {
+          setError("ไม่พบคำสั่งซื้อในอุปกรณ์นี้");
+          setIsLoading(false);
+          return;
+        }
+        setStoredOrder(order);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการโหลดคำสั่งซื้อ");
+        setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [orderId]);
 
   const uploadBalanceSlip = useCallback(

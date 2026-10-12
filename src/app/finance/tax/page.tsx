@@ -27,8 +27,8 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
+import { OrderService } from "../../../services/order.service";
 import {
-  listMockOrders,
   MOCK_ORDERS_UPDATED_EVENT,
   type MockStoredOrder,
 } from "../../../mocks/storage.mock";
@@ -42,7 +42,9 @@ export default function FinanceTaxPage() {
 
   const refreshOrders = useCallback((): void => {
     if (user?.role === "FINANCE" || user?.role === "ADMIN") {
-      setOrders(listMockOrders());
+      void OrderService.getOrders().then((data) => {
+        setOrders(data);
+      });
     }
   }, [user?.role]);
 

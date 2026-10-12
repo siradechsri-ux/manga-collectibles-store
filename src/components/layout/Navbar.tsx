@@ -137,14 +137,14 @@ export default function Navbar() {
     try {
       await logout();
       if (typeof window !== "undefined") {
-        window.localStorage.removeItem("mock_current_role");
+        window.localStorage.setItem("mock_current_role", "GUEST");
       }
       setUserMenuOpen(false);
       setMobileMenuOpen(false);
       if (typeof window !== "undefined") {
-        window.location.href = "/";
+        window.location.href = "/login";
       } else {
-        router.replace("/");
+        router.replace("/login");
       }
     } catch (err) {
       console.error("Logout failed:", err);
@@ -152,7 +152,7 @@ export default function Navbar() {
   }
 
   const currentRole = mounted && user ? user.role : "CUSTOMER";
-  const isCustomer = currentRole === "CUSTOMER";
+  const isCustomer = !user || currentRole === "CUSTOMER";
   const isStaff = currentRole === "STAFF";
   const isFinance = currentRole === "FINANCE";
   const isAdmin = currentRole === "ADMIN";
@@ -836,6 +836,25 @@ export default function Navbar() {
                     รายงานภาษี & e-Tax
                   </Link>
                 </>
+              )}
+
+              <div className="my-2 border-t border-zinc-100 dark:border-zinc-800" />
+              {user ? (
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="flex items-center gap-2 whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-left font-bold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                >
+                  <LogOut size={15} /> ออกจากระบบ ({user.fullName})
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 whitespace-nowrap shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-center font-bold text-white hover:bg-orange-600 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-orange-500 dark:hover:text-white"
+                >
+                  <LogIn size={15} /> เข้าสู่ระบบ
+                </Link>
               )}
             </nav>
           </div>

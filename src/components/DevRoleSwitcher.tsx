@@ -10,11 +10,18 @@ import {
   Package,
   ShieldCheck,
   UserRound,
+  UserX,
   Wallet,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 const ROLES = [
+  {
+    key: "GUEST" as const,
+    label: "ผู้เยี่ยมชม",
+    sublabel: "Guest",
+    icon: UserX,
+  },
   {
     key: "CUSTOMER" as const,
     label: "ลูกค้า",
@@ -41,7 +48,10 @@ const ROLES = [
   },
 ] as const;
 
-const ROLE_LANDING_PAGES: Record<"CUSTOMER" | "STAFF" | "FINANCE" | "ADMIN", string> = {
+type RoleKey = (typeof ROLES)[number]["key"];
+
+const ROLE_LANDING_PAGES: Record<RoleKey, string> = {
+  GUEST: "/",
   CUSTOMER: "/",
   STAFF: "/staff/packing",
   FINANCE: "/finance/slips",
@@ -66,7 +76,7 @@ export default function DevRoleSwitcher({
     return null;
   }
 
-  async function handleSwitch(role: "CUSTOMER" | "STAFF" | "FINANCE" | "ADMIN") {
+  async function handleSwitch(role: RoleKey) {
     // ปิด Drawer / Dropdown ทันทีเมื่อคลิกเลือก
     setIsExpanded(false);
     setSwitching(true);
@@ -77,11 +87,11 @@ export default function DevRoleSwitcher({
         window.localStorage.setItem("mock_current_role", role);
       }
 
-      // 2. ล็อกอินเข้าสู่บทบาทจำลอง
+      // 2. ล็อกอินเข้าสู่บทบาทจำลอง (หรือเคลียร์เป็น GUEST)
       await quickLogin(role);
 
-      // 3. กำหนดเวลา Transition นุ่มนวล 400ms ก่อนพาไปยังหน้าปลายทาง
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      // 3. กำหนดเวลา Transition นุ่มนวล 300ms ก่อนพาไปยังหน้าปลายทาง
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       // 4. กำหนดเส้นทางหน้าเริ่มต้นตามบทบาท
       const targetPath = ROLE_LANDING_PAGES[role] ?? "/";
@@ -96,15 +106,17 @@ export default function DevRoleSwitcher({
     }
   }
 
-  const currentRole = ROLES.find((r) => r.key === user?.role) ?? ROLES[0];
+  const currentRole = user
+    ? ROLES.find((r) => r.key === user.role) ?? ROLES[1]
+    : ROLES[0];
   const CurrentIcon = currentRole.icon;
 
   if (embedded) {
     return (
       <>
-        <div className="flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900">
           {ROLES.map(({ key, label, icon: Icon }) => {
-            const isActive = user?.role === key;
+            const isActive = (!user && key === "GUEST") || user?.role === key;
             return (
               <button
                 key={key}
@@ -178,9 +190,9 @@ export default function DevRoleSwitcher({
 
         {/* Role buttons list when expanded */}
         {isExpanded ? (
-          <div className="grid grid-cols-2 gap-1.5 p-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-1.5 p-2 sm:grid-cols-5">
             {ROLES.map(({ key, label, sublabel, icon: Icon }) => {
-              const isActive = user?.role === key;
+              const isActive = (!user && key === "GUEST") || user?.role === key;
               return (
                 <button
                   key={key}

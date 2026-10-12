@@ -8,6 +8,7 @@ import {
   Boxes,
   Check,
   CreditCard,
+  LogIn,
   MapPin,
   Minus,
   Package,
@@ -301,6 +302,12 @@ export default function CheckoutPage() {
   }, [authLoading, isStaffAccount, router, user]);
 
   useEffect(() => {
+    if (!authLoading && (!isAuthenticated || !user)) {
+      router.replace("/login?redirect=/checkout");
+    }
+  }, [authLoading, isAuthenticated, user, router]);
+
+  useEffect(() => {
     if (!user || user.role !== "CUSTOMER" || authLoading) {
       setSavedAddresses([]);
       setSelectedAddressId("");
@@ -403,7 +410,8 @@ export default function CheckoutPage() {
       setCheckoutError("บัญชีเจ้าหน้าที่ไม่สามารถทำรายการสั่งซื้อได้");
       return;
     }
-    if (!isAuthenticated && !useMockMode) {
+    if (!isAuthenticated || !user) {
+      setCheckoutError("กรุณาเข้าสู่ระบบก่อนยืนยันการสั่งซื้อและชำระเงิน");
       router.push("/login?redirect=/checkout");
       return;
     }
@@ -840,7 +848,7 @@ export default function CheckoutPage() {
                 สรุปภาษีในแบบฟอร์มยังไม่รวมค่าจัดส่ง ซึ่งระบบจะคำนวณตามพื้นที่และน้ำหนักจริง
               </p>
 
-              {!isAuthenticated && process.env.NEXT_PUBLIC_USE_MOCK !== "true" ? (
+              {!isAuthenticated || !user ? (
                 <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                   <ShieldCheck aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
                   <p>
@@ -883,13 +891,20 @@ export default function CheckoutPage() {
                       isDepositEligible && item.selectedPaymentType === "DEPOSIT"
                         ? item.depositAmount
                         : fullUnitPrice;
+                    const itemImg = item.image || item.coverImage || item.imageUrl;
                     return (
                       <article
                         key={`${item.kind}-${item.id}`}
                         className="flex gap-3 border-b border-zinc-100 pb-4 last:border-0 last:pb-0 dark:border-zinc-800"
                       >
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                          {item.kind === "MANGA" || item.kind === "LIGHT_NOVEL" ? (
+                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-300">
+                          {itemImg ? (
+                            <img
+                              src={itemImg}
+                              alt={cartItemTitle(item)}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : item.kind === "MANGA" || item.kind === "LIGHT_NOVEL" ? (
                             <BookOpen aria-hidden="true" className="h-5 w-5" />
                           ) : item.kind === "PLAMO" ? (
                             <Boxes aria-hidden="true" className="h-5 w-5" />
@@ -1029,18 +1044,29 @@ export default function CheckoutPage() {
                       </span>
                     </div>
                   ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void submitCheckout()}
-                    disabled={isSubmitting || items.length === 0}
-                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <CreditCard aria-hidden="true" className="h-4 w-4" />
-                    {isSubmitting ? "กำลังสร้างคำสั่งซื้อ..." : "ยืนยันการสั่งซื้อและชำระเงิน"}
-                    {!isSubmitting ? (
+                  {!isAuthenticated || !user ? (
+                    <Link
+                      href="/login?redirect=/checkout"
+                      className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-orange-500 dark:hover:text-white"
+                    >
+                      <LogIn aria-hidden="true" className="h-4 w-4" />
+                      เข้าสู่ระบบเพื่อดำเนินการชำระเงิน
                       <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                    ) : null}
-                  </button>
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void submitCheckout()}
+                      disabled={isSubmitting || items.length === 0}
+                      className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <CreditCard aria-hidden="true" className="h-4 w-4" />
+                      {isSubmitting ? "กำลังสร้างคำสั่งซื้อ..." : "ยืนยันการสั่งซื้อและชำระเงิน"}
+                      {!isSubmitting ? (
+                        <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                      ) : null}
+                    </button>
+                  )}
                   <p className="flex items-center justify-center gap-1.5 text-center text-xs text-zinc-600 dark:text-zinc-400">
                     <Check aria-hidden="true" className="h-3.5 w-3.5 text-emerald-600" />
                     ชำระเงินอย่างปลอดภัย ข้อมูลของคุณได้รับการปกป้อง

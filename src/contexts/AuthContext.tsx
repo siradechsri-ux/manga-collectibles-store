@@ -61,8 +61,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (credentials: AuthCredentials) => Promise<AuthUser>;
   quickLogin: (
-    role: "CUSTOMER" | "ADMIN" | "STAFF" | "FINANCE",
-  ) => Promise<AuthUser>;
+    role: "GUEST" | "CUSTOMER" | "ADMIN" | "STAFF" | "FINANCE",
+  ) => Promise<AuthUser | null>;
   register: (credentials: RegisterCredentials) => Promise<AuthUser>;
   updateUserDetails: (fullName: string) => void;
   logout: () => Promise<void>;
@@ -228,18 +228,20 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
         try {
           const savedRole =
             typeof window !== "undefined"
-              ? (window.localStorage.getItem("mock_current_role") as AuthRole | null)
+              ? window.localStorage.getItem("mock_current_role")
               : null;
-          if (
+          if (savedRole === "GUEST") {
+            currentMock = null;
+          } else if (
             savedRole &&
             (savedRole === "CUSTOMER" ||
               savedRole === "STAFF" ||
               savedRole === "FINANCE" ||
               savedRole === "ADMIN")
           ) {
-            currentMock = loginAsMockRole(savedRole);
+            currentMock = loginAsMockRole(savedRole as AuthRole);
           } else {
-            currentMock = loginAsMockRole("CUSTOMER");
+            currentMock = null;
           }
         } catch {
           currentMock = null;
@@ -254,7 +256,15 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
           storageEvt.key === "manga-collectibles-mock-user-v1" ||
           storageEvt.key === "mock_current_role"
         ) {
-          setUser(getMockUser());
+          const saved =
+            typeof window !== "undefined"
+              ? window.localStorage.getItem("mock_current_role")
+              : null;
+          if (saved === "GUEST") {
+            setUser(null);
+          } else {
+            setUser(getMockUser());
+          }
         }
       };
       window.addEventListener("storage", handleStorage);
@@ -301,10 +311,24 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
 
   const quickLogin = useCallback(
     async (
-      role: "CUSTOMER" | "ADMIN" | "STAFF" | "FINANCE",
-    ): Promise<AuthUser> => {
+      role: "GUEST" | "CUSTOMER" | "ADMIN" | "STAFF" | "FINANCE",
+    ): Promise<AuthUser | null> => {
       if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
         throw new Error("Quick Test Login ใช้ได้เฉพาะเมื่อเปิดโหมด Prototype");
+      }
+      if (role === "GUEST") {
+        logoutMockUser();
+        setUser(null);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("mock_current_role", "GUEST");
+          window.dispatchEvent(
+            new StorageEvent("storage", { key: "manga-collectibles-mock-user-v1" }),
+          );
+          window.dispatchEvent(
+            new StorageEvent("storage", { key: "mock_current_role" }),
+          );
+        }
+        return null;
       }
       const mockUser = loginAsMockRole(role);
       setUser(mockUser);
@@ -385,6 +409,15 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
   const logout = useCallback(async (): Promise<void> => {
     if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
       logoutMockUser();
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("mock_current_role", "GUEST");
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: "manga-collectibles-mock-user-v1" }),
+        );
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: "mock_current_role" }),
+        );
+      }
       setUser(null);
       return;
     }

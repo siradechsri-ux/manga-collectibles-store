@@ -9,10 +9,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { cancelMockOrder, MOCK_ORDERS_UPDATED_EVENT } from "../../../mocks/storage.mock";
 import { useAuth } from "../../../contexts/AuthContext";
+import { OrderService } from "../../../services/order.service";
 import {
-  listMockOrders,
+  MOCK_ORDERS_UPDATED_EVENT,
   type MockStoredOrder,
 } from "../../../mocks/storage.mock";
 
@@ -40,13 +40,15 @@ export default function CustomerOrdersPage() {
 
   const refreshOrders = useCallback((): void => {
     if (user?.role === "CUSTOMER") {
-      setOrders(
-        listMockOrders(user.id).sort(
-          (left, right) =>
-            new Date(right.detail.createdAt).getTime() -
-            new Date(left.detail.createdAt).getTime(),
-        ),
-      );
+      void OrderService.getOrders(user.id).then((fetched) => {
+        setOrders(
+          fetched.sort(
+            (left, right) =>
+              new Date(right.detail.createdAt).getTime() -
+              new Date(left.detail.createdAt).getTime(),
+          ),
+        );
+      });
     } else {
       setOrders([]);
     }
@@ -62,11 +64,11 @@ export default function CustomerOrdersPage() {
     };
   }, [refreshOrders]);
 
-  function confirmCancellation(): void {
+  async function confirmCancellation(): Promise<void> {
     if (!cancelTarget || !user) return;
     setCancelError(null);
     try {
-      cancelMockOrder(cancelTarget.detail.id, user.id);
+      await OrderService.cancelOrder(cancelTarget.detail.id, user.id);
       setCancelTarget(null);
       refreshOrders();
     } catch (error) {

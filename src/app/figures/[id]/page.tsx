@@ -8,7 +8,8 @@ import FigureDetailCard, {
   FigurePurchaseRequest,
 } from "../../../components/FigureDetailCard";
 import { CartItem, useCart } from "../../../context/CartContext";
-import { CatalogFigure, fetchCatalog } from "../../../lib/catalog-client";
+import { CatalogFigure } from "../../../lib/catalog-client";
+import { ProductService } from "../../../services/product.service";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../../../mocks/admin-products.mock";
 
 export default function FigureProductPage() {
@@ -25,16 +26,7 @@ export default function FigureProductPage() {
     setLoading(true);
     setError(null);
     try {
-      const catalog = await fetchCatalog();
-      const allCollectibles = [
-        ...catalog.figures,
-        ...(catalog.plamo ?? []),
-        ...(catalog.goods ?? []),
-        ...(catalog.accessories ?? []),
-      ];
-      const selectedFigure = allCollectibles.find(
-        (item) => item.slug === slug || item.id === slug,
-      );
+      const selectedFigure = await ProductService.getFigureById(slug);
       if (!selectedFigure) {
         setFigure(null);
         setError("ไม่พบข้อมูลสินค้าชิ้นนี้");
@@ -72,11 +64,15 @@ export default function FigureProductPage() {
       throw new Error("รหัสสินค้าไม่ถูกต้อง ไม่สามารถเพิ่มลงตะกร้าได้");
     }
     const cat = figure?.category;
+    const img = request.product.images?.[0] || figure?.images?.[0] || null;
     if (cat === "PLAMO" && figure) {
       return {
         kind: "PLAMO",
         id: variantId,
         name: request.product.name,
+        image: img,
+        coverImage: img,
+        imageUrl: img,
         fullPrice: request.product.fullPrice,
         depositAmount: request.product.depositAmount,
         selectedPaymentType: request.paymentOption,
@@ -90,6 +86,9 @@ export default function FigureProductPage() {
         kind: "GOODS",
         id: variantId,
         name: request.product.name,
+        image: img,
+        coverImage: img,
+        imageUrl: img,
         fullPrice: request.product.fullPrice,
         quantity: request.quantity,
         subcategory: figure.subcategory,
@@ -100,6 +99,9 @@ export default function FigureProductPage() {
         kind: "ACCESSORY",
         id: variantId,
         name: request.product.name,
+        image: img,
+        coverImage: img,
+        imageUrl: img,
         fullPrice: request.product.fullPrice,
         quantity: request.quantity,
         subcategory: figure.subcategory,
@@ -110,6 +112,9 @@ export default function FigureProductPage() {
       kind: "FIGURE",
       id: variantId,
       name: request.product.name,
+      image: img,
+      coverImage: img,
+      imageUrl: img,
       fullPrice: request.product.fullPrice,
       depositAmount: request.product.depositAmount,
       selectedPaymentType: request.paymentOption,

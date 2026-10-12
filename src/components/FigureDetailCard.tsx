@@ -138,6 +138,7 @@ export default function FigureDetailCard({
     message: string;
     isError: boolean;
   } | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   const deadlineTimestamp = new Date(product.preorderDeadline).getTime();
   const hasValidDeadline = Number.isFinite(deadlineTimestamp);
@@ -260,43 +261,69 @@ export default function FigureDetailCard({
           className="bg-slate-50 p-4 sm:p-6 lg:p-8 dark:bg-zinc-900/60"
           aria-label="ข้อมูลจำลองสินค้า"
         >
-          <div className="flex aspect-square flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200/90 bg-gradient-to-br from-zinc-50 via-zinc-100/70 to-orange-50/40 p-6 text-zinc-900 shadow-xs dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-950 dark:text-zinc-100 sm:p-8">
-            <div className="flex items-center justify-between">
-              <span className="rounded-md bg-orange-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-orange-800 dark:bg-orange-950 dark:text-orange-300">
-                OFFICIAL COLLECTIBLE
-              </span>
-              <div className="rounded-xl bg-white/80 p-2 text-orange-600 shadow-xs backdrop-blur-xs dark:bg-zinc-800 dark:text-orange-400">
-                <PackageCheck size={22} aria-hidden="true" />
+          <div className="relative flex aspect-square flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200/90 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-xs">
+            {product.images?.[0] && !imageError ? (
+              <div className="relative h-full w-full overflow-hidden flex items-center justify-center p-4 sm:p-6 bg-zinc-50 dark:bg-zinc-900/80">
+                <img
+                  src={product.images[0]}
+                  alt={product.name}
+                  className="h-full w-full object-contain transition-transform duration-300 hover:scale-105"
+                  onError={() => setImageError(true)}
+                  loading="lazy"
+                />
+                <div className="absolute top-4 left-4">
+                  <span className="rounded-md bg-orange-600 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-xs">
+                    OFFICIAL COLLECTIBLE
+                  </span>
+                </div>
+                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between rounded-xl bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-xs">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck size={16} className="text-emerald-400" aria-hidden="true" />
+                    <span>ของแท้ 100% ลิขสิทธิ์ถูกต้อง</span>
+                  </div>
+                  <span>VAT 7%</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex h-full w-full flex-col justify-between p-6 text-zinc-900 dark:text-zinc-100 sm:p-8 bg-gradient-to-br from-zinc-50 via-zinc-100/70 to-orange-50/40 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-950">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-md bg-orange-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-orange-800 dark:bg-orange-950 dark:text-orange-300">
+                    OFFICIAL COLLECTIBLE
+                  </span>
+                  <div className="rounded-xl bg-white/80 p-2 text-orange-600 shadow-xs backdrop-blur-xs dark:bg-zinc-800 dark:text-orange-400">
+                    <PackageCheck size={22} aria-hidden="true" />
+                  </div>
+                </div>
 
-            <div className="my-auto py-4 text-center">
-              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 shadow-sm dark:bg-orange-950 dark:text-orange-400">
-                <PackageCheck size={36} strokeWidth={1.5} aria-hidden="true" />
-              </div>
-              <h2 className="text-lg font-black leading-tight text-zinc-950 dark:text-zinc-50 sm:text-xl">
-                {product.name}
-              </h2>
-              <p className="mt-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400 sm:text-sm">
-                ตัวละคร: {product.character} · {product.series}
-              </p>
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                <span className="rounded-lg bg-zinc-200/80 px-2.5 py-1 text-xs font-bold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
-                  {product.manufacturer}
-                </span>
-                <span className="rounded-lg bg-zinc-200/80 px-2.5 py-1 text-xs font-bold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
-                  {product.scale}
-                </span>
-              </div>
-            </div>
+                <div className="my-auto py-4 text-center">
+                  <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 shadow-sm dark:bg-orange-950 dark:text-orange-400">
+                    <PackageCheck size={36} strokeWidth={1.5} aria-hidden="true" />
+                  </div>
+                  <h2 className="text-lg font-black leading-tight text-zinc-950 dark:text-zinc-50 sm:text-xl">
+                    {product.name}
+                  </h2>
+                  <p className="mt-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400 sm:text-sm">
+                    ตัวละคร: {product.character} · {product.series}
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <span className="rounded-lg bg-zinc-200/80 px-2.5 py-1 text-xs font-bold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                      {product.manufacturer}
+                    </span>
+                    <span className="rounded-lg bg-zinc-200/80 px-2.5 py-1 text-xs font-bold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                      {product.scale}
+                    </span>
+                  </div>
+                </div>
 
-            <div className="flex items-center justify-between border-t border-black/5 pt-3 text-xs font-semibold text-zinc-500 dark:border-white/10 dark:text-zinc-400">
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck size={16} className="text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-                <span>ของแท้ 100% ลิขสิทธิ์ถูกต้อง</span>
+                <div className="flex items-center justify-between border-t border-black/5 pt-3 text-xs font-semibold text-zinc-500 dark:border-white/10 dark:text-zinc-400">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck size={16} className="text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                    <span>ของแท้ 100% ลิขสิทธิ์ถูกต้อง</span>
+                  </div>
+                  <span>VAT 7%</span>
+                </div>
               </div>
-              <span>VAT 7%</span>
-            </div>
+            )}
           </div>
         </section>
 

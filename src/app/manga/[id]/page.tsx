@@ -8,7 +8,8 @@ import SeriesVolumeSelector, {
   VolumeItem,
 } from "../../../components/SeriesVolumeSelector";
 import { useCart } from "../../../context/CartContext";
-import { CatalogMangaSeries, fetchCatalog } from "../../../lib/catalog-client";
+import { CatalogMangaSeries } from "../../../lib/catalog-client";
+import { ProductService } from "../../../services/product.service";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../../../mocks/admin-products.mock";
 
 export default function MangaSeriesPage() {
@@ -26,7 +27,7 @@ export default function MangaSeriesPage() {
     setLoading(true);
     setError(null);
     try {
-      const catalog = await fetchCatalog();
+      const catalog = await ProductService.getProducts();
       const selectedSeries =
         catalog.mangaSeries.find((item) => item.id === seriesId) ??
         catalog.lightNovelSeries?.find((item) => item.id === seriesId);
@@ -67,12 +68,16 @@ export default function MangaSeriesPage() {
 
   function addVolume(volume: VolumeItem): void {
     try {
+      const img = volume.coverUrl || series?.coverImage || series?.coverUrl || null;
       addItem({
         kind: isNovel ? "LIGHT_NOVEL" : "MANGA",
         id: volume.id,
         title: series?.title ?? volume.title,
         volume: volume.volumeNumber,
         ...(volume.variantLabel ? { variantLabel: volume.variantLabel } : {}),
+        image: img,
+        coverImage: img,
+        imageUrl: img,
         price: volume.price,
         isPreorder: volume.status === "PREORDER",
         quantity: 1,
@@ -88,12 +93,16 @@ export default function MangaSeriesPage() {
   function addSelectedVolumes(volumes: VolumeItem[]): void {
     try {
       for (const volume of volumes) {
+        const img = volume.coverUrl || series?.coverImage || series?.coverUrl || null;
         addItem({
           kind: isNovel ? "LIGHT_NOVEL" : "MANGA",
           id: volume.id,
           title: series?.title ?? volume.title,
           volume: volume.volumeNumber,
           ...(volume.variantLabel ? { variantLabel: volume.variantLabel } : {}),
+          image: img,
+          coverImage: img,
+          imageUrl: img,
           price: volume.price,
           isPreorder: volume.status === "PREORDER",
           quantity: 1,
@@ -173,6 +182,7 @@ export default function MangaSeriesPage() {
                 volumes={series.volumes}
                 onAddToCart={addVolume}
                 onCheckoutNow={addSelectedVolumes}
+                isNovel={isNovel}
               />
             </div>
           </>

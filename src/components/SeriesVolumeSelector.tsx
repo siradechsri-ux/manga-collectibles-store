@@ -24,7 +24,7 @@ export interface VolumeItem {
   volumeNumber: number;
   title: string;
   variantLabel?: string;
-  coverUrl?: string;
+  coverUrl?: string | null;
   price: number;
   weightGrams?: number;
   stock: number;
@@ -36,6 +36,7 @@ export interface SeriesVolumeSelectorProps {
   volumes: VolumeItem[];
   onAddToCart: (volume: VolumeItem) => void;
   onCheckoutNow: (volumes: VolumeItem[]) => void;
+  isNovel?: boolean;
 }
 
 const currencyFormatter = new Intl.NumberFormat("th-TH", {
@@ -67,6 +68,7 @@ export default function SeriesVolumeSelector({
   volumes,
   onAddToCart,
   onCheckoutNow,
+  isNovel = false,
 }: SeriesVolumeSelectorProps) {
   const { user } = useAuth();
   const userCanShop = canShop(user?.role);
@@ -242,6 +244,7 @@ export default function SeriesVolumeSelector({
                     alt={`ปก ${volume.title}`}
                     title={volume.title}
                     volumeNumber={volume.volumeNumber}
+                    isNovel={isNovel}
                     aspectRatio="2/3"
                   />
                 </div>
@@ -249,7 +252,7 @@ export default function SeriesVolumeSelector({
                 <div className="flex min-w-0 flex-1 flex-col">
                   <div className="mb-2 flex items-center gap-2 flex-wrap">
                     <span className="rounded bg-orange-100 px-2 py-0.5 text-[10px] font-extrabold text-orange-800 dark:bg-orange-950 dark:text-orange-300">
-                      MANGA
+                      {isNovel ? "NOVEL" : "MANGA"}
                     </span>
                     <span
                       className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${

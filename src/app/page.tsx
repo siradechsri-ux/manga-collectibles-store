@@ -26,6 +26,7 @@ import {
   CatalogMangaSeries,
   fetchCatalog,
 } from "../lib/catalog-client";
+import { ProductService } from "../services/product.service";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../mocks/admin-products.mock";
 import { MangaSeriesCard, CollectibleProductCard } from "../components/ProductCard";
 
@@ -488,7 +489,7 @@ function StorefrontContent() {
     setLoading(true);
     setError(null);
     try {
-      setCatalog(await fetchCatalog());
+      setCatalog(await ProductService.getProducts());
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -517,11 +518,15 @@ function StorefrontContent() {
   function handleQuickAddToCart(item: CatalogFigure): void {
     try {
       const id = Number(item.id);
+      const img = item.coverImage || item.images?.[0] || null;
       if (item.category === "PLAMO") {
         addItem({
           kind: "PLAMO",
           id,
           name: item.name,
+          image: img,
+          coverImage: img,
+          imageUrl: img,
           fullPrice: item.fullPrice,
           depositAmount: item.depositAmount,
           selectedPaymentType: "FULL",
@@ -534,6 +539,9 @@ function StorefrontContent() {
           kind: "GOODS",
           id,
           name: item.name,
+          image: img,
+          coverImage: img,
+          imageUrl: img,
           fullPrice: item.fullPrice,
           quantity: 1,
           subcategory: item.subcategory,
@@ -543,6 +551,9 @@ function StorefrontContent() {
           kind: "ACCESSORY",
           id,
           name: item.name,
+          image: img,
+          coverImage: img,
+          imageUrl: img,
           fullPrice: item.fullPrice,
           quantity: 1,
           subcategory: item.subcategory,
@@ -553,6 +564,9 @@ function StorefrontContent() {
           kind: "FIGURE",
           id,
           name: item.name,
+          image: img,
+          coverImage: img,
+          imageUrl: img,
           fullPrice: item.fullPrice,
           depositAmount: item.depositAmount,
           selectedPaymentType: "FULL",
@@ -575,7 +589,7 @@ function StorefrontContent() {
     return (catalog?.mangaSeries ?? []).filter((series) => {
       const queryMatches =
         query.length === 0 ||
-        `${series.title} ${series.publisher} ${series.volumes
+        `${series.title} ${series.publisher} ${series.author ?? ""} ${(series.altTitles ?? []).join(" ")} ${series.volumes
           .map((v) => `${v.title} ${v.variantLabel ?? ""} ${v.isbn ?? ""}`)
           .join(" ")}`
           .toLocaleLowerCase()
@@ -593,7 +607,7 @@ function StorefrontContent() {
     return (catalog?.lightNovelSeries ?? []).filter((series) => {
       const queryMatches =
         query.length === 0 ||
-        `${series.title} ${series.publisher} ${series.volumes
+        `${series.title} ${series.publisher} ${series.author ?? ""} ${(series.altTitles ?? []).join(" ")} ${series.volumes
           .map((v) => `${v.title} ${v.variantLabel ?? ""} ${v.isbn ?? ""}`)
           .join(" ")}`
           .toLocaleLowerCase()
@@ -615,7 +629,7 @@ function StorefrontContent() {
     return combined.filter((item) => {
       const queryMatches =
         query.length === 0 ||
-        `${item.name} ${item.series} ${item.character} ${item.manufacturer} ${item.janCode} ${item.grade ?? ""}`
+        `${item.name} ${item.series} ${item.character} ${item.manufacturer} ${item.janCode} ${item.grade ?? ""} ${(item.altTitles ?? []).join(" ")}`
           .toLocaleLowerCase()
           .includes(query);
       return (
@@ -631,7 +645,7 @@ function StorefrontContent() {
     return (catalog?.goods ?? []).filter((item) => {
       const queryMatches =
         query.length === 0 ||
-        `${item.name} ${item.series} ${item.character} ${item.subcategory ?? ""}`
+        `${item.name} ${item.series} ${item.character} ${item.manufacturer} ${item.janCode} ${item.subcategory ?? ""} ${(item.altTitles ?? []).join(" ")}`
           .toLocaleLowerCase()
           .includes(query);
       return (
@@ -647,7 +661,7 @@ function StorefrontContent() {
     return (catalog?.accessories ?? []).filter((item) => {
       const queryMatches =
         query.length === 0 ||
-        `${item.name} ${item.series} ${item.subcategory ?? ""}`
+        `${item.name} ${item.series} ${item.manufacturer} ${item.janCode} ${item.subcategory ?? ""} ${(item.altTitles ?? []).join(" ")}`
           .toLocaleLowerCase()
           .includes(query);
       return (

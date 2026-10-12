@@ -747,22 +747,22 @@ function createDemoOrders(): MockStoredOrder[] {
       items: [
         {
           id: "demo-6-manga",
-          title: "บันทึกนักปรุงยาแห่งหอคอย เล่ม 2",
+          title: "SPY x FAMILY เล่ม 2",
           productType: "MANGA",
           volumeLabel: "เล่ม 2",
           quantity: 1,
           paymentType: "FULL",
-          lineTotal: 99,
+          lineTotal: 95,
           remainingBalance: 0,
           isPreorder: false,
         },
         {
           id: "demo-6-figure",
-          title: "Moonlit City Guardian - Collector Figure",
+          title: "Nendoroid Anya Forger",
           productType: "FIGURE",
           quantity: 1,
           paymentType: "FULL",
-          lineTotal: 2_650,
+          lineTotal: 1_850,
           remainingBalance: 0,
           isPreorder: true,
         },
@@ -1952,7 +1952,7 @@ const MOCK_WAITLIST_ENTRIES: readonly MockWaitlistEntry[] = [
   },
   {
     id: 4,
-    productName: "Moonlit City Guardian - Collector Figure",
+    productName: "Nendoroid Anya Forger",
     customerName: "คุณปกรณ์",
     customerEmail: "pakorn@example.test",
     queuePosition: 1,
@@ -1961,7 +1961,7 @@ const MOCK_WAITLIST_ENTRIES: readonly MockWaitlistEntry[] = [
   },
   {
     id: 5,
-    productName: "Moonlit City Guardian - Collector Figure",
+    productName: "Nendoroid Anya Forger",
     customerName: "คุณศิริพร",
     customerEmail: "siriporn@example.test",
     queuePosition: 2,
@@ -1970,7 +1970,7 @@ const MOCK_WAITLIST_ENTRIES: readonly MockWaitlistEntry[] = [
   },
   {
     id: 6,
-    productName: "Moonlit City - Acrylic Diorama",
+    productName: "Anya Forger Acrylic Stand (Spy x Family)",
     customerName: "คุณธนา",
     customerEmail: "thana@example.test",
     queuePosition: 1,

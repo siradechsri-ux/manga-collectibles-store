@@ -23,6 +23,9 @@ export interface MangaCartItem {
   title: string;
   volume: number;
   variantLabel?: string;
+  image?: string | null;
+  coverImage?: string | null;
+  imageUrl?: string | null;
   price: number;
   isPreorder: boolean;
   quantity: number;
@@ -34,6 +37,9 @@ export interface LightNovelCartItem {
   title: string;
   volume: number;
   variantLabel?: string;
+  image?: string | null;
+  coverImage?: string | null;
+  imageUrl?: string | null;
   price: number;
   isPreorder: boolean;
   quantity: number;
@@ -43,6 +49,9 @@ export interface FigureCartItem {
   kind: "FIGURE";
   id: number;
   name: string;
+  image?: string | null;
+  coverImage?: string | null;
+  imageUrl?: string | null;
   fullPrice: number;
   depositAmount: number;
   selectedPaymentType: "FULL" | "DEPOSIT";
@@ -54,6 +63,9 @@ export interface PlamoCartItem {
   kind: "PLAMO";
   id: number;
   name: string;
+  image?: string | null;
+  coverImage?: string | null;
+  imageUrl?: string | null;
   fullPrice: number;
   depositAmount: number;
   selectedPaymentType: "FULL" | "DEPOSIT";
@@ -66,6 +78,9 @@ export interface GoodsCartItem {
   kind: "GOODS";
   id: number;
   name: string;
+  image?: string | null;
+  coverImage?: string | null;
+  imageUrl?: string | null;
   fullPrice: number;
   quantity: number;
   subcategory?: string;
@@ -75,6 +90,9 @@ export interface AccessoryCartItem {
   kind: "ACCESSORY";
   id: number;
   name: string;
+  image?: string | null;
+  coverImage?: string | null;
+  imageUrl?: string | null;
   fullPrice: number;
   quantity: number;
   subcategory?: string;
@@ -134,6 +152,9 @@ const mangaCartItemSchema = z
     title: z.string().trim().min(1).max(300),
     volume: z.number().int().positive().safe(),
     variantLabel: z.string().trim().min(1).max(150).optional(),
+    image: z.string().nullable().optional(),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
     price: z.number().finite().positive(),
     isPreorder: z.boolean(),
     quantity: z.number().int().positive().safe(),
@@ -147,6 +168,9 @@ const lightNovelCartItemSchema = z
     title: z.string().trim().min(1).max(300),
     volume: z.number().int().positive().safe(),
     variantLabel: z.string().trim().min(1).max(150).optional(),
+    image: z.string().nullable().optional(),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
     price: z.number().finite().positive(),
     isPreorder: z.boolean(),
     quantity: z.number().int().positive().safe(),
@@ -158,6 +182,9 @@ const figureCartItemSchema = z
     kind: z.literal("FIGURE"),
     id: z.number().int().positive().safe(),
     name: z.string().trim().min(1).max(300),
+    image: z.string().nullable().optional(),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
     fullPrice: z.number().finite().positive(),
     depositAmount: z.number().finite().nonnegative(),
     selectedPaymentType: z.enum(["FULL", "DEPOSIT"]),
@@ -183,6 +210,9 @@ const plamoCartItemSchema = z
     kind: z.literal("PLAMO"),
     id: z.number().int().positive().safe(),
     name: z.string().trim().min(1).max(300),
+    image: z.string().nullable().optional(),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
     fullPrice: z.number().finite().positive(),
     depositAmount: z.number().finite().nonnegative(),
     selectedPaymentType: z.enum(["FULL", "DEPOSIT"]),
@@ -197,6 +227,9 @@ const goodsCartItemSchema = z
     kind: z.literal("GOODS"),
     id: z.number().int().positive().safe(),
     name: z.string().trim().min(1).max(300),
+    image: z.string().nullable().optional(),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
     fullPrice: z.number().finite().positive(),
     quantity: z.number().int().positive().safe(),
     subcategory: z.string().optional(),
@@ -208,6 +241,9 @@ const accessoryCartItemSchema = z
     kind: z.literal("ACCESSORY"),
     id: z.number().int().positive().safe(),
     name: z.string().trim().min(1).max(300),
+    image: z.string().nullable().optional(),
+    coverImage: z.string().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
     fullPrice: z.number().finite().positive(),
     quantity: z.number().int().positive().safe(),
     subcategory: z.string().optional(),

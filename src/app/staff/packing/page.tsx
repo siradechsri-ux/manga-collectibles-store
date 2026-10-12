@@ -4,11 +4,8 @@ import { AlertTriangle, Check, PackageCheck, Printer, ScanLine } from "lucide-re
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
-import {
-  listMockOrders,
-  markMockOrderShipped,
-  type MockStoredOrder,
-} from "../../../mocks/storage.mock";
+import { OrderService } from "../../../services/order.service";
+import type { MockStoredOrder } from "../../../mocks/storage.mock";
 import type { ShipmentCarrier } from "../../../components/OrderDetailView";
 
 export default function StaffPackingPage() {
@@ -24,14 +21,16 @@ export default function StaffPackingPage() {
 
   const refreshOrders = useCallback((): void => {
     if (user?.role === "STAFF" || user?.role === "ADMIN") {
-      setOrders(
-        listMockOrders().filter(
-          (order) =>
-            order.detail.paymentStatus === "PAID" &&
-            order.detail.status !== "SHIPPED" &&
-            order.detail.status !== "DELIVERED",
-        ),
-      );
+      void OrderService.getOrders().then((all) => {
+        setOrders(
+          all.filter(
+            (order) =>
+              order.detail.paymentStatus === "PAID" &&
+              order.detail.status !== "SHIPPED" &&
+              order.detail.status !== "DELIVERED",
+          ),
+        );
+      });
     }
   }, [user?.role]);
 
@@ -76,11 +75,11 @@ export default function StaffPackingPage() {
     setShippingOrderId(orderId);
   }
 
-  function confirmShipment(): void {
+  async function confirmShipment(): Promise<void> {
     if (shippingOrderId === null) return;
     const orderId = shippingOrderId;
     try {
-      const shippedOrder = markMockOrderShipped(orderId, shippingCarrier);
+      const shippedOrder = await OrderService.markOrderShipped(orderId, shippingCarrier);
       setOrders((current) =>
         current.filter((order) => order.detail.id !== shippedOrder.detail.id),
       );

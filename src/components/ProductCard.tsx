@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -42,42 +43,48 @@ export function BookCoverFallback({
   className = "",
   compact = false,
 }: BookCoverFallbackProps) {
-  const Icon = isNovel ? BookMarked : BookOpen;
-  const categoryLabel = isNovel ? "LIGHT NOVEL" : "MANGA";
+  const Icon = BookOpen;
+  const categoryLabel = isNovel ? "NOVEL" : "MANGA";
+  const formattedVol =
+    volumeNumber !== undefined && volumeNumber !== null
+      ? typeof volumeNumber === "number"
+        ? `VOL. ${String(volumeNumber).padStart(2, "0")}`
+        : `VOL. ${volumeNumber}`
+      : null;
 
   return (
     <div
-      className={`relative flex h-full w-full flex-col justify-between overflow-hidden rounded-xl border p-3 select-none transition-colors ${
+      className={`relative flex h-full w-full flex-col justify-between overflow-hidden rounded-xl border p-2.5 sm:p-3 select-none transition-all shadow-xs ${
         isNovel
-          ? "border-amber-200/90 bg-gradient-to-br from-amber-50 via-stone-50 to-orange-100/50 text-stone-900 dark:border-amber-900/60 dark:from-stone-900 dark:via-zinc-900 dark:to-stone-950 dark:text-stone-100"
-          : "border-zinc-200/90 bg-gradient-to-br from-zinc-100 via-stone-50 to-orange-50/40 text-zinc-900 dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-900/90 dark:to-zinc-950 dark:text-zinc-100"
+          ? "border-amber-300/60 bg-gradient-to-br from-amber-50 via-stone-50 to-orange-100/60 text-stone-900 dark:border-amber-900/40 dark:from-stone-900 dark:via-zinc-900 dark:to-stone-950 dark:text-stone-100"
+          : "border-zinc-200/90 bg-gradient-to-br from-zinc-50 via-stone-50 to-orange-50/70 text-zinc-900 dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-900/90 dark:to-zinc-950 dark:text-zinc-100"
       } ${className}`}
-      aria-label={`การ์ดหนังสือ ${title}${volumeNumber ? ` เล่ม ${volumeNumber}` : ""}`}
+      aria-label={`การ์ดหนังสือ ${title}${formattedVol ? ` ${formattedVol}` : ""}`}
     >
       {/* Subtle decorative spine stripe */}
-      <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-orange-500/70 via-amber-500/50 to-orange-600/70 dark:from-orange-500/50 dark:to-orange-700/50" />
+      <div className="absolute inset-y-0 left-0 w-2.5 bg-gradient-to-b from-orange-500 via-amber-500 to-orange-600 shadow-xs dark:from-orange-500/80 dark:to-orange-700/80" />
+      <div className="absolute inset-y-0 left-2.5 w-px bg-black/10 dark:bg-white/10" />
 
       {/* Top section: Category indicator & Lucide icon */}
-      <div className="flex items-start justify-between gap-1 pl-1">
-        <span className="rounded bg-black/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-stone-700 dark:bg-white/10 dark:text-stone-300">
+      <div className="flex items-start justify-between gap-1 pl-2">
+        <span className="rounded bg-black/5 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-stone-700 dark:bg-white/10 dark:text-stone-300">
           {categoryLabel}
         </span>
-        <div className="rounded-lg bg-white/80 p-1.5 text-orange-700 shadow-xs backdrop-blur-xs dark:bg-zinc-800/90 dark:text-orange-400">
-          <Icon size={compact ? 14 : 18} aria-hidden="true" />
+        <div className="rounded-md bg-white/80 p-1 text-orange-600 shadow-2xs backdrop-blur-xs dark:bg-zinc-800/90 dark:text-orange-400">
+          <Icon size={compact ? 12 : 14} aria-hidden="true" />
         </div>
       </div>
 
       {/* Center section: Large volume number typography & Title */}
-      <div className="my-auto py-1 pl-1">
-        {volumeNumber !== undefined && volumeNumber !== null ? (
-          <div className="inline-flex items-center gap-1 rounded-md border border-orange-300/70 bg-white/90 px-2 py-0.5 text-xs font-black text-orange-900 shadow-xs dark:border-orange-900/80 dark:bg-zinc-900 dark:text-orange-300">
-            <span>เล่ม</span>
-            <span className="text-sm font-black">{volumeNumber}</span>
+      <div className="my-auto py-1 pl-2">
+        {formattedVol ? (
+          <div className="mb-0.5 text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+            {formattedVol}
           </div>
         ) : null}
         <p
-          className={`mt-2 font-bold leading-tight line-clamp-3 text-zinc-900 dark:text-zinc-100 ${
-            compact ? "text-xs" : "text-sm"
+          className={`font-bold leading-snug line-clamp-2 text-zinc-700 dark:text-zinc-300 ${
+            compact ? "text-[10px]" : "text-xs"
           }`}
           title={title}
         >
@@ -86,9 +93,9 @@ export function BookCoverFallback({
       </div>
 
       {/* Bottom section: Authenticity tag */}
-      <div className="flex items-center justify-between border-t border-black/5 pt-1.5 pl-1 text-[9px] font-semibold text-stone-500 dark:border-white/10 dark:text-stone-400">
-        <span>ฉบับลิขสิทธิ์</span>
-        <span>VAT 0%</span>
+      <div className="mt-1 flex items-center justify-between gap-1.5 border-t border-black/10 pt-1.5 pl-2 text-[8px] sm:text-[8.5px] font-bold text-stone-600 dark:border-white/10 dark:text-stone-400">
+        <span className="truncate">ฉบับลิขสิทธิ์</span>
+        <span className="shrink-0 tracking-wider text-[7.5px] sm:text-[8px] font-black text-orange-700 dark:text-orange-400">OFFICIAL</span>
       </div>
     </div>
   );
@@ -106,26 +113,40 @@ export interface BookCoverImageProps {
 }
 
 /**
- * Standard Manga / Light Novel Minimal Typography Card.
- * Replaces external images with clean typography & aspect ratio 2:3 or 3:4.
+ * Standard Manga / Light Novel Cover Image with Clean Typography Fallback.
  */
 export function BookCoverImage({
+  src,
+  alt,
   title,
   volumeNumber,
   isNovel = false,
   aspectRatio = "2/3",
   className = "",
 }: BookCoverImageProps) {
+  const [hasError, setHasError] = useState(false);
   const ratioClass = aspectRatio === "3/4" ? "aspect-[3/4]" : "aspect-[2/3]";
 
   return (
-    <div className={`relative ${ratioClass} w-full overflow-hidden rounded-xl ${className}`}>
-      <BookCoverFallback
-        title={title}
-        volumeNumber={volumeNumber}
-        isNovel={isNovel}
-        compact
-      />
+    <div
+      className={`relative ${ratioClass} w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 ${className}`}
+    >
+      {src && !hasError ? (
+        <img
+          src={src}
+          alt={alt || title}
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          onError={() => setHasError(true)}
+          loading="lazy"
+        />
+      ) : (
+        <BookCoverFallback
+          title={title}
+          volumeNumber={volumeNumber}
+          isNovel={isNovel}
+          compact
+        />
+      )}
     </div>
   );
 }
@@ -140,15 +161,17 @@ export interface CollectibleCoverImageProps {
 }
 
 /**
- * Minimal Typography Card for Collectibles (Figure, Plamo, Goods, Accessories).
- * Pure typography, no external network requests, clean Dark/Light styling.
+ * Collectible Image (Figure, Plamo, Goods, Accessories) with Clean Typography Fallback.
  */
 export function CollectibleCoverImage({
+  src,
+  alt,
   name,
   category,
   scale,
   className = "",
 }: CollectibleCoverImageProps) {
+  const [hasError, setHasError] = useState(false);
   const isPlamo = category === "PLAMO";
   const isGoods = category === "GOODS";
   const isAccessory = category === "ACCESSORY";
@@ -162,48 +185,91 @@ export function CollectibleCoverImage({
         : Package;
 
   const categoryLabel = isPlamo
-    ? "PLAMO"
+    ? "GUNPLA / PLAMO"
     : isGoods
-      ? "GOODS"
+      ? "GOODS & MERCH"
       : isAccessory
         ? "CARE & ACCESSORY"
         : "FIGURE";
 
+  const themeClass = isPlamo
+    ? "border-sky-300/80 bg-gradient-to-br from-sky-50 via-zinc-50 to-blue-50/40 text-zinc-900 dark:border-sky-900/50 dark:from-zinc-900 dark:via-sky-950/30 dark:to-zinc-950 dark:text-zinc-100"
+    : isGoods
+      ? "border-violet-300/80 bg-gradient-to-br from-violet-50 via-zinc-50 to-purple-50/40 text-zinc-900 dark:border-violet-900/50 dark:from-zinc-900 dark:via-violet-950/30 dark:to-zinc-950 dark:text-zinc-100"
+      : isAccessory
+        ? "border-emerald-300/80 bg-gradient-to-br from-emerald-50 via-zinc-50 to-teal-50/40 text-zinc-900 dark:border-emerald-900/50 dark:from-zinc-900 dark:via-emerald-950/30 dark:to-zinc-950 dark:text-zinc-100"
+        : "border-zinc-200/90 bg-gradient-to-br from-zinc-50 via-zinc-100/70 to-orange-50/30 text-zinc-900 dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-900 dark:text-zinc-100";
+
+  const iconContainerClass = isPlamo
+    ? "bg-sky-100 text-sky-700 dark:bg-sky-950/80 dark:text-sky-300"
+    : isGoods
+      ? "bg-violet-100 text-violet-700 dark:bg-violet-950/80 dark:text-violet-300"
+      : isAccessory
+        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300"
+        : "bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300";
+
+  const cornerIconClass = isPlamo
+    ? "text-sky-700 dark:text-sky-400"
+    : isGoods
+      ? "text-violet-700 dark:text-violet-400"
+      : isAccessory
+        ? "text-emerald-700 dark:text-emerald-400"
+        : "text-orange-700 dark:text-orange-400";
+
   return (
     <div
-      className={`relative flex aspect-square w-full flex-col justify-between overflow-hidden rounded-xl border border-zinc-200/90 bg-gradient-to-br from-zinc-50 via-zinc-100/70 to-orange-50/30 p-3 select-none text-zinc-900 transition-colors dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-900 dark:text-zinc-100 ${className}`}
+      className={`relative flex aspect-square w-full flex-col justify-between overflow-hidden rounded-xl border transition-colors ${src && !hasError ? "border-zinc-200/90 dark:border-zinc-800" : themeClass} ${className}`}
       aria-label={`การ์ดของสะสม ${name}`}
     >
-      {/* Top section: Category badge & Icon */}
-      <div className="flex items-start justify-between gap-1">
-        <span className="rounded bg-black/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-stone-700 dark:bg-white/10 dark:text-stone-300">
-          {categoryLabel}
-        </span>
-        <div className="rounded-lg bg-white/80 p-1.5 text-orange-700 shadow-xs backdrop-blur-xs dark:bg-zinc-800 dark:text-orange-400">
-          <Icon size={18} aria-hidden="true" />
+      {src && !hasError ? (
+        <div className="relative h-full w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+          <img
+            src={src}
+            alt={alt || name}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={() => setHasError(true)}
+            loading="lazy"
+          />
+          <div className="absolute top-2 left-2 flex items-center gap-1">
+            <span className="rounded bg-black/60 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white backdrop-blur-xs">
+              {categoryLabel}
+            </span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex h-full w-full flex-col justify-between p-3 select-none">
+          {/* Top section: Category badge & Icon */}
+          <div className="flex items-start justify-between gap-1">
+            <span className="rounded bg-black/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-stone-700 dark:bg-white/10 dark:text-stone-300">
+              {categoryLabel}
+            </span>
+            <div className={`rounded-lg bg-white/80 p-1.5 shadow-xs backdrop-blur-xs dark:bg-zinc-800 ${cornerIconClass}`}>
+              <Icon size={18} aria-hidden="true" />
+            </div>
+          </div>
 
-      {/* Center section: Product name & Scale/Grade */}
-      <div className="my-auto py-2 text-center">
-        <div className="mx-auto mb-1.5 flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-700 shadow-xs dark:bg-orange-950/70 dark:text-orange-300">
-          <Icon size={20} aria-hidden="true" />
+          {/* Center section: Product name & Scale/Grade */}
+          <div className="my-auto py-2 text-center">
+            <div className={`mx-auto mb-1.5 flex h-10 w-10 items-center justify-center rounded-xl shadow-xs ${iconContainerClass}`}>
+              <Icon size={20} aria-hidden="true" />
+            </div>
+            <p className="line-clamp-2 text-xs font-bold leading-tight text-zinc-900 dark:text-zinc-100 sm:text-sm">
+              {name}
+            </p>
+            {scale ? (
+              <span className="mt-1 inline-block rounded-md bg-zinc-200/70 px-2 py-0.5 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                {scale}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Bottom section: Authenticity tag & Tax */}
+          <div className="flex items-center justify-between border-t border-black/5 pt-1.5 text-[9px] font-semibold text-zinc-500 dark:border-white/10 dark:text-zinc-400">
+            <span>ของแท้ 100%</span>
+            <span>VAT 7%</span>
+          </div>
         </div>
-        <p className="line-clamp-2 text-xs font-bold leading-tight text-zinc-900 dark:text-zinc-100 sm:text-sm">
-          {name}
-        </p>
-        {scale ? (
-          <span className="mt-1 inline-block rounded-md bg-zinc-200/70 px-2 py-0.5 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-            {scale}
-          </span>
-        ) : null}
-      </div>
-
-      {/* Bottom section: Authenticity tag & Tax */}
-      <div className="flex items-center justify-between border-t border-black/5 pt-1.5 text-[9px] font-semibold text-zinc-500 dark:border-white/10 dark:text-zinc-400">
-        <span>ของแท้ 100%</span>
-        <span>VAT 7%</span>
-      </div>
+      )}
     </div>
   );
 }
@@ -233,6 +299,13 @@ export function MangaSeriesCard({ series, type }: MangaSeriesCardProps) {
         <div className="flex gap-4">
           <div className="w-24 shrink-0 sm:w-28">
             <BookCoverImage
+              src={
+                series.coverUrl ||
+                series.coverImage ||
+                series.images?.[0] ||
+                series.volumes[0]?.coverUrl
+              }
+              alt={series.title}
               title={series.title}
               volumeNumber={series.volumes[0]?.volumeNumber ?? 1}
               isNovel={isNovel}
@@ -321,21 +394,25 @@ export function CollectibleProductCard({
       <div>
         <div className="relative p-3">
           <CollectibleCoverImage
+            src={item.images?.[0]}
+            alt={item.name}
             name={item.name}
             category={item.category}
             scale={item.scale}
           />
 
-          <div className="absolute bottom-5 right-5 flex items-center gap-1.5">
-            {item.grade ? (
-              <span className="rounded-md bg-orange-600/90 px-2 py-0.5 text-[10px] font-black text-white shadow-xs">
-                {item.grade}
+          {item.images?.[0] ? (
+            <div className="absolute bottom-5 right-5 flex items-center gap-1.5">
+              {item.grade ? (
+                <span className="rounded-md bg-orange-600/90 px-2 py-0.5 text-[10px] font-black text-white shadow-xs">
+                  {item.grade}
+                </span>
+              ) : null}
+              <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
+                {item.manufacturer || "Official"}
               </span>
-            ) : null}
-            <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
-              {item.manufacturer || "Official"}
-            </span>
-          </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="px-5 pb-2">

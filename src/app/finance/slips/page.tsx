@@ -25,13 +25,11 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
+import { OrderService } from "../../../services/order.service";
 import {
-  listMockOrders,
-  approveMockOrderPaymentReview,
   canRejectMockOrderPayment,
   MOCK_ORDERS_UPDATED_EVENT,
   MOCK_PAYMENT_REJECTION_REASONS,
-  rejectMockOrderPayment,
   type MockPaymentRejectionReason,
   type MockStoredOrder,
 } from "../../../mocks/storage.mock";
@@ -52,7 +50,9 @@ export default function FinanceSlipsPage() {
 
   const refreshOrders = useCallback((): void => {
     if (user?.role === "FINANCE" || user?.role === "ADMIN") {
-      setOrders(listMockOrders());
+      void OrderService.getOrders().then((data) => {
+        setOrders(data);
+      });
     }
   }, [user?.role]);
 
@@ -66,11 +66,11 @@ export default function FinanceSlipsPage() {
     };
   }, [refreshOrders]);
 
-  function handleApprove(order: MockStoredOrder): void {
+  async function handleApprove(order: MockStoredOrder): Promise<void> {
     setActionError(null);
     setActionNotice(null);
     try {
-      approveMockOrderPaymentReview(order.detail.id);
+      await OrderService.approveSlip(order.detail.id);
       refreshOrders();
       setSelectedSlipOrder(null);
       setActionNotice(`อนุมัติสลิปคำสั่งซื้อ ${order.detail.orderNumber} สำเร็จ และส่งต่อให้ฝ่ายคลังแพ็กของแล้ว`);
@@ -79,12 +79,12 @@ export default function FinanceSlipsPage() {
     }
   }
 
-  function handleReject(): void {
+  async function handleReject(): Promise<void> {
     if (!rejectionTarget) return;
     setActionError(null);
     setActionNotice(null);
     try {
-      rejectMockOrderPayment(rejectionTarget.detail.id, rejectionReason);
+      await OrderService.rejectSlip(rejectionTarget.detail.id, rejectionReason);
       refreshOrders();
       setActionNotice(`ปฏิเสธสลิปคำสั่งซื้อ ${rejectionTarget.detail.orderNumber} เรียบร้อยแล้ว (เหตุผล: ${rejectionReason})`);
       setRejectionTarget(null);

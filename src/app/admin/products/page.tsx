@@ -4,6 +4,10 @@ import {
   AlertTriangle,
   BookOpen,
   Boxes,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   CirclePlus,
   Edit3,
   Package,
@@ -27,6 +31,29 @@ import {
 } from "../../../mocks/admin-products.mock";
 import { resetMockCommerceData } from "../../../mocks/storage.mock";
 import { canManageInventory, canViewStock } from "../../../utils/permissions";
+
+function productImage(product: AdminProduct): string | null {
+  if (product.type === "MANGA" || product.type === "LIGHT_NOVEL") {
+    return product.coverImage || null;
+  }
+  return product.imageUrl || null;
+}
+
+function getPaginationRange(current: number, total: number): (number | "dots")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  if (current <= 3) {
+    return [1, 2, 3, 4, "dots", total];
+  }
+
+  if (current >= total - 2) {
+    return [1, "dots", total - 3, total - 2, total - 1, total];
+  }
+
+  return [1, "dots", current - 1, current, current + 1, "dots", total];
+}
 
 function productName(product: AdminProduct): string {
   return product.type === "MANGA" || product.type === "LIGHT_NOVEL"
@@ -159,6 +186,9 @@ export default function AdminProductsPage() {
     return subscribeToAdminProducts(refreshProducts);
   }, [refreshProducts, canView]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
   const filteredProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return products.filter((product) => {
@@ -180,6 +210,31 @@ export default function AdminProductsPage() {
       return searchable.toLocaleLowerCase().includes(normalizedQuery);
     });
   }, [category, products, query, status]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [category, query, status, itemsPerPage]);
+
+  const totalItems = filteredProducts.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (validCurrentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+  const paginatedProducts = useMemo(
+    () => filteredProducts.slice(startIndex, endIndex),
+    [filteredProducts, startIndex, endIndex],
+  );
+
+  function handlePageChange(newPage: number): void {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    if (typeof window !== "undefined") {
+      const tableCard = document.getElementById("stock-table-card");
+      if (tableCard) {
+        tableCard.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }
 
   if (isLoading) {
     return (
@@ -295,7 +350,7 @@ export default function AdminProductsPage() {
           <MetricCard icon={<Package size={19} />} label="รายการเปิดพรีออเดอร์" value={preorderCount} accent="violet" />
         </section>
 
-        <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <section id="stock-table-card" className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <label className="relative min-w-0 flex-1">
               <span className="sr-only">ค้นหาสินค้า</span>
@@ -336,16 +391,36 @@ export default function AdminProductsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {filteredProducts.map((product) => {
+                {paginatedProducts.map((product) => {
                   const state = productStatus(product);
                   const editUrl = `/admin/products/${encodeURIComponent(product.id)}/edit`;
+                  const imageSrc = productImage(product);
                   return (
                     <tr key={product.id} className="align-middle hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
                       <td className="px-4 py-3 font-mono text-xs text-zinc-600 dark:text-zinc-400">{productCode(product)}</td>
                       <td className="px-4 py-3">
-                        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
-                          {productCategoryIcon(product.type)}
-                        </span>
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-800">
+                          {imageSrc ? (
+                            <img
+                              src={imageSrc}
+                              alt={productName(product)}
+                              loading="lazy"
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                                const fallback = e.currentTarget.nextElementSibling;
+                                if (fallback) fallback.classList.remove("hidden");
+                              }}
+                            />
+                          ) : null}
+                          <span
+                            className={`flex h-full w-full items-center justify-center text-zinc-500 dark:text-zinc-400 ${
+                              imageSrc ? "hidden" : ""
+                            }`}
+                          >
+                            {productCategoryIcon(product.type)}
+                          </span>
+                        </div>
                       </td>
                       <td className="max-w-72 px-4 py-3">
                         <p className="line-clamp-2 font-semibold text-zinc-900 dark:text-zinc-100">{productName(product)}</p>
@@ -378,13 +453,125 @@ export default function AdminProductsPage() {
                     </tr>
                   );
                 })}
-                {filteredProducts.length === 0 ? (
+                {paginatedProducts.length === 0 ? (
                   <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">ไม่พบสินค้าที่ตรงกับเงื่อนไข</td></tr>
                 ) : null}
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">แสดง {filteredProducts.length} จาก {products.length} รายการ</p>
+
+          {/* Pagination Controls Bar */}
+          <div className="mt-4 flex flex-col gap-3 border-t border-zinc-100 pt-3 dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">
+            {/* Left side: Item count summary & Page size selector */}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
+              <span>
+                แสดง <strong className="text-zinc-900 dark:text-zinc-100">{totalItems === 0 ? 0 : startIndex + 1} - {endIndex}</strong> จากทั้งหมด{" "}
+                <strong className="text-zinc-900 dark:text-zinc-100">{totalItems}</strong> รายการ
+                {totalItems !== products.length ? ` (กรองจาก ${products.length} รายการ)` : ""}
+              </span>
+              <div className="flex items-center gap-1.5 border-l border-zinc-200 pl-3 dark:border-zinc-700">
+                <span>หน้าละ:</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  aria-label="จำนวนรายการต่อหน้า"
+                  className="h-8 rounded-lg border border-zinc-300 bg-white px-2 text-xs font-bold text-zinc-800 outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                >
+                  <option value={20}>20 รายการ</option>
+                  <option value={50}>50 รายการ</option>
+                  <option value={100}>100 รายการ</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Right side: Pagination button group */}
+            {totalPages > 1 ? (
+              <nav aria-label="การแบ่งหน้าสินค้า" className="flex flex-wrap items-center gap-1">
+                {/* First page button */}
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(1)}
+                  disabled={validCurrentPage === 1}
+                  aria-label="ไปยังหน้าแรก"
+                  title="หน้าแรก"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-40 disabled:pointer-events-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  <ChevronsLeft size={15} aria-hidden="true" />
+                </button>
+
+                {/* Previous page button */}
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(validCurrentPage - 1)}
+                  disabled={validCurrentPage === 1}
+                  aria-label="ไปยังหน้าก่อนหน้า"
+                  title="หน้าก่อนหน้า"
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-40 disabled:pointer-events-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  <ChevronLeft size={15} aria-hidden="true" />
+                  <span className="hidden sm:inline">ก่อนหน้า</span>
+                </button>
+
+                {/* Page number buttons */}
+                <div className="flex items-center gap-1">
+                  {getPaginationRange(validCurrentPage, totalPages).map((item, index) => {
+                    if (item === "dots") {
+                      return (
+                        <span
+                          key={`dots-${index}`}
+                          className="px-1 text-xs text-zinc-400 select-none"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+                    const isCurrent = item === validCurrentPage;
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => handlePageChange(item)}
+                        aria-current={isCurrent ? "page" : undefined}
+                        aria-label={`ไปยังหน้าที่ ${item}`}
+                        className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold transition ${
+                          isCurrent
+                            ? "bg-orange-600 text-white shadow-xs"
+                            : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Next page button */}
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(validCurrentPage + 1)}
+                  disabled={validCurrentPage === totalPages}
+                  aria-label="ไปยังหน้าถัดไป"
+                  title="หน้าถัดไป"
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-40 disabled:pointer-events-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  <span className="hidden sm:inline">ถัดไป</span>
+                  <ChevronRight size={15} aria-hidden="true" />
+                </button>
+
+                {/* Last page button */}
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={validCurrentPage === totalPages}
+                  aria-label="ไปยังหน้าสุดท้าย"
+                  title="หน้าสุดท้าย"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 transition hover:bg-zinc-100 disabled:opacity-40 disabled:pointer-events-none dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  <ChevronsRight size={15} aria-hidden="true" />
+                </button>
+              </nav>
+            ) : null}
+          </div>
         </section>
       </div>
 
