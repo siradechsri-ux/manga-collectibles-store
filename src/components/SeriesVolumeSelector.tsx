@@ -6,6 +6,8 @@ import {
   BookOpen,
   CalendarDays,
   Check,
+  ChevronLeft,
+  ChevronRight,
   ListChecks,
   PackageCheck,
   ShoppingCart,
@@ -80,6 +82,18 @@ export default function SeriesVolumeSelector({
     message: string;
     isError: boolean;
   } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const volumesPerPage = 9;
+  const totalPages = Math.max(1, Math.ceil(volumes.length / volumesPerPage));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const visibleVolumes = useMemo(
+    () =>
+      volumes.slice(
+        (validCurrentPage - 1) * volumesPerPage,
+        validCurrentPage * volumesPerPage,
+      ),
+    [validCurrentPage, volumes],
+  );
 
   const purchasableVolumes = useMemo(
     () =>
@@ -209,7 +223,7 @@ export default function SeriesVolumeSelector({
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {volumes.map((volume) => {
+          {visibleVolumes.map((volume) => {
             const isOutOfStock =
               volume.status === "OUT_OF_STOCK" || volume.stock <= 0;
             const isPreorder = volume.status === "PREORDER";
@@ -341,6 +355,48 @@ export default function SeriesVolumeSelector({
           })}
         </div>
       )}
+
+      {totalPages > 1 ? (
+        <nav
+          aria-label="แบ่งหน้ารายการเล่ม"
+          className="mt-6 flex flex-wrap items-center justify-center gap-2"
+        >
+          <button
+            type="button"
+            onClick={() => setCurrentPage(validCurrentPage - 1)}
+            disabled={validCurrentPage === 1}
+            aria-label="หน้าก่อนหน้า"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-card-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronLeft size={18} aria-hidden="true" />
+          </button>
+          {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+            <button
+              key={page}
+              type="button"
+              onClick={() => setCurrentPage(page)}
+              aria-label={`หน้า ${page}`}
+              aria-current={validCurrentPage === page ? "page" : undefined}
+              className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-semibold ${
+                validCurrentPage === page
+                  ? "border-orange-600 bg-orange-600 text-white"
+                  : "border-border bg-card text-card-foreground hover:border-orange-400"
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setCurrentPage(validCurrentPage + 1)}
+            disabled={validCurrentPage === totalPages}
+            aria-label="หน้าถัดไป"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-card-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+        </nav>
+      ) : null}
 
       {userCanShop && selectedVolumes.length > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 text-card-foreground shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-md">

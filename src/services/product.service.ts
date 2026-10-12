@@ -4,6 +4,7 @@ import type {
   CatalogFigure,
   CatalogMangaSeries,
 } from "../lib/catalog-client";
+import { catalogResponseSchema } from "../lib/catalog-client";
 import { getAdminProductsCatalog } from "../mocks/admin-products.mock";
 import { getMockCatalog } from "../mocks/products.mock";
 
@@ -28,6 +29,30 @@ export class ProductService {
     }
     const json = await response.json();
     return json.data;
+  }
+
+  static async getMangaSeries(): Promise<CatalogMangaSeries[]> {
+    if (IS_MOCK_MODE) {
+      if (typeof window !== "undefined") {
+        return getAdminProductsCatalog().mangaSeries;
+      }
+      return getMockCatalog().mangaSeries;
+    }
+
+    const response = await fetch("/api/catalog?category=MANGA", {
+      headers: { Accept: "application/json" },
+    });
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error("เซิร์ฟเวอร์ส่งข้อมูลมังงะไม่ถูกต้อง");
+    }
+    const parsed = catalogResponseSchema.safeParse(body);
+    if (!response.ok || !parsed.success) {
+      throw new Error("ไม่สามารถโหลดรายการมังงะได้");
+    }
+    return parsed.data.data.mangaSeries;
   }
 
   /**

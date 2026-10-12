@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
 import { z } from "zod";
-import { getMockCatalog } from "../../../mocks/products.mock";
+import {
+  getMockCatalog,
+  mangaSeries as artworkMangaSeries,
+} from "../../../mocks/products.mock";
 
 export const dynamic = "force-dynamic";
 
@@ -172,10 +175,17 @@ function requiredPositiveNumber(value: string | null, field: string): number {
   return number;
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
+  const mangaOnly = new URL(request.url).searchParams.get("category") === "MANGA";
   if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
+    const catalog = getMockCatalog();
     return NextResponse.json(
-      { success: true, data: getMockCatalog() },
+      {
+        success: true,
+        data: mangaOnly
+          ? { mangaSeries: catalog.mangaSeries, figures: [] }
+          : catalog,
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   }
@@ -219,7 +229,7 @@ export async function GET(): Promise<NextResponse> {
            AND product.is_active = TRUE
          ORDER BY series.title, product.volume_number, variant.id`,
       ),
-      pool.query<FigureVariantRow>(
+      mangaOnly ? Promise.resolve({ rows: [] as FigureVariantRow[] }) : pool.query<FigureVariantRow>(
         `SELECT
            product.slug,
            variant.id::text AS variant_id,
@@ -351,7 +361,27 @@ export async function GET(): Promise<NextResponse> {
     });
 
     const data = {
-      mangaSeries: [...mangaBySlug.values()],
+      mangaSeries: [...mangaBySlug.values()].map((series) => {
+        const artwork = artworkMangaSeries.find((item) => item.id === series.id);
+        return {
+          ...series,
+          ...(artwork?.coverImage ? { coverImage: artwork.coverImage } : {}),
+          ...(artwork?.coverUrl ? { coverUrl: artwork.coverUrl } : {}),
+          ...(artwork?.images ? { images: artwork.images } : {}),
+          volumes: series.volumes.map((volume) => {
+            const volumeArtwork = artwork?.volumes.find(
+              (item) => item.volumeNumber === volume.volumeNumber,
+            );
+            return {
+              ...volume,
+              ...(volumeArtwork?.coverUrl
+                ? { coverUrl: volumeArtwork.coverUrl }
+                : {}),
+              ...(volumeArtwork?.images ? { images: volumeArtwork.images } : {}),
+            };
+          }),
+        };
+      }),
       figures,
     };
     const parsed = responseSchema.safeParse({ success: true, data });

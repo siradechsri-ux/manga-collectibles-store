@@ -73,7 +73,7 @@ const figureSchema = z
   })
   .strict();
 
-const catalogResponseSchema = z
+export const catalogResponseSchema = z
   .object({
     success: z.literal(true),
     data: z

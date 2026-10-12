@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -277,12 +277,13 @@ export function CollectibleCoverImage({
 export interface MangaSeriesCardProps {
   series: CatalogMangaSeries;
   type: "MANGA" | "LIGHT_NOVEL";
+  returnTo?: string;
 }
 
 /**
  * Modern Manga or Light Novel Series Card used in the storefront catalog.
  */
-export function MangaSeriesCard({ series, type }: MangaSeriesCardProps) {
+export function MangaSeriesCard({ series, type, returnTo }: MangaSeriesCardProps) {
   const isNovel = type === "LIGHT_NOVEL";
   const startingPrice =
     series.volumes.length > 0
@@ -292,7 +293,7 @@ export function MangaSeriesCard({ series, type }: MangaSeriesCardProps) {
 
   return (
     <Link
-      href={`/manga/${encodeURIComponent(series.id)}`}
+      href={`/manga/${encodeURIComponent(series.id)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
       className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-orange-800"
     >
       <div>
@@ -374,9 +375,142 @@ export function MangaSeriesCard({ series, type }: MangaSeriesCardProps) {
   );
 }
 
+export function MangaShowcaseCard({ series }: { series: CatalogMangaSeries }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isCycling, setIsCycling] = useState(false);
+  const [isFading, setIsFading] = useState(false);
+  const images = Array.from(
+    new Set(
+      [
+        series.coverUrl,
+        series.coverImage,
+        ...(series.images ?? []),
+        ...series.volumes.flatMap((volume) => [
+          volume.coverUrl,
+          ...(volume.images ?? []),
+        ]),
+      ].filter((image): image is string => Boolean(image)),
+    ),
+  );
+  const hasMultipleImages = images.length > 1;
+  const nextIndex = hasMultipleImages ? (activeIndex + 1) % images.length : activeIndex;
+  const hasAvailableVolumes = series.volumes.some(
+    (volume) => volume.status === "IN_STOCK" && volume.stock > 0,
+  );
+  const hasPreorderVolumes = series.volumes.some(
+    (volume) => volume.status === "PREORDER",
+  );
+  const startingPrice = series.volumes.length
+    ? Math.min(...series.volumes.map((volume) => volume.price))
+    : null;
+
+  useEffect(() => {
+    if (!isCycling || !hasMultipleImages) return;
+    let transitionTimeout: ReturnType<typeof setTimeout> | undefined;
+    const interval = setInterval(() => {
+      setIsFading(true);
+      transitionTimeout = setTimeout(() => {
+        setActiveIndex((current) => (current + 1) % images.length);
+        setIsFading(false);
+      }, 650);
+    }, 2200);
+    return () => {
+      clearInterval(interval);
+      if (transitionTimeout) clearTimeout(transitionTimeout);
+    };
+  }, [hasMultipleImages, images.length, isCycling]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [series.id]);
+
+  const isNovel = series.category === "LIGHT_NOVEL";
+
+  return (
+    <Link
+      href={`/manga/${encodeURIComponent(series.id)}`}
+      onMouseEnter={() => setIsCycling(true)}
+      onMouseLeave={() => { setIsCycling(false); setIsFading(false); }}
+      onFocus={() => setIsCycling(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsCycling(false);
+          setIsFading(false);
+        }
+      }}
+      className="group flex h-full min-h-112 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-orange-800"
+    >
+      <div className="relative h-80 shrink-0 overflow-hidden bg-zinc-100 dark:bg-zinc-800 sm:h-88">
+        {images.length > 0 ? (
+          <>
+            <img
+              src={images[activeIndex]}
+              alt={`${series.title} ปกหนังสือ`}
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+              loading="lazy"
+            />
+            {hasMultipleImages ? (
+              <img
+                src={images[nextIndex]}
+                alt={`${series.title} ภาพปกเพิ่มเติม`}
+                aria-hidden="true"
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isFading ? "opacity-100" : "opacity-0"}`}
+                loading="lazy"
+              />
+            ) : null}
+          </>
+        ) : (
+          <BookCoverFallback
+            title={series.title}
+            volumeNumber={series.volumes[0]?.volumeNumber}
+            isNovel={isNovel}
+          />
+        )}
+        <div className="absolute left-3 top-3 flex items-center gap-2">
+          <span className="rounded bg-black/70 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white">
+            {isNovel ? "LIGHT NOVEL" : "MANGA"}
+          </span>
+          <span className="rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
+            {hasPreorderVolumes ? "Pre-order" : hasAvailableVolumes ? "พร้อมส่ง" : "สินค้าหมด"}
+          </span>
+        </div>
+        {hasMultipleImages ? (
+          <span className="absolute bottom-3 right-3 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+            {activeIndex + 1} / {images.length}
+          </span>
+        ) : null}
+      </div>
+      <div className="flex flex-1 flex-col justify-between p-5">
+        <div>
+          <p className="truncate text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+            {series.publisher}
+          </p>
+          <h2 className="mt-1 line-clamp-2 text-lg font-extrabold text-zinc-950 group-hover:text-orange-700 dark:text-zinc-100 dark:group-hover:text-orange-400">
+            {series.title}
+          </h2>
+        </div>
+        <div className="mt-4 flex items-end justify-between gap-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+          <div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {series.volumes.length} รายการเล่ม
+            </p>
+            <p className="mt-0.5 text-base font-black text-zinc-900 dark:text-zinc-100">
+              {startingPrice === null ? "สินค้าหมด" : `เริ่มต้น ${moneyFormatter.format(startingPrice)}`}
+            </p>
+          </div>
+          <span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-orange-600 px-3 text-xs font-bold text-white transition group-hover:bg-orange-700">
+            เลือกดูเล่ม <ArrowRight size={15} aria-hidden="true" />
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 export interface CollectibleProductCardProps {
   item: CatalogFigure;
   onAddToCart?: (item: CatalogFigure) => void;
+  returnTo?: string;
 }
 
 /**
@@ -385,6 +519,7 @@ export interface CollectibleProductCardProps {
 export function CollectibleProductCard({
   item,
   onAddToCart,
+  returnTo,
 }: CollectibleProductCardProps) {
   const { user } = useAuth();
   const userCanShop = canShop(user?.role);
@@ -476,7 +611,7 @@ export function CollectibleProductCard({
       <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
         <div className="flex items-center gap-2">
           <Link
-            href={`/figures/${encodeURIComponent(item.slug)}`}
+            href={`/figures/${encodeURIComponent(item.slug)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
             className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             รายละเอียด

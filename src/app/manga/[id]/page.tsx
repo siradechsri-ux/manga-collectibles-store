@@ -11,6 +11,7 @@ import { useCart } from "../../../context/CartContext";
 import { CatalogMangaSeries } from "../../../lib/catalog-client";
 import { ProductService } from "../../../services/product.service";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../../../mocks/admin-products.mock";
+import { getSafeCollectionReturnPath } from "../../../lib/collection-return";
 
 export default function MangaSeriesPage() {
   const params = useParams<{ id: string }>();
@@ -22,6 +23,15 @@ export default function MangaSeriesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cartNotice, setCartNotice] = useState<string | null>(null);
+  const [returnPath, setReturnPath] = useState("/");
+
+  useEffect(() => {
+    setReturnPath(
+      getSafeCollectionReturnPath(
+        new URLSearchParams(window.location.search).get("returnTo"),
+      ),
+    );
+  }, []);
 
   const loadSeries = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -120,10 +130,11 @@ export default function MangaSeriesPage() {
     <main className="min-h-screen bg-[#f7f7f5] px-4 py-7 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-7xl">
         <Link
-          href="/"
+          href={returnPath}
           className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-orange-700"
         >
-          <ArrowLeft size={17} aria-hidden="true" /> กลับไปหน้าร้าน
+          <ArrowLeft size={17} aria-hidden="true" />
+          {returnPath.startsWith("/collections/") ? "กลับไปหน้าหมวดหมู่" : "กลับไปหน้าร้าน"}
         </Link>
 
         {loading ? (

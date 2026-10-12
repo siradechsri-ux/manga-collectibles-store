@@ -22,12 +22,189 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, FormEvent } from "react";
+import { useEffect, useRef, useState, FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
+import type { CatalogData } from "../../lib/catalog-client";
+import { ProductService } from "../../services/product.service";
 import CartDrawer from "../CartDrawer";
 import DevRoleSwitcher from "../DevRoleSwitcher";
 import ThemeToggle from "../ThemeToggle";
+
+interface SearchSuggestion {
+  title: string;
+  detail: string;
+  image: string | null;
+  href: string;
+  category: string;
+}
+
+function findProductSuggestions(catalog: CatalogData, query: string): SearchSuggestion[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) return [];
+
+  const candidates: Array<{ suggestion: SearchSuggestion; searchable: string }> = [];
+
+  for (const series of catalog.mangaSeries) {
+    candidates.push({
+      suggestion: {
+        title: series.title,
+        detail: `${series.publisher} · ${series.volumes.length} เล่ม`,
+        image:
+          series.coverUrl ||
+          series.coverImage ||
+          series.images?.[0] ||
+          series.volumes[0]?.coverUrl ||
+          series.volumes[0]?.images?.[0] ||
+          null,
+        href: `/manga/${encodeURIComponent(series.id)}`,
+        category: "มังงะ",
+      },
+      searchable: [
+        series.title,
+        series.publisher,
+        series.author ?? "",
+        ...(series.altTitles ?? []),
+        ...series.volumes.flatMap((volume) => [
+          volume.title,
+          volume.variantLabel ?? "",
+          volume.isbn ?? "",
+        ]),
+      ].join(" ").toLocaleLowerCase(),
+    });
+  }
+
+  for (const series of catalog.lightNovelSeries) {
+    candidates.push({
+      suggestion: {
+        title: series.title,
+        detail: `${series.publisher} · ${series.volumes.length} เล่ม`,
+        image:
+          series.coverUrl ||
+          series.coverImage ||
+          series.images?.[0] ||
+          series.volumes[0]?.coverUrl ||
+          series.volumes[0]?.images?.[0] ||
+          null,
+        href: `/manga/${encodeURIComponent(series.id)}`,
+        category: "ไลท์โนเวล",
+      },
+      searchable: [
+        series.title,
+        series.publisher,
+        series.author ?? "",
+        ...(series.altTitles ?? []),
+        ...series.volumes.flatMap((volume) => [
+          volume.title,
+          volume.variantLabel ?? "",
+          volume.isbn ?? "",
+        ]),
+      ].join(" ").toLocaleLowerCase(),
+    });
+  }
+
+  const collectibles = [
+    ...catalog.figures,
+    ...catalog.plamo,
+    ...catalog.goods,
+    ...catalog.accessories,
+  ];
+  for (const item of collectibles) {
+    candidates.push({
+      suggestion: {
+        title: item.name,
+        detail: item.series || item.manufacturer,
+        image: item.coverImage || item.coverUrl || item.images[0] || null,
+        href: `/figures/${encodeURIComponent(item.slug)}`,
+        category:
+          item.category === "PLAMO"
+            ? "พลาสติกโมเดล"
+            : item.category === "GOODS"
+              ? "กู้ดส์"
+              : item.category === "ACCESSORY"
+                ? "อุปกรณ์ดูแล"
+                : "ฟิกเกอร์",
+      },
+      searchable: [
+        item.name,
+        item.series,
+        item.character,
+        item.manufacturer,
+        item.janCode,
+        item.grade ?? "",
+        item.subcategory ?? "",
+        ...(item.altTitles ?? []),
+      ].join(" ").toLocaleLowerCase(),
+    });
+  }
+
+  return candidates
+    .filter(({ searchable }) => searchable.includes(normalizedQuery))
+    .sort((first, second) => {
+      const firstStarts = first.suggestion.title.toLocaleLowerCase().startsWith(normalizedQuery);
+      const secondStarts = second.suggestion.title.toLocaleLowerCase().startsWith(normalizedQuery);
+      return Number(secondStarts) - Number(firstStarts);
+    })
+    .slice(0, 8)
+    .map(({ suggestion }) => suggestion);
+}
+
+function SearchSuggestionList({
+  id,
+  query,
+  suggestions,
+  loading,
+  activeIndex,
+  open,
+  onSelect,
+}: {
+  id: string;
+  query: string;
+  suggestions: SearchSuggestion[];
+  loading: boolean;
+  activeIndex: number;
+  open: boolean;
+  onSelect: (suggestion: SearchSuggestion) => void;
+}) {
+  if (!open || query.trim().length < 2) return null;
+
+  return (
+    <div id={id} className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
+      {loading ? (
+        <p className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">กำลังค้นหาสินค้า...</p>
+      ) : suggestions.length > 0 ? (
+        <ul role="listbox" aria-label="ผลการค้นหาสินค้า" className="max-h-96 overflow-y-auto">
+          {suggestions.map((suggestion, index) => (
+            <li id={`${id}-option-${index}`} key={`${suggestion.href}-${suggestion.title}`} role="option" aria-selected={activeIndex === index}>
+              <Link
+                href={suggestion.href}
+                onClick={() => onSelect(suggestion)}
+                className={`flex items-center gap-3 px-3 py-2.5 transition ${
+                  activeIndex === index
+                    ? "bg-orange-50 dark:bg-zinc-800"
+                    : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                }`}
+              >
+                {suggestion.image ? (
+                  <img src={suggestion.image} alt="" className="h-11 w-9 shrink-0 rounded-md border border-zinc-200 object-cover dark:border-zinc-700" />
+                ) : (
+                  <span className="h-11 w-9 shrink-0 rounded-md bg-zinc-100 dark:bg-zinc-800" />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-zinc-900 dark:text-zinc-100">{suggestion.title}</span>
+                  <span className="mt-0.5 block truncate text-xs text-zinc-500 dark:text-zinc-400">{suggestion.detail}</span>
+                </span>
+                <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{suggestion.category}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">ไม่พบสินค้าที่ตรงกับ “{query.trim()}”</p>
+      )}
+    </div>
+  );
+}
 
 const ROLE_CONFIG = {
   CUSTOMER: {
@@ -71,10 +248,17 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const adminDropdownRef = useRef<HTMLDivElement>(null);
+  const searchCatalogRef = useRef<CatalogData | null>(null);
+  const searchCatalogRequestRef = useRef<Promise<CatalogData> | null>(null);
 
   // Sync search query from URL if available
   useEffect(() => {
@@ -87,6 +271,45 @@ export default function Navbar() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!searchFocused || query.length < 2) {
+      setSearchSuggestions([]);
+      setSearchLoading(false);
+      setActiveSuggestionIndex(-1);
+      return;
+    }
+
+    let isCurrent = true;
+    setSearchLoading(true);
+    setActiveSuggestionIndex(-1);
+    const timeout = setTimeout(() => {
+      async function findSuggestions(): Promise<void> {
+        try {
+          let catalog = searchCatalogRef.current;
+          if (!catalog) {
+            searchCatalogRequestRef.current ??= ProductService.getProducts();
+            catalog = await searchCatalogRequestRef.current;
+            searchCatalogRef.current = catalog;
+          }
+          if (isCurrent) {
+            setSearchSuggestions(findProductSuggestions(catalog, query));
+          }
+        } catch {
+          if (isCurrent) setSearchSuggestions([]);
+        } finally {
+          if (isCurrent) setSearchLoading(false);
+        }
+      }
+      void findSuggestions();
+    }, 180);
+
+    return () => {
+      isCurrent = false;
+      clearTimeout(timeout);
+    };
+  }, [searchFocused, searchQuery]);
 
   // Handle clicking outside of dropdown menus
   useEffect(() => {
@@ -124,12 +347,32 @@ export default function Navbar() {
 
   function handleSearchSubmit(e: FormEvent) {
     e.preventDefault();
-    const query = searchQuery.trim();
-    if (query) {
-      router.push(`/?q=${encodeURIComponent(query)}#browse-collection`);
-    } else {
-      router.push(`/#browse-collection`);
+    const suggestion = searchSuggestions[activeSuggestionIndex] ?? searchSuggestions[0];
+    if (suggestion) router.push(suggestion.href);
+    setSearchFocused(false);
+    setMobileMenuOpen(false);
+  }
+
+  function handleSearchSuggestionKeyDown(event: ReactKeyboardEvent<HTMLInputElement>): void {
+    if (event.key === "ArrowDown" && searchSuggestions.length > 0) {
+      event.preventDefault();
+      setActiveSuggestionIndex((current) =>
+        current >= searchSuggestions.length - 1 ? 0 : current + 1,
+      );
+    } else if (event.key === "ArrowUp" && searchSuggestions.length > 0) {
+      event.preventDefault();
+      setActiveSuggestionIndex((current) =>
+        current <= 0 ? searchSuggestions.length - 1 : current - 1,
+      );
+    } else if (event.key === "Escape") {
+      setSearchFocused(false);
     }
+  }
+
+  function selectSearchSuggestion(suggestion: SearchSuggestion): void {
+    setSearchQuery(suggestion.title);
+    setSearchFocused(false);
+    setMobileSearchOpen(false);
     setMobileMenuOpen(false);
   }
 
@@ -188,35 +431,6 @@ export default function Navbar() {
               aria-label="เมนูหลัก"
               className="hidden items-center gap-3 lg:flex xl:gap-4"
             >
-              {isCustomer && (
-                <>
-                  <Link
-                    href="/?category=ALL#browse-collection"
-                    className="whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold text-zinc-700 transition hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-orange-400"
-                  >
-                    แคตตาล็อกทั้งหมด
-                  </Link>
-                  <Link
-                    href="/?category=MANGA#browse-collection"
-                    className="whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold text-zinc-700 transition hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-orange-400"
-                  >
-                    มังงะ & โนเวล
-                  </Link>
-                  <Link
-                    href="/?category=FIGURE#browse-collection"
-                    className="whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold text-zinc-700 transition hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-orange-400"
-                  >
-                    ฟิกเกอร์ & โมเดล
-                  </Link>
-                  <Link
-                    href="/?status=PREORDER#browse-collection"
-                    className="whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold text-zinc-700 transition hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-orange-400"
-                  >
-                    พรีออเดอร์
-                  </Link>
-                </>
-              )}
-
               {isStaff && (
                 <>
                   <Link
@@ -377,11 +591,16 @@ export default function Navbar() {
 
           {/* ===================== [2. ตรงกลาง - flex-1 max-w-md mx-4]: กล่องค้นหาสินค้า (CUSTOMER & ADMIN Only) ===================== */}
           {(isCustomer || isAdmin) ? (
-            <div className="mx-4 hidden flex-1 max-w-md md:flex items-center">
+            <div className="mx-4 hidden min-w-0 flex-1 items-center md:flex">
               <form
                 onSubmit={handleSearchSubmit}
                 className="relative w-full"
                 role="search"
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setSearchFocused(false);
+                  }
+                }}
               >
                 <div className="relative flex items-center w-full">
                   <Search
@@ -393,8 +612,15 @@ export default function Navbar() {
                     type="search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setSearchFocused(true)}
+                    onKeyDown={handleSearchSuggestionKeyDown}
                     placeholder="ค้นหาสินค้า ชื่อเรื่อง หรือรหัส..."
                     aria-label="ค้นหาสินค้าในร้าน"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={searchFocused && searchQuery.trim().length >= 2}
+                    aria-controls="desktop-product-search-suggestions"
+                    aria-activedescendant={activeSuggestionIndex >= 0 ? `desktop-product-search-suggestions-option-${activeSuggestionIndex}` : undefined}
                     className="h-9 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-8 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
                   />
                   {searchQuery ? (
@@ -402,7 +628,6 @@ export default function Navbar() {
                       type="button"
                       onClick={() => {
                         setSearchQuery("");
-                        router.push(`/#browse-collection`);
                       }}
                       aria-label="ล้างการค้นหา"
                       className="absolute right-2.5 text-slate-400 hover:text-slate-600 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -411,6 +636,15 @@ export default function Navbar() {
                     </button>
                   ) : null}
                 </div>
+                <SearchSuggestionList
+                  id="desktop-product-search-suggestions"
+                  query={searchQuery}
+                  suggestions={searchSuggestions}
+                  loading={searchLoading}
+                  activeIndex={activeSuggestionIndex}
+                  open={searchFocused}
+                  onSelect={selectSearchSuggestion}
+                />
               </form>
             </div>
           ) : (
@@ -419,6 +653,22 @@ export default function Navbar() {
 
           {/* ===================== [3. ฝั่งขวา - flex items-center shrink-0]: ตะกร้าสินค้า, สลับธีม, โปรไฟล์เดียว ===================== */}
           <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+            {(isCustomer || isAdmin) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileSearchOpen((current) => !current);
+                  setMobileMenuOpen(false);
+                  setSearchFocused(false);
+                }}
+                aria-label={mobileSearchOpen ? "ปิดการค้นหา" : "เปิดการค้นหา"}
+                aria-expanded={mobileSearchOpen}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 text-slate-700 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-orange-800 dark:hover:bg-zinc-900 dark:hover:text-orange-400 md:hidden"
+              >
+                {mobileSearchOpen ? <X size={17} aria-hidden="true" /> : <Search size={17} aria-hidden="true" />}
+              </button>
+            ) : null}
+
             {/* Cart Drawer Trigger Button (CUSTOMER only) */}
             {isCustomer ? (
               <button
@@ -648,67 +898,59 @@ export default function Navbar() {
           </div>
         </div>
 
+        {mobileSearchOpen && (isCustomer || isAdmin) ? (
+          <div className="border-t border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950 md:hidden">
+            <form
+              onSubmit={handleSearchSubmit}
+              className="relative"
+              role="search"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setSearchFocused(false);
+                }
+              }}
+            >
+              <div className="relative flex items-center">
+                <Search size={15} className="pointer-events-none absolute left-3 text-slate-400 dark:text-zinc-500" aria-hidden="true" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onKeyDown={handleSearchSuggestionKeyDown}
+                  placeholder="ค้นหาสินค้า ชื่อเรื่อง หรือรหัส..."
+                  aria-label="ค้นหาสินค้าในร้าน"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={searchFocused && searchQuery.trim().length >= 2}
+                  aria-controls="mobile-product-search-suggestions"
+                  aria-activedescendant={activeSuggestionIndex >= 0 ? `mobile-product-search-suggestions-option-${activeSuggestionIndex}` : undefined}
+                  className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-9 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                />
+                {searchQuery ? (
+                  <button type="button" onClick={() => setSearchQuery("")} aria-label="ล้างการค้นหา" className="absolute right-2.5 text-slate-400 hover:text-slate-600 dark:text-zinc-400 dark:hover:text-zinc-200">
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+              <SearchSuggestionList
+                id="mobile-product-search-suggestions"
+                query={searchQuery}
+                suggestions={searchSuggestions}
+                loading={searchLoading}
+                activeIndex={activeSuggestionIndex}
+                open={searchFocused}
+                onSelect={selectSearchSuggestion}
+              />
+            </form>
+          </div>
+        ) : null}
+
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen ? (
           <div className="border-t border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950 lg:hidden">
-            {(isCustomer || isAdmin) ? (
-              <form onSubmit={handleSearchSubmit} className="mb-4">
-                <div className="relative flex items-center">
-                  <Search size={15} className="absolute left-3 text-slate-400 dark:text-zinc-500" />
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="ค้นหาสินค้า..."
-                    aria-label="ค้นหาสินค้าในร้าน"
-                    className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-8 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
-                  />
-                  {searchQuery ? (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      aria-label="ล้างการค้นหา"
-                      className="absolute right-2.5 text-slate-400 hover:text-slate-600 dark:text-zinc-400 dark:hover:text-zinc-200"
-                    >
-                      <X size={14} />
-                    </button>
-                  ) : null}
-                </div>
-              </form>
-            ) : null}
-
             <nav className="flex flex-col gap-1 text-xs font-bold">
-              {isCustomer && (
-                <>
-                  <Link
-                    href="/?category=ALL#browse-collection"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
-                  >
-                    แคตตาล็อกทั้งหมด
-                  </Link>
-                  <Link
-                    href="/?category=MANGA#browse-collection"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
-                  >
-                    มังงะ & โนเวล
-                  </Link>
-                  <Link
-                    href="/?category=FIGURE#browse-collection"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
-                  >
-                    ฟิกเกอร์ & โมเดล
-                  </Link>
-                  <Link
-                    href="/?status=PREORDER#browse-collection"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
-                  >
-                    พรีออเดอร์
-                  </Link>
-                  {user ? (
+              {isCustomer && user ? (
                     <Link
                       href="/orders"
                       onClick={() => setMobileMenuOpen(false)}
@@ -716,9 +958,7 @@ export default function Navbar() {
                     >
                       ประวัติคำสั่งซื้อของฉัน
                     </Link>
-                  ) : null}
-                </>
-              )}
+              ) : null}
 
               {isStaff && (
                 <>
