@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Check,
   Clock3,
+  Heart,
   Minus,
   PackageCheck,
   Plus,
@@ -15,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useWishlist } from "../contexts/WishlistContext";
 import { joinMockWaitlist } from "../mocks/storage.mock";
 import { canShop } from "../utils/permissions";
 
@@ -34,6 +36,8 @@ export interface FigureProduct {
   releaseMonthYear: string;
   status: "PREORDER_OPEN" | "PREORDER_CLOSED" | "IN_STOCK";
   stockOrQuotaRemaining: number;
+  slug?: string;
+  category?: "FIGURE" | "PLAMO" | "GOODS" | "ACCESSORY" | string;
   boxDimensions: {
     widthCm: number;
     lengthCm: number;
@@ -131,6 +135,7 @@ export default function FigureDetailCard({
 }: FigureDetailCardProps) {
   const { user } = useAuth();
   const userCanShop = canShop(user?.role);
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [paymentOption, setPaymentOption] = useState<FigurePaymentOption>("FULL");
   const [quantity, setQuantity] = useState(1);
   const [now, setNow] = useState(() => Date.now());
@@ -139,6 +144,25 @@ export default function FigureDetailCard({
     isError: boolean;
   } | null>(null);
   const [imageError, setImageError] = useState(false);
+
+  const figureItemType = (product.category as any) || "FIGURE";
+  const isWishlisted = isInWishlist(product.id, figureItemType);
+
+  function handleToggleWishlist(): void {
+    toggleWishlist({
+      id: product.id,
+      itemType: figureItemType,
+      title: product.name,
+      price:
+        product.status === "PREORDER_OPEN" && product.depositAmount > 0
+          ? product.depositAmount
+          : product.fullPrice,
+      imageUrl: product.images?.[0] || null,
+      url: `/figures/${encodeURIComponent(product.slug || product.id)}`,
+      category: product.category,
+      isPreorder: product.status === "PREORDER_OPEN",
+    });
+  }
 
   const deadlineTimestamp = new Date(product.preorderDeadline).getTime();
   const hasValidDeadline = Number.isFinite(deadlineTimestamp);
@@ -276,6 +300,20 @@ export default function FigureDetailCard({
                     OFFICIAL COLLECTIBLE
                   </span>
                 </div>
+                {userCanShop ? (
+                  <button
+                    type="button"
+                    onClick={handleToggleWishlist}
+                    aria-label={isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"}
+                    className="absolute top-4 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-zinc-600 shadow-sm backdrop-blur-xs transition hover:scale-110 hover:text-red-600 dark:bg-zinc-800/90 dark:text-zinc-300 dark:hover:text-red-400"
+                  >
+                    <Heart
+                      size={18}
+                      className={isWishlisted ? "fill-red-500 text-red-500" : ""}
+                      aria-hidden="true"
+                    />
+                  </button>
+                ) : null}
                 <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between rounded-xl bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-xs">
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck size={16} className="text-emerald-400" aria-hidden="true" />
@@ -290,8 +328,24 @@ export default function FigureDetailCard({
                   <span className="rounded-md bg-orange-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-orange-800 dark:bg-orange-950 dark:text-orange-300">
                     OFFICIAL COLLECTIBLE
                   </span>
-                  <div className="rounded-xl bg-white/80 p-2 text-orange-600 shadow-xs backdrop-blur-xs dark:bg-zinc-800 dark:text-orange-400">
-                    <PackageCheck size={22} aria-hidden="true" />
+                  <div className="flex items-center gap-2">
+                    {userCanShop ? (
+                      <button
+                        type="button"
+                        onClick={handleToggleWishlist}
+                        aria-label={isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/80 text-zinc-600 shadow-xs backdrop-blur-xs transition hover:text-red-600 dark:bg-zinc-800 dark:text-zinc-300"
+                      >
+                        <Heart
+                          size={16}
+                          className={isWishlisted ? "fill-red-500 text-red-500" : ""}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    ) : null}
+                    <div className="rounded-xl bg-white/80 p-2 text-orange-600 shadow-xs backdrop-blur-xs dark:bg-zinc-800 dark:text-orange-400">
+                      <PackageCheck size={22} aria-hidden="true" />
+                    </div>
                   </div>
                 </div>
 
@@ -352,12 +406,30 @@ export default function FigureDetailCard({
             ) : null}
           </div>
 
-          <p className="mt-4 text-sm font-medium text-slate-500">
-            {product.series}
-          </p>
-          <h1 className="mt-1 text-2xl font-bold leading-tight tracking-tight text-slate-950 sm:text-3xl">
-            {product.name}
-          </h1>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="mt-4 text-sm font-medium text-slate-500">
+                {product.series}
+              </p>
+              <h1 className="mt-1 text-2xl font-bold leading-tight tracking-tight text-slate-950 sm:text-3xl">
+                {product.name}
+              </h1>
+            </div>
+            {userCanShop ? (
+              <button
+                type="button"
+                onClick={handleToggleWishlist}
+                aria-label={isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"}
+                className="mt-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-xs transition hover:scale-105 hover:border-red-200 hover:text-red-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+              >
+                <Heart
+                  size={20}
+                  className={isWishlisted ? "fill-red-500 text-red-500" : ""}
+                  aria-hidden="true"
+                />
+              </button>
+            ) : null}
+          </div>
           <p className="mt-2 text-base text-slate-600">
             ตัวละคร: <span className="font-semibold text-slate-800">{product.character}</span>
           </p>
@@ -560,40 +632,61 @@ export default function FigureDetailCard({
                 </div>
               </div>
 
-              {waitlistRequired ? (
-                <button
-                  type="button"
-                  onClick={joinWaitlist}
-                  className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-                >
-                  <Bell size={18} aria-hidden="true" />
-                  ลงชื่อเข้าคิวรับสิทธิ์ (Waitlist)
-                </button>
-              ) : product.status === "PREORDER_OPEN" ? (
-                <button
-                  type="button"
-                  onClick={() => submitPurchase("PREORDER")}
-                  disabled={!canPurchase}
-                  className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-zinc-800"
-                >
-                  <Check size={18} aria-hidden="true" />
-                  {preorderIsOrderable
-                    ? "สั่งจองล่วงหน้า (Pre-order)"
-                    : product.stockOrQuotaRemaining <= 0
-                      ? "โควตาสั่งจองเต็มแล้ว"
-                      : "ปิดรับจองแล้ว"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => submitPurchase("CART")}
-                  disabled={!canPurchase}
-                  className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-orange-600 dark:hover:text-white dark:disabled:bg-zinc-800"
-                >
-                  <ShoppingBag size={18} aria-hidden="true" />
-                  {canPurchase ? "หยิบใส่ตะกร้า" : "สินค้าหมด"}
-                </button>
-              )}
+              <div className="mt-5 flex items-center gap-3">
+                {waitlistRequired ? (
+                  <button
+                    type="button"
+                    onClick={joinWaitlist}
+                    className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+                  >
+                    <Bell size={18} aria-hidden="true" />
+                    ลงชื่อเข้าคิวรับสิทธิ์ (Waitlist)
+                  </button>
+                ) : product.status === "PREORDER_OPEN" ? (
+                  <button
+                    type="button"
+                    onClick={() => submitPurchase("PREORDER")}
+                    disabled={!canPurchase}
+                    className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-zinc-800"
+                  >
+                    <Check size={18} aria-hidden="true" />
+                    {preorderIsOrderable
+                      ? "สั่งจองล่วงหน้า (Pre-order)"
+                      : product.stockOrQuotaRemaining <= 0
+                        ? "โควตาสั่งจองเต็มแล้ว"
+                        : "ปิดรับจองแล้ว"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => submitPurchase("CART")}
+                    disabled={!canPurchase}
+                    className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-orange-600 dark:hover:text-white dark:disabled:bg-zinc-800"
+                  >
+                    <ShoppingBag size={18} aria-hidden="true" />
+                    {canPurchase ? "หยิบใส่ตะกร้า" : "สินค้าหมด"}
+                  </button>
+                )}
+
+                {userCanShop ? (
+                  <button
+                    type="button"
+                    onClick={handleToggleWishlist}
+                    aria-label={isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"}
+                    className={`inline-flex min-h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition hover:scale-105 ${
+                      isWishlisted
+                        ? "border-red-200 bg-red-50 text-red-600 dark:border-red-900/60 dark:bg-red-950/40"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-red-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                    }`}
+                  >
+                    <Heart
+                      size={20}
+                      className={isWishlisted ? "fill-red-500 text-red-500" : ""}
+                      aria-hidden="true"
+                    />
+                  </button>
+                ) : null}
+              </div>
             </>
           ) : (
             <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">

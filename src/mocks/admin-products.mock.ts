@@ -13,6 +13,11 @@ import {
   BOOK_COVER_ADDON_VARIANT_ID,
   getMockCatalog,
 } from "./products.mock";
+import {
+  findRewardCheckoutVariant,
+  getRewardNumericId,
+  listRewards,
+} from "./rewards.mock";
 
 const dimensionsSchema = z
   .object({
@@ -978,6 +983,18 @@ export function getCheckoutInventorySnapshot(): CheckoutInventorySnapshotItem[] 
     }
   }
 
+  for (const reward of listRewards()) {
+    snapshots.push({
+      productVariantId: getRewardNumericId(reward.id),
+      productType: "GOODS",
+      title: `[รางวัลสะสมแต้ม] ${reward.title}`,
+      price: 0,
+      weightGrams: 50,
+      isPreorder: false,
+      stockOrQuotaRemaining: reward.stock,
+    });
+  }
+
   return snapshots;
 }
 
@@ -1114,6 +1131,11 @@ export function restoreAdminProductInventory(
 export function findAdminCheckoutVariant(
   productVariantId: number,
 ): MockCatalogVariant | null {
+  const rewardVariant = findRewardCheckoutVariant(productVariantId);
+  if (rewardVariant) {
+    return rewardVariant;
+  }
+
   if (productVariantId === BOOK_COVER_ADDON_VARIANT_ID) {
     return {
       productType: "ACCESSORY",

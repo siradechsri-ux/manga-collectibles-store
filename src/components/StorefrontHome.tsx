@@ -1,10 +1,18 @@
 "use client";
 
-import { ShoppingBag, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { LayoutGrid, ShoppingBag, Sparkles } from "lucide-react";
 import CollectionCategoryCard from "./CollectionCategoryCard";
+import BentoCategoryGrid from "./BentoCategoryGrid";
+import EditorialCategoryGrid from "./EditorialCategoryGrid";
+import HeroProductShowcase from "./HeroProductShowcase";
 import { STORE_COLLECTIONS } from "../lib/store-collections";
 
 export default function StorefrontHome() {
+  const [categoryViewStyle, setCategoryViewStyle] = useState<"editorial" | "bento" | "clean">(
+    "editorial",
+  );
+
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl pb-16">
@@ -27,32 +35,72 @@ export default function StorefrontHome() {
                 และอุปกรณ์ถนอมของสะสม พร้อมจัดส่งถึงบ้าน
               </p>
             </div>
-            <div className="hidden min-h-52 items-center justify-center lg:flex">
-              <div className="relative flex h-48 w-56 items-center justify-center rounded-2xl border border-white/15 bg-white/5 shadow-2xl backdrop-blur-sm">
-                <div className="absolute -right-6 -top-5 h-24 w-24 rotate-6 rounded-xl border border-orange-300/30 bg-orange-500/20" />
-                <div className="absolute -bottom-5 -left-5 h-24 w-24 -rotate-6 rounded-xl border border-sky-300/30 bg-sky-500/15" />
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg">
-                  <ShoppingBag size={34} strokeWidth={1.7} aria-hidden="true" />
-                </div>
-              </div>
+            <div className="flex w-full items-center justify-center">
+              <HeroProductShowcase />
             </div>
           </div>
         </section>
 
         <section id="browse-collection" className="mt-10 scroll-mt-24" aria-labelledby="catalog-heading">
-          <header className="mb-5">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-700 dark:text-orange-400">
-              Browse collection
-            </p>
-            <h2 id="catalog-heading" className="mt-1 text-2xl font-black text-zinc-950 dark:text-zinc-100 sm:text-3xl">
-              เลือกดูตามหมวดสินค้า
-            </h2>
+          <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-700 dark:text-orange-400">
+                Browse collection
+              </p>
+              <h2 id="catalog-heading" className="mt-1 text-2xl font-black text-zinc-950 dark:text-zinc-100 sm:text-3xl">
+                เลือกดูตามหมวดสินค้า
+              </h2>
+            </div>
+
+            {/* Quick Switcher between Editorial, Bento, and Clean Card */}
+            <div className="flex flex-wrap items-center gap-1 rounded-xl border border-zinc-200 bg-white p-1 text-xs font-bold shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
+              <button
+                type="button"
+                onClick={() => setCategoryViewStyle("editorial")}
+                className={`rounded-lg px-3 py-1.5 transition ${
+                  categoryViewStyle === "editorial"
+                    ? "bg-orange-600 text-white shadow-xs"
+                    : "text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white"
+                }`}
+              >
+                แบบ Editorial (แบบ 3)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryViewStyle("bento")}
+                className={`rounded-lg px-3 py-1.5 transition ${
+                  categoryViewStyle === "bento"
+                    ? "bg-orange-600 text-white shadow-xs"
+                    : "text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white"
+                }`}
+              >
+                แบบ Bento (แบบ 2)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryViewStyle("clean")}
+                className={`rounded-lg px-3 py-1.5 transition ${
+                  categoryViewStyle === "clean"
+                    ? "bg-orange-600 text-white shadow-xs"
+                    : "text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white"
+                }`}
+              >
+                แบบ Clean Showcase (แบบ 1)
+              </button>
+            </div>
           </header>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {STORE_COLLECTIONS.map((collection) => (
-              <CollectionCategoryCard key={collection.slug} collection={collection} />
-            ))}
-          </div>
+
+          {categoryViewStyle === "editorial" ? (
+            <EditorialCategoryGrid />
+          ) : categoryViewStyle === "bento" ? (
+            <BentoCategoryGrid />
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {STORE_COLLECTIONS.map((collection) => (
+                <CollectionCategoryCard key={collection.slug} collection={collection} />
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>

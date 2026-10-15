@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, BookOpen, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, BookOpen, Heart, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -8,6 +8,9 @@ import SeriesVolumeSelector, {
   VolumeItem,
 } from "../../../components/SeriesVolumeSelector";
 import { useCart } from "../../../context/CartContext";
+import { useAuth } from "../../../contexts/AuthContext";
+import { useWishlist } from "../../../contexts/WishlistContext";
+import { canShop } from "../../../utils/permissions";
 import { CatalogMangaSeries } from "../../../lib/catalog-client";
 import { ProductService } from "../../../services/product.service";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../../../mocks/admin-products.mock";
@@ -18,6 +21,9 @@ export default function MangaSeriesPage() {
   const seriesId = Array.isArray(params.id) ? params.id[0] ?? "" : params.id;
   const router = useRouter();
   const { addItem } = useCart();
+  const { user } = useAuth();
+  const userCanShop = canShop(user?.role);
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [isNovel, setIsNovel] = useState(false);
   const [series, setSeries] = useState<CatalogMangaSeries | null>(null);
   const [loading, setLoading] = useState(true);
@@ -158,9 +164,57 @@ export default function MangaSeriesPage() {
             <section className="mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-violet-950 to-slate-950 p-6 text-white sm:p-10">
               <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
                 <div>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-violet-100">
-                    <BookOpen size={14} aria-hidden="true" /> {isNovel ? "ไลท์โนเวล" : "มังงะ"} · {series.publisher}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-violet-100">
+                      <BookOpen size={14} aria-hidden="true" /> {isNovel ? "ไลท์โนเวล" : "มังงะ"} · {series.publisher}
+                    </span>
+                    {userCanShop ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const startingPrice = series.volumes.length
+                            ? Math.min(...series.volumes.map((v) => v.price))
+                            : 0;
+                          toggleWishlist({
+                            id: series.id,
+                            itemType: isNovel ? "LIGHT_NOVEL" : "MANGA",
+                            title: series.title,
+                            price: startingPrice,
+                            imageUrl:
+                              series.coverUrl ||
+                              series.coverImage ||
+                              series.images?.[0] ||
+                              series.volumes[0]?.coverUrl ||
+                              null,
+                            url: `/manga/${encodeURIComponent(series.id)}`,
+                            category: series.category,
+                            isPreorder: series.volumes.some((v) => v.status === "PREORDER"),
+                          });
+                        }}
+                        aria-label={
+                          isInWishlist(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA")
+                            ? "นำออกจากรายการที่ถูกใจ"
+                            : "เพิ่มในรายการที่ถูกใจ"
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+                      >
+                        <Heart
+                          size={14}
+                          className={
+                            isInWishlist(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA")
+                              ? "fill-red-500 text-red-500"
+                              : ""
+                          }
+                          aria-hidden="true"
+                        />
+                        <span>
+                          {isInWishlist(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA")
+                            ? "บันทึกแล้ว"
+                            : "สิ่งที่ชอบ"}
+                        </span>
+                      </button>
+                    ) : null}
+                  </div>
                   <h1 className="mt-4 max-w-3xl text-3xl font-black tracking-tight sm:text-4xl">
                     {series.title}
                   </h1>

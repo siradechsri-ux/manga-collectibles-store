@@ -120,5 +120,18 @@ export function isRouteAllowedForRole(pathname: string, role?: AuthRole | null):
     return role === "CUSTOMER";
   }
 
+  // เส้นทางสะสมแต้มแลกของรางวัล (CUSTOMER เท่านั้น)
+  if (pathname === "/rewards" || pathname.startsWith("/rewards/")) {
+    return role === "CUSTOMER";
+  }
+
   return true;
+}
+
+/**
+ * สิทธิ์สะสมแต้มและแลกของรางวัล (/rewards):
+ * จริงเฉพาะ 'CUSTOMER'
+ */
+export function canRedeemRewards(role?: AuthRole | null): boolean {
+  return role === "CUSTOMER";
 }

@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  BellRing,
   BookMarked,
   BookOpen,
   Boxes,
   CalendarDays,
+  Heart,
   Layers,
   Package,
   ShieldCheck,
@@ -16,6 +18,8 @@ import {
 } from "lucide-react";
 import type { CatalogFigure, CatalogMangaSeries } from "../lib/catalog-client";
 import { useAuth } from "../contexts/AuthContext";
+import { useWishlist } from "../contexts/WishlistContext";
+import BackInStockModal from "./BackInStockModal";
 import { canShop } from "../utils/permissions";
 
 const moneyFormatter = new Intl.NumberFormat("th-TH", {
@@ -284,18 +288,54 @@ export interface MangaSeriesCardProps {
  * Modern Manga or Light Novel Series Card used in the storefront catalog.
  */
 export function MangaSeriesCard({ series, type, returnTo }: MangaSeriesCardProps) {
+  const { user } = useAuth();
+  const userCanShop = canShop(user?.role);
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const isNovel = type === "LIGHT_NOVEL";
   const startingPrice =
     series.volumes.length > 0
       ? Math.min(...series.volumes.map((v) => v.price))
       : null;
   const preorderVolume = series.volumes.find((v) => v.status === "PREORDER");
+  const isWishlisted = isInWishlist(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA");
 
   return (
     <Link
       href={`/manga/${encodeURIComponent(series.id)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
-      className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-orange-800"
+      className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-orange-800"
     >
+      {userCanShop ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleWishlist({
+              id: series.id,
+              itemType: isNovel ? "LIGHT_NOVEL" : "MANGA",
+              title: series.title,
+              price: startingPrice ?? 0,
+              imageUrl:
+                series.coverUrl ||
+                series.coverImage ||
+                series.images?.[0] ||
+                series.volumes[0]?.coverUrl ||
+                null,
+              url: `/manga/${encodeURIComponent(series.id)}`,
+              category: series.category,
+              isPreorder: Boolean(preorderVolume),
+            });
+          }}
+          aria-label={isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"}
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-zinc-600 shadow-sm backdrop-blur-xs transition hover:scale-110 hover:text-red-600 dark:bg-zinc-800/90 dark:text-zinc-300 dark:hover:text-red-400"
+        >
+          <Heart
+            size={16}
+            className={isWishlisted ? "fill-red-500 text-red-500" : ""}
+            aria-hidden="true"
+          />
+        </button>
+      ) : null}
       <div>
         <div className="flex gap-4">
           <div className="w-24 shrink-0 sm:w-28">
@@ -425,6 +465,10 @@ export function MangaShowcaseCard({ series }: { series: CatalogMangaSeries }) {
   }, [series.id]);
 
   const isNovel = series.category === "LIGHT_NOVEL";
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const { user } = useAuth();
+  const userCanShop = canShop(user?.role);
+  const isWishlisted = isInWishlist(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA");
 
   return (
     <Link
@@ -474,6 +518,33 @@ export function MangaShowcaseCard({ series }: { series: CatalogMangaSeries }) {
             {hasPreorderVolumes ? "Pre-order" : hasAvailableVolumes ? "พร้อมส่ง" : "สินค้าหมด"}
           </span>
         </div>
+        {userCanShop ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleWishlist({
+                id: series.id,
+                itemType: isNovel ? "LIGHT_NOVEL" : "MANGA",
+                title: series.title,
+                price: startingPrice ?? 0,
+                imageUrl: images[0] ?? null,
+                url: `/manga/${encodeURIComponent(series.id)}`,
+                category: series.category,
+                isPreorder: hasPreorderVolumes,
+              });
+            }}
+            aria-label={isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"}
+            className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-zinc-600 shadow-sm backdrop-blur-xs transition hover:scale-110 hover:text-red-600 dark:bg-zinc-800/90 dark:text-zinc-300 dark:hover:text-red-400"
+          >
+            <Heart
+              size={16}
+              className={isWishlisted ? "fill-red-500 text-red-500" : ""}
+              aria-hidden="true"
+            />
+          </button>
+        ) : null}
         {hasMultipleImages ? (
           <span className="absolute bottom-3 right-3 rounded-full bg-black/65 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
             {activeIndex + 1} / {images.length}
@@ -523,118 +594,176 @@ export function CollectibleProductCard({
 }: CollectibleProductCardProps) {
   const { user } = useAuth();
   const userCanShop = canShop(user?.role);
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const [isBackInStockOpen, setIsBackInStockOpen] = useState(false);
+  const isWishlisted = isInWishlist(item.id, item.category);
 
   return (
-    <div className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xs transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-orange-800">
-      <div>
-        <div className="relative p-3">
-          <CollectibleCoverImage
-            src={item.images?.[0]}
-            alt={item.name}
-            name={item.name}
-            category={item.category}
-            scale={item.scale}
-          />
+    <>
+      <div className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xs transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-orange-800">
+        <div>
+          <div className="relative p-3">
+            <CollectibleCoverImage
+              src={item.images?.[0]}
+              alt={item.name}
+              name={item.name}
+              category={item.category}
+              scale={item.scale}
+            />
 
-          {item.images?.[0] ? (
-            <div className="absolute bottom-5 right-5 flex items-center gap-1.5">
-              {item.grade ? (
-                <span className="rounded-md bg-orange-600/90 px-2 py-0.5 text-[10px] font-black text-white shadow-xs">
-                  {item.grade}
+            {/* Wishlist Heart Toggle */}
+            {userCanShop ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleWishlist({
+                    id: item.id,
+                    itemType: (item.category as any) ?? "FIGURE",
+                    title: item.name,
+                    price:
+                      item.status === "PREORDER_OPEN" && item.depositAmount > 0
+                        ? item.depositAmount
+                        : item.fullPrice,
+                    imageUrl: item.images?.[0] ?? null,
+                    url: `/figures/${encodeURIComponent(item.slug)}`,
+                    category: item.category,
+                    isPreorder: item.status === "PREORDER_OPEN",
+                  });
+                }}
+                aria-label={
+                  isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"
+                }
+                className="absolute top-5 right-5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-zinc-600 shadow-sm backdrop-blur-xs transition hover:scale-110 hover:text-red-600 dark:bg-zinc-800/90 dark:text-zinc-300 dark:hover:text-red-400"
+              >
+                <Heart
+                  size={16}
+                  className={isWishlisted ? "fill-red-500 text-red-500" : ""}
+                  aria-hidden="true"
+                />
+              </button>
+            ) : null}
+
+            {item.images?.[0] ? (
+              <div className="absolute bottom-5 right-5 flex items-center gap-1.5">
+                {item.grade ? (
+                  <span className="rounded-md bg-orange-600/90 px-2 py-0.5 text-[10px] font-black text-white shadow-xs">
+                    {item.grade}
+                  </span>
+                ) : null}
+                <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
+                  {item.manufacturer || "Official"}
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="px-5 pb-2">
+            {/* Header Badges: Clean flex items-center gap-2 flex-wrap without overlapping */}
+            <div className="mb-2 flex items-center gap-2 flex-wrap">
+              <span className="rounded bg-orange-100 px-2 py-0.5 text-[10px] font-extrabold text-orange-800 dark:bg-orange-950 dark:text-orange-300">
+                {item.category ?? "FIGURE"}
+              </span>
+              <span
+                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
+                  item.status === "PREORDER_OPEN"
+                    ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                    : item.status === "IN_STOCK"
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                      : "border-zinc-300 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                }`}
+              >
+                {item.status === "PREORDER_OPEN"
+                  ? "Pre-order"
+                  : item.status === "IN_STOCK"
+                    ? "พร้อมส่ง"
+                    : "ปิดรับจอง"}
+              </span>
+              <span className="ml-auto text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                VAT 7%
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                {item.series || "สินค้าสะสม"}
+              </p>
+            </div>
+            <h3 className="mt-1 line-clamp-2 min-h-12 text-sm font-extrabold leading-tight text-zinc-950 group-hover:text-orange-700 dark:text-zinc-100 sm:text-base">
+              {item.name}
+            </h3>
+            <div className="mt-2 flex items-baseline justify-between gap-2">
+              <div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  {item.status === "PREORDER_OPEN" && item.depositAmount > 0
+                    ? "เงินมัดจำสั่งจอง"
+                    : "ราคา"}
+                </p>
+                <p className="text-lg font-black text-zinc-950 dark:text-zinc-100">
+                  {moneyFormatter.format(
+                    item.status === "PREORDER_OPEN" && item.depositAmount > 0
+                      ? item.depositAmount
+                      : item.fullPrice,
+                  )}
+                </p>
+              </div>
+              {item.scale ? (
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {item.scale}
                 </span>
               ) : null}
-              <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
-                {item.manufacturer || "Official"}
-              </span>
             </div>
-          ) : null}
+          </div>
         </div>
 
-        <div className="px-5 pb-2">
-          {/* Header Badges: Clean flex items-center gap-2 flex-wrap without overlapping */}
-          <div className="mb-2 flex items-center gap-2 flex-wrap">
-            <span className="rounded bg-orange-100 px-2 py-0.5 text-[10px] font-extrabold text-orange-800 dark:bg-orange-950 dark:text-orange-300">
-              {item.category ?? "FIGURE"}
-            </span>
-            <span
-              className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
-                item.status === "PREORDER_OPEN"
-                  ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                  : item.status === "IN_STOCK"
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                    : "border-zinc-300 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-              }`}
+        <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/figures/${encodeURIComponent(item.slug)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
-              {item.status === "PREORDER_OPEN"
-                ? "Pre-order"
-                : item.status === "IN_STOCK"
-                  ? "พร้อมส่ง"
-                  : "ปิดรับจอง"}
-            </span>
-            <span className="ml-auto text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
-              VAT 7%
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-              {item.series || "สินค้าสะสม"}
-            </p>
-          </div>
-          <h3 className="mt-1 line-clamp-2 min-h-12 text-sm font-extrabold leading-tight text-zinc-950 group-hover:text-orange-700 dark:text-zinc-100 sm:text-base">
-            {item.name}
-          </h3>
-          <div className="mt-2 flex items-baseline justify-between gap-2">
-            <div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                {item.status === "PREORDER_OPEN" && item.depositAmount > 0
-                  ? "เงินมัดจำสั่งจอง"
-                  : "ราคา"}
-              </p>
-              <p className="text-lg font-black text-zinc-950 dark:text-zinc-100">
-                {moneyFormatter.format(
-                  item.status === "PREORDER_OPEN" && item.depositAmount > 0
-                    ? item.depositAmount
-                    : item.fullPrice,
-                )}
-              </p>
-            </div>
-            {item.scale ? (
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {item.scale}
-              </span>
+              รายละเอียด
+            </Link>
+            {userCanShop ? (
+              item.stockOrQuotaRemaining > 0 && onAddToCart ? (
+                <button
+                  type="button"
+                  onClick={() => onAddToCart(item)}
+                  className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-orange-600 px-3.5 text-xs font-bold text-white transition hover:bg-orange-700"
+                >
+                  <ShoppingBag size={14} aria-hidden="true" />
+                  หยิบใส่ตะกร้า
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex min-h-10 items-center justify-center rounded-xl bg-zinc-100 px-2.5 text-xs font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                    สินค้าหมด
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsBackInStockOpen(true)}
+                    title="แจ้งเตือนเมื่อสินค้าพร้อมจำหน่าย"
+                    className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 text-xs font-bold text-amber-800 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+                  >
+                    <BellRing size={13} aria-hidden="true" />
+                    แจ้งเตือน
+                  </button>
+                </div>
+              )
             ) : null}
           </div>
         </div>
       </div>
 
-      <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/figures/${encodeURIComponent(item.slug)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
-            className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          >
-            รายละเอียด
-          </Link>
-          {userCanShop ? (
-            item.stockOrQuotaRemaining > 0 && onAddToCart ? (
-              <button
-                type="button"
-                onClick={() => onAddToCart(item)}
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-orange-600 px-3.5 text-xs font-bold text-white transition hover:bg-orange-700"
-              >
-                <ShoppingBag size={14} aria-hidden="true" />
-                หยิบใส่ตะกร้า
-              </button>
-            ) : (
-              <span className="inline-flex min-h-10 items-center justify-center rounded-xl bg-zinc-100 px-3 text-xs font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                สินค้าหมด
-              </span>
-            )
-          ) : null}
-        </div>
-      </div>
-    </div>
+      <BackInStockModal
+        isOpen={isBackInStockOpen}
+        onClose={() => setIsBackInStockOpen(false)}
+        productId={item.id}
+        productTitle={item.name}
+        productCategory={item.category}
+      />
+    </>
   );
 }
 

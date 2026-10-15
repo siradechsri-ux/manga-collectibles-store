@@ -16,7 +16,9 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Tag,
   Truck,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,6 +31,11 @@ import {
   useCart,
 } from "../../context/CartContext";
 import { BookCoverAddonBox } from "../../components/BookCoverAddonBox";
+import {
+  listPromoCodes,
+  MOCK_PROMO_CODES_UPDATED_EVENT,
+  type PromoCoupon,
+} from "../../utils/promo";
 import {
   CheckoutTaxItem,
   ShippingAddress,
@@ -165,7 +172,7 @@ function itemTypeLabel(item: CartItem): string {
       : "พลาสติกโมเดล · ชำระเต็มจำนวน";
   }
   if (item.kind === "GOODS") {
-    return "กู้ดส์ & สินค้าคาแรคเตอร์ · พร้อมส่ง";
+    return item.isReward ? "ของรางวัลสะสมแต้ม" : "กู้ดส์ & สินค้าคาแรคเตอร์ · พร้อมส่ง";
   }
   return "อุปกรณ์ดูแลของสะสม · พร้อมส่ง";
 }
@@ -226,7 +233,7 @@ function taxInvoiceItems(
         id: item.id,
         name: item.name,
         quantity: item.quantity,
-        unitPrice: item.fullPrice,
+        unitPrice: item.isReward ? 0 : item.fullPrice,
         type: "GOODS",
       };
     }
@@ -261,20 +268,54 @@ export default function CheckoutPage() {
     user,
   } = useAuth();
   const {
-    items,
+    items: allCartItems,
+    selectedItems,
     isReady: cartReady,
-    itemCount,
+    itemCount: totalCartItemCount,
+    selectedItemCount,
     immediateTotal,
     remainingBalanceTotal,
     bookCoverAddon,
     bookCount,
     hasBookItems,
     bookCoverAddonPrice,
+    appliedPromoCode,
+    promoDiscount,
+    promoTitle,
+    discountedImmediateTotal,
     removeItem,
     updateQuantity,
     updateFigurePaymentType,
+    applyPromoCode,
+    removePromoCode,
+    removeCheckedOutItems,
     clearCart,
   } = useCart();
+
+  // In checkout, only checkout selected items from cart
+  const items = selectedItems;
+  const itemCount = selectedItemCount;
+
+  const [promoInput, setPromoInput] = useState("");
+  const [promoNotice, setPromoNotice] = useState<{ text: string; isError: boolean } | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<PromoCoupon[]>([]);
+
+  useEffect(() => {
+    function loadCoupons() {
+      const now = new Date();
+      const active = listPromoCodes().filter(
+        (c) => c.isActive && new Date(c.expiresAt) > now,
+      );
+      setAvailableCoupons(active);
+    }
+    loadCoupons();
+    window.addEventListener(MOCK_PROMO_CODES_UPDATED_EVENT, loadCoupons);
+    window.addEventListener("storage", loadCoupons);
+    return () => {
+      window.removeEventListener(MOCK_PROMO_CODES_UPDATED_EVENT, loadCoupons);
+      window.removeEventListener("storage", loadCoupons);
+    };
+  }, []);
 
   const [shippingAddress, setShippingAddress] =
     useState<ShippingFormValues>(EMPTY_SHIPPING_ADDRESS);
@@ -528,6 +569,7 @@ export default function CheckoutPage() {
       serviceAreaCode: parsedAddress.data.postalCode,
       shippingPolicy: shipmentPolicy,
       shippingAddress: parsedAddress.data,
+      promoCode: appliedPromoCode || undefined,
       ...(useMockMode
         ? { catalogSnapshot: getCheckoutInventorySnapshot() }
         : {}),
@@ -570,7 +612,7 @@ export default function CheckoutPage() {
       if (useMockMode) {
         saveMockOrder(order, user?.id);
       }
-      clearCart();
+      removeCheckedOutItems();
       const orderId = String(order.orderId);
       if (order.paymentUrl) {
         const paymentUrl = new URL(order.paymentUrl, window.location.origin);
@@ -630,16 +672,18 @@ export default function CheckoutPage() {
         <span className="rounded-2xl bg-zinc-100 p-4 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
           <ShoppingBag aria-hidden="true" className="h-8 w-8" />
         </span>
-        <h1 className="mt-5 text-2xl font-bold text-zinc-900 dark:text-zinc-100">ไม่มีสินค้าในตะกร้าของคุณ</h1>
+        <h1 className="mt-5 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          ไม่มีสินค้าที่เลือกชำระเงิน
+        </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          เลือกมังงะหรือของสะสมที่ต้องการ แล้วกลับมาชำระเงินได้เลย
+          กรุณาเลือกรายการสินค้าที่ต้องการสั่งซื้อในตะกร้าก่อนดำเนินการชำระเงิน
         </p>
         <Link
           href="/"
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-700"
         >
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-          เลือกซื้อสินค้า
+          กลับไปเลือกสินค้า
         </Link>
       </main>
     );
@@ -922,9 +966,16 @@ export default function CheckoutPage() {
                               <h3 className="line-clamp-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                 {cartItemTitle(item)}
                               </h3>
-                              <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-                                {itemTypeLabel(item)}
-                              </p>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                                  {itemTypeLabel(item)}
+                                </p>
+                                {item.kind === "GOODS" && item.isReward ? (
+                                  <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
+                                    แลกฟรี (0 บาท)
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                             <button
                               type="button"
@@ -942,7 +993,8 @@ export default function CheckoutPage() {
                                 onClick={() =>
                                   updateQuantity(item.kind, item.id, item.quantity - 1)
                                 }
-                                className="p-1.5 text-zinc-600 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+                                disabled={item.kind === "GOODS" && Boolean(item.isReward)}
+                                className="p-1.5 text-zinc-600 hover:text-zinc-950 disabled:opacity-30 dark:text-zinc-300 dark:hover:text-white"
                                 aria-label="ลดจำนวน"
                               >
                                 <Minus aria-hidden="true" className="h-3.5 w-3.5" />
@@ -955,8 +1007,11 @@ export default function CheckoutPage() {
                                 onClick={() =>
                                   updateQuantity(item.kind, item.id, item.quantity + 1)
                                 }
-                                disabled={item.quantity >= 99}
-                                className="p-1.5 text-zinc-600 hover:text-zinc-950 disabled:opacity-40 dark:text-zinc-300 dark:hover:text-white"
+                                disabled={
+                                  (item.kind === "GOODS" && Boolean(item.isReward)) ||
+                                  item.quantity >= 99
+                                }
+                                className="p-1.5 text-zinc-600 hover:text-zinc-950 disabled:opacity-30 dark:text-zinc-300 dark:hover:text-white"
                                 aria-label="เพิ่มจำนวน"
                               >
                                 <Plus aria-hidden="true" className="h-3.5 w-3.5" />
@@ -988,12 +1043,25 @@ export default function CheckoutPage() {
                             ) : null}
                           </div>
                           <div className="mt-2 flex justify-between text-xs">
-                            <span className="text-zinc-600 dark:text-zinc-400">
-                              ชำระตอนนี้ {money(immediateUnitPrice * item.quantity)}
-                            </span>
-                            <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                              {money(fullUnitPrice * item.quantity)}
-                            </span>
+                            {item.kind === "GOODS" && item.isReward ? (
+                              <>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                  แลกฟรี (0 บาท)
+                                </span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                  ฿0.00
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-zinc-600 dark:text-zinc-400">
+                                  ชำระตอนนี้ {money(immediateUnitPrice * item.quantity)}
+                                </span>
+                                <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                                  {money(fullUnitPrice * item.quantity)}
+                                </span>
+                              </>
+                            )}
                           </div>
                           {isDepositEligible &&
                           item.selectedPaymentType === "DEPOSIT" ? (
@@ -1007,7 +1075,107 @@ export default function CheckoutPage() {
                   })}
                 </div>
 
-                <div className="space-y-3 border-t border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-950">
+                <div className="space-y-4 border-t border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-950">
+                  {/* Promo Code Engine in Order Summary */}
+                  <div className="rounded-xl border border-zinc-200 bg-white p-3.5 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                      <Tag size={14} className="text-orange-600 dark:text-orange-400" aria-hidden="true" />
+                      <span>โค้ดส่วนลด / โปรโมชัน</span>
+                    </div>
+
+                    {appliedPromoCode ? (
+                      <div className="mt-2.5 flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 dark:border-emerald-800 dark:bg-emerald-950/60">
+                        <div className="min-w-0">
+                          <p className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 truncate">
+                            {appliedPromoCode} · {promoTitle}
+                          </p>
+                          <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                            {appliedPromoCode === "FREESHIP"
+                              ? "ใช้สิทธิ์ส่งฟรีสำเร็จ"
+                              : `ลดทันที ${money(promoDiscount)}`}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            removePromoCode();
+                            setPromoNotice(null);
+                          }}
+                          className="ml-2 rounded-md p-1 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-900"
+                          aria-label="ยกเลิกโค้ด"
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-2.5 space-y-2">
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={promoInput}
+                            onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                            placeholder="เช่น WELCOME10, FREESHIP, MANGA50"
+                            className="min-h-9 flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 text-xs font-semibold text-zinc-900 uppercase placeholder:normal-case placeholder:font-normal placeholder:text-zinc-400 focus:border-orange-500 focus:bg-white focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-orange-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!promoInput.trim()) return;
+                              const res = applyPromoCode(promoInput);
+                              setPromoNotice({ text: res.message, isError: !res.success });
+                              if (res.success) setPromoInput("");
+                            }}
+                            className="min-h-9 rounded-lg bg-zinc-900 px-3 text-xs font-bold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                          >
+                            ใช้โค้ด
+                          </button>
+                        </div>
+                        {availableCoupons.length > 0 ? (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                              แนะนำ:
+                            </span>
+                            {availableCoupons.slice(0, 4).map((c) => (
+                              <button
+                                key={c.code}
+                                type="button"
+                                onClick={() => {
+                                  const res = applyPromoCode(c.code);
+                                  setPromoNotice({
+                                    text: res.message,
+                                    isError: !res.success,
+                                  });
+                                }}
+                                className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-bold text-zinc-700 hover:border-orange-300 hover:text-orange-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-orange-700 dark:hover:text-orange-400"
+                              >
+                                {c.code} (
+                                {c.type === "FREE_SHIPPING"
+                                  ? "ส่งฟรี"
+                                  : c.type === "PERCENTAGE"
+                                    ? `-${c.value}%`
+                                    : `-฿${c.value}`}
+                                )
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+
+                    {promoNotice ? (
+                      <p
+                        role="status"
+                        className={`mt-2 text-[11px] font-semibold ${
+                          promoNotice.isError
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-emerald-700 dark:text-emerald-400"
+                        }`}
+                      >
+                        {promoNotice.text}
+                      </p>
+                    ) : null}
+                  </div>
+
                   <div className="flex justify-between text-sm text-zinc-600 dark:text-zinc-400">
                     <span>ยอดสินค้าที่ชำระวันนี้</span>
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">{money(subtotal)}</span>
@@ -1021,16 +1189,35 @@ export default function CheckoutPage() {
                       <span className="font-semibold">{money(bookCoverAddonPrice)}</span>
                     </div>
                   ) : null}
+                  {promoDiscount > 0 ? (
+                    <div className="flex justify-between text-xs text-emerald-700 dark:text-emerald-400">
+                      <span className="font-medium">
+                        ส่วนลดโปรโมชัน ({appliedPromoCode} · {promoTitle})
+                      </span>
+                      <span className="font-bold">-{money(promoDiscount)}</span>
+                    </div>
+                  ) : null}
                   <div className="flex justify-between text-sm text-zinc-600 dark:text-zinc-400">
                     <span>ค่าจัดส่ง</span>
-                    <span className="text-xs text-zinc-600 dark:text-zinc-400">คำนวณตามพื้นที่</span>
+                    <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                      {appliedPromoCode === "FREESHIP" ? "ฟรีค่าจัดส่ง" : "คำนวณตามพื้นที่"}
+                    </span>
                   </div>
                   <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/40">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm font-semibold text-amber-950 dark:text-amber-200">
                         ยอดชำระทันที*
                       </span>
-                      <span className="text-lg font-bold text-orange-700 dark:text-amber-400">{money(subtotal)}</span>
+                      <div className="text-right">
+                        {promoDiscount > 0 ? (
+                          <span className="mr-2 text-xs text-zinc-400 line-through">
+                            {money(subtotal)}
+                          </span>
+                        ) : null}
+                        <span className="text-lg font-bold text-orange-700 dark:text-amber-400">
+                          {money(discountedImmediateTotal)}
+                        </span>
+                      </div>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-amber-900/80 dark:text-amber-300/80">
                       * ยอดนี้ยังไม่รวมค่าจัดส่ง ซึ่งระบบจะแจ้งยอดจริงเมื่อสร้างคำสั่งซื้อ

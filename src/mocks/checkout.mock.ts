@@ -4,6 +4,8 @@ import { generateMockQrDataUrl } from "./qr.mock";
 import { findMockVariant } from "./products.mock";
 import type { MockCatalogVariant } from "./products.mock";
 import { findAdminCheckoutVariant } from "./admin-products.mock";
+import { findRewardCheckoutVariant } from "./rewards.mock";
+import { validatePromoCode } from "../utils/promo";
 
 const taxInvoiceRequestSchema = z
   .object({
@@ -40,7 +42,7 @@ const catalogSnapshotSchema = z.array(
       title: z.string().min(1),
       volumeNumber: z.number().int().positive().optional(),
       variantLabel: z.string().optional(),
-      price: z.number().finite().positive(),
+      price: z.number().finite().nonnegative(),
       weightGrams: z.number().int().nonnegative(),
       isPreorder: z.boolean(),
       stockOrQuotaRemaining: z.number().int().nonnegative(),
@@ -105,6 +107,7 @@ const checkoutInputSchema = z
       .strict(),
     taxInvoiceRequest: taxInvoiceRequestSchema.optional(),
     catalogSnapshot: catalogSnapshotSchema.optional(),
+    promoCode: z.string().trim().optional(),
   })
   .strict();
 
@@ -263,9 +266,11 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
             : {}),
         }
       : process.env.NEXT_PUBLIC_USE_MOCK === "true"
-        ? findAdminCheckoutVariant(item.productVariantId) ??
+        ? findRewardCheckoutVariant(item.productVariantId) ??
+          findAdminCheckoutVariant(item.productVariantId) ??
           findMockVariant(item.productVariantId)
-        : findMockVariant(item.productVariantId);
+        : findRewardCheckoutVariant(item.productVariantId) ??
+          findMockVariant(item.productVariantId);
     if (!variant) {
       throw new MockCheckoutError(404, `ไม่พบสินค้า variant ${item.productVariantId}`);
     }
@@ -382,7 +387,7 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
     });
   }
 
-  const shippingFeeCents =
+  const rawShippingFeeCents =
     billableWeightGrams <= 500
       ? 4_000
       : billableWeightGrams <= 1_000
@@ -390,8 +395,33 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
         : billableWeightGrams <= 2_000
           ? 8_000
           : 12_000;
-  const immediateAmountCents = immediateMerchandiseCents + shippingFeeCents;
-  const totalAmountCents = fullMerchandiseCents + shippingFeeCents;
+
+  let finalShippingFeeCents = rawShippingFeeCents;
+  let promoDiscountCents = 0;
+  if (parsed.data.promoCode) {
+    const promoRes = validatePromoCode(
+      parsed.data.promoCode,
+      immediateMerchandiseCents / 100,
+      rawShippingFeeCents / 100,
+    );
+    if (promoRes.valid) {
+      if (promoRes.freeShipping) {
+        finalShippingFeeCents = 0;
+      } else {
+        promoDiscountCents = toCents(promoRes.discountAmount);
+      }
+    }
+  }
+
+  const shippingFeeCents = finalShippingFeeCents;
+  const immediateAmountCents = Math.max(
+    0,
+    immediateMerchandiseCents + shippingFeeCents - promoDiscountCents,
+  );
+  const totalAmountCents = Math.max(
+    0,
+    fullMerchandiseCents + shippingFeeCents - promoDiscountCents,
+  );
   const taxGrossCents = figureTaxableGrossCents + shippingFeeCents;
   const vatAmountCents = Math.round((taxGrossCents * 7) / 107);
   const taxInvoiceRequest = parsed.data.taxInvoiceRequest;

@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { z } from "zod";
+import { validatePromoCode } from "../utils/promo";
 
 export interface FigureBoxDimensions {
   widthCm: number;
@@ -84,6 +85,8 @@ export interface GoodsCartItem {
   fullPrice: number;
   quantity: number;
   subcategory?: string;
+  isReward?: boolean;
+  pointsSpent?: number;
 }
 
 export interface AccessoryCartItem {
@@ -109,6 +112,7 @@ export type CartItem =
 
 export interface CartSummary {
   itemCount: number;
+  selectedItemCount: number;
   bookCount: number;
   hasBookItems: boolean;
   bookCoverAddon: boolean;
@@ -116,10 +120,17 @@ export interface CartSummary {
   merchandiseTotal: number;
   immediateTotal: number;
   remainingBalanceTotal: number;
+  appliedPromoCode: string | null;
+  promoDiscount: number;
+  promoTitle: string | null;
+  discountedImmediateTotal: number;
+  isFreeShipping: boolean;
 }
 
 export interface CartContextValue extends CartSummary {
   items: readonly CartItem[];
+  selectedItems: readonly CartItem[];
+  selectedCartItemKeys: readonly string[];
   isReady: boolean;
   addItem: (item: CartItem) => void;
   removeItem: (kind: CartItem["kind"], id: number) => void;
@@ -130,7 +141,15 @@ export interface CartContextValue extends CartSummary {
   ) => void;
   setBookCoverAddon: (enabled: boolean) => void;
   toggleBookCoverAddon: () => void;
+  applyPromoCode: (code: string) => { success: boolean; message: string };
+  removePromoCode: () => void;
   clearCart: () => void;
+  toggleItemSelection: (key: string) => void;
+  selectAllItems: () => void;
+  unselectAllItems: () => void;
+  removeSelectedItems: () => void;
+  removeCheckedOutItems: (keys?: string[]) => void;
+  isItemSelected: (key: string) => boolean;
 }
 
 interface CartProviderProps {
@@ -230,9 +249,11 @@ const goodsCartItemSchema = z
     image: z.string().nullable().optional(),
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
-    fullPrice: z.number().finite().positive(),
+    fullPrice: z.number().finite().nonnegative(),
     quantity: z.number().int().positive().safe(),
     subcategory: z.string().optional(),
+    isReward: z.boolean().optional(),
+    pointsSpent: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -264,8 +285,13 @@ const storedCartSchema = z.array(cartItemSchema).max(100);
 const CART_STORAGE_KEY = "manga-collectibles-cart-v2";
 const LEGACY_CART_STORAGE_KEY = "manga-collectibles-cart-v1";
 const ADDON_STORAGE_KEY = "manga-collectibles-book-cover-addon";
+const SELECTED_ITEMS_STORAGE_KEY = "manga-collectibles-cart-selected-v1";
 
 export const BOOK_COVER_PRICE_PER_ITEM = 5;
+
+export function getCartItemKey(item: { kind: CartItem["kind"]; id: number }): string {
+  return `${item.kind}-${item.id}`;
+}
 
 function isBookItem(item: CartItem): boolean {
   return item.kind === "MANGA" || item.kind === "LIGHT_NOVEL";
@@ -301,7 +327,9 @@ function validateCartItem(item: CartItem): CartItem {
 
 export function CartProvider({ children }: CartProviderProps) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [selectedCartItemKeys, setSelectedCartItemKeys] = useState<string[]>([]);
   const [bookCoverAddon, setBookCoverAddonState] = useState<boolean>(false);
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -309,15 +337,35 @@ export function CartProvider({ children }: CartProviderProps) {
       const savedCart =
         window.localStorage.getItem(CART_STORAGE_KEY) ??
         window.localStorage.getItem(LEGACY_CART_STORAGE_KEY);
+      let parsedItems: CartItem[] = [];
       if (savedCart) {
         const parsedJson: unknown = JSON.parse(savedCart);
         const parsedCart = storedCartSchema.safeParse(parsedJson);
         if (parsedCart.success) {
-          setItems(parsedCart.data);
+          parsedItems = parsedCart.data;
+          setItems(parsedItems);
         } else {
           setItems([]);
         }
       }
+
+      const savedSelected = window.localStorage.getItem(SELECTED_ITEMS_STORAGE_KEY);
+      if (savedSelected) {
+        try {
+          const parsed = JSON.parse(savedSelected);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSelectedCartItemKeys(parsed);
+          } else if (parsedItems.length > 0) {
+            // Default to all selected if empty
+            setSelectedCartItemKeys(parsedItems.map(getCartItemKey));
+          }
+        } catch {
+          setSelectedCartItemKeys(parsedItems.map(getCartItemKey));
+        }
+      } else if (parsedItems.length > 0) {
+        setSelectedCartItemKeys(parsedItems.map(getCartItemKey));
+      }
+
       const savedAddon = window.localStorage.getItem(ADDON_STORAGE_KEY);
       if (savedAddon === "true") {
         setBookCoverAddonState(true);
@@ -325,6 +373,7 @@ export function CartProvider({ children }: CartProviderProps) {
     } catch (error) {
       console.error("Could not restore shopping cart.", error);
       setItems([]);
+      setSelectedCartItemKeys([]);
     } finally {
       setIsReady(true);
     }
@@ -335,13 +384,18 @@ export function CartProvider({ children }: CartProviderProps) {
     try {
       window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
       window.localStorage.setItem(ADDON_STORAGE_KEY, String(bookCoverAddon));
+      window.localStorage.setItem(
+        SELECTED_ITEMS_STORAGE_KEY,
+        JSON.stringify(selectedCartItemKeys),
+      );
     } catch (error) {
       console.error("Could not persist shopping cart.", error);
     }
-  }, [bookCoverAddon, isReady, items]);
+  }, [bookCoverAddon, isReady, items, selectedCartItemKeys]);
 
   const addItem = useCallback((input: CartItem): void => {
     const item = validateCartItem(input);
+    const itemKey = getCartItemKey(item);
     setItems((current) => {
       const index = current.findIndex(
         (candidate) =>
@@ -374,13 +428,20 @@ export function CartProvider({ children }: CartProviderProps) {
       }
       return updated;
     });
+
+    // Auto select newly added item
+    setSelectedCartItemKeys((current) =>
+      current.includes(itemKey) ? current : [...current, itemKey],
+    );
   }, []);
 
   const removeItem = useCallback(
     (kind: CartItem["kind"], id: number): void => {
+      const itemKey = `${kind}-${id}`;
       setItems((current) =>
         current.filter((item) => item.kind !== kind || item.id !== id),
       );
+      setSelectedCartItemKeys((current) => current.filter((k) => k !== itemKey));
     },
     [],
   );
@@ -390,6 +451,7 @@ export function CartProvider({ children }: CartProviderProps) {
       if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > 99) {
         throw new RangeError("จำนวนสินค้าต้องอยู่ระหว่าง 0 ถึง 99");
       }
+      const itemKey = `${kind}-${id}`;
       setItems((current) =>
         quantity === 0
           ? current.filter((item) => item.kind !== kind || item.id !== id)
@@ -397,6 +459,9 @@ export function CartProvider({ children }: CartProviderProps) {
               item.kind === kind && item.id === id ? { ...item, quantity } : item,
             ),
       );
+      if (quantity === 0) {
+        setSelectedCartItemKeys((current) => current.filter((k) => k !== itemKey));
+      }
     },
     [],
   );
@@ -414,6 +479,45 @@ export function CartProvider({ children }: CartProviderProps) {
     [],
   );
 
+  const toggleItemSelection = useCallback((key: string): void => {
+    setSelectedCartItemKeys((current) =>
+      current.includes(key)
+        ? current.filter((itemKey) => itemKey !== key)
+        : [...current, key],
+    );
+  }, []);
+
+  const selectAllItems = useCallback((): void => {
+    setSelectedCartItemKeys(items.map(getCartItemKey));
+  }, [items]);
+
+  const unselectAllItems = useCallback((): void => {
+    setSelectedCartItemKeys([]);
+  }, []);
+
+  const removeSelectedItems = useCallback((): void => {
+    setItems((current) =>
+      current.filter((item) => !selectedCartItemKeys.includes(getCartItemKey(item))),
+    );
+    setSelectedCartItemKeys([]);
+  }, [selectedCartItemKeys]);
+
+  const removeCheckedOutItems = useCallback((keys?: string[]): void => {
+    setSelectedCartItemKeys((currentSelected) => {
+      const targetKeys = keys ?? currentSelected;
+      setItems((currentItems) =>
+        currentItems.filter((item) => !targetKeys.includes(getCartItemKey(item))),
+      );
+      return currentSelected.filter((key) => !targetKeys.includes(key));
+    });
+    setAppliedPromoCode(null);
+  }, []);
+
+  const isItemSelected = useCallback(
+    (key: string): boolean => selectedCartItemKeys.includes(key),
+    [selectedCartItemKeys],
+  );
+
   const setBookCoverAddon = useCallback((enabled: boolean): void => {
     setBookCoverAddonState(enabled);
   }, []);
@@ -424,18 +528,31 @@ export function CartProvider({ children }: CartProviderProps) {
 
   const clearCart = useCallback((): void => {
     setItems([]);
+    setSelectedCartItemKeys([]);
     setBookCoverAddonState(false);
+    setAppliedPromoCode(null);
   }, []);
 
+  const selectedItems = useMemo<CartItem[]>(() => {
+    return items.filter((item) =>
+      selectedCartItemKeys.includes(getCartItemKey(item)),
+    );
+  }, [items, selectedCartItemKeys]);
+
   const summary = useMemo<CartSummary>(() => {
-    let itemCount = 0;
+    let totalCartItemCount = 0;
+    for (const item of items) {
+      totalCartItemCount += item.quantity;
+    }
+
+    let selectedItemCount = 0;
     let bookCount = 0;
     let baseMerchandiseTotal = 0;
     let baseImmediateTotal = 0;
     let remainingBalanceTotal = 0;
 
-    for (const item of items) {
-      itemCount += item.quantity;
+    for (const item of selectedItems) {
+      selectedItemCount += item.quantity;
       if (isBookItem(item)) {
         bookCount += item.quantity;
       }
@@ -452,25 +569,78 @@ export function CartProvider({ children }: CartProviderProps) {
         ? bookCount * BOOK_COVER_PRICE_PER_ITEM
         : 0;
 
+    const merchandiseTotal =
+      selectedItems.length === 0
+        ? 0
+        : Number((baseMerchandiseTotal + bookCoverAddonPrice).toFixed(2));
+    const immediateTotal =
+      selectedItems.length === 0
+        ? 0
+        : Number((baseImmediateTotal + bookCoverAddonPrice).toFixed(2));
+
+    let promoDiscount = 0;
+    let promoTitle: string | null = null;
+    let isFreeShipping = false;
+    if (appliedPromoCode && selectedItems.length > 0) {
+      const res = validatePromoCode(appliedPromoCode, merchandiseTotal);
+      if (res.valid) {
+        promoDiscount = res.discountAmount;
+        promoTitle = res.coupon?.title ?? null;
+        isFreeShipping = res.freeShipping;
+      }
+    }
+
+    const discountedImmediateTotal = Math.max(
+      0,
+      Number((immediateTotal - promoDiscount).toFixed(2)),
+    );
+
     return {
-      itemCount,
+      itemCount: totalCartItemCount,
+      selectedItemCount,
       bookCount,
       hasBookItems,
       bookCoverAddon,
       bookCoverAddonPrice,
-      merchandiseTotal: Number(
-        (baseMerchandiseTotal + bookCoverAddonPrice).toFixed(2),
-      ),
-      immediateTotal: Number(
-        (baseImmediateTotal + bookCoverAddonPrice).toFixed(2),
-      ),
-      remainingBalanceTotal: Number(remainingBalanceTotal.toFixed(2)),
+      merchandiseTotal,
+      immediateTotal,
+      remainingBalanceTotal:
+        selectedItems.length === 0 ? 0 : Number(remainingBalanceTotal.toFixed(2)),
+      appliedPromoCode,
+      promoDiscount,
+      promoTitle,
+      discountedImmediateTotal,
+      isFreeShipping,
     };
-  }, [bookCoverAddon, items]);
+  }, [appliedPromoCode, bookCoverAddon, items, selectedItems]);
+
+  const applyPromoCode = useCallback(
+    (code: string): { success: boolean; message: string } => {
+      const res = validatePromoCode(code, summary.merchandiseTotal);
+      if (!res.valid) {
+        return {
+          success: false,
+          message: res.errorMessage || "โค้ดส่วนลดไม่ถูกต้อง",
+        };
+      }
+      setAppliedPromoCode(code.trim().toUpperCase());
+      return {
+        success: true,
+        message: `ใช้โค้ด ${res.coupon?.code} สำเร็จ (${res.coupon?.title})`,
+      };
+    },
+    [summary.merchandiseTotal],
+  );
+
+  const removePromoCode = useCallback((): void => {
+    setAppliedPromoCode(null);
+  }, []);
 
   const value = useMemo<CartContextValue>(
     () => ({
       items,
+      selectedItems,
+      selectedCartItemKeys,
       isReady,
       ...summary,
       addItem,
@@ -479,10 +649,20 @@ export function CartProvider({ children }: CartProviderProps) {
       updateFigurePaymentType,
       setBookCoverAddon,
       toggleBookCoverAddon,
+      applyPromoCode,
+      removePromoCode,
       clearCart,
+      toggleItemSelection,
+      selectAllItems,
+      unselectAllItems,
+      removeSelectedItems,
+      removeCheckedOutItems,
+      isItemSelected,
     }),
     [
       items,
+      selectedItems,
+      selectedCartItemKeys,
       isReady,
       summary,
       addItem,
@@ -491,7 +671,15 @@ export function CartProvider({ children }: CartProviderProps) {
       updateFigurePaymentType,
       setBookCoverAddon,
       toggleBookCoverAddon,
+      applyPromoCode,
+      removePromoCode,
       clearCart,
+      toggleItemSelection,
+      selectAllItems,
+      unselectAllItems,
+      removeSelectedItems,
+      removeCheckedOutItems,
+      isItemSelected,
     ],
   );
 

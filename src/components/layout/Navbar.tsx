@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  Award,
   Boxes,
   ChevronDown,
+  Heart,
   Layers,
   LogIn,
   LogOut,
@@ -12,6 +14,7 @@ import {
   Search,
   ShieldCheck,
   ShoppingBag,
+  Sparkles,
   Store,
   TrendingUp,
   Truck,
@@ -25,10 +28,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
+import { useWishlist } from "../../contexts/WishlistContext";
+import { getUserPoints, subscribeUserPoints } from "../../mocks/points.mock";
 import type { CatalogData } from "../../lib/catalog-client";
 import { ProductService } from "../../services/product.service";
 import CartDrawer from "../CartDrawer";
 import DevRoleSwitcher from "../DevRoleSwitcher";
+import PointBadge from "../PointBadge";
 import ThemeToggle from "../ThemeToggle";
 
 interface SearchSuggestion {
@@ -241,9 +247,11 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { itemCount } = useCart();
+  const { wishlistCount } = useWishlist();
   const { user, logout, isLoading } = useAuth();
 
   const [mounted, setMounted] = useState(false);
+  const [userPoints, setUserPoints] = useState<number>(450);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
@@ -260,9 +268,14 @@ export default function Navbar() {
   const searchCatalogRef = useRef<CatalogData | null>(null);
   const searchCatalogRequestRef = useRef<Promise<CatalogData> | null>(null);
 
-  // Sync search query from URL if available
+  // Sync user points and search query from URL if available
   useEffect(() => {
     setMounted(true);
+    setUserPoints(getUserPoints());
+    const unsubscribe = subscribeUserPoints((points) => {
+      setUserPoints(points);
+    });
+
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const q = params.get("q") ?? params.get("search") ?? "";
@@ -270,6 +283,10 @@ export default function Navbar() {
         setSearchQuery(q);
       }
     }
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -669,6 +686,48 @@ export default function Navbar() {
               </button>
             ) : null}
 
+            {/* Rewards Points Badge (CUSTOMER only) */}
+            {isCustomer ? (
+              <Link
+                href="/rewards"
+                aria-label={`แต้มสะสมสมาชิก (${mounted ? userPoints : 0} แต้ม)`}
+                className={`relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold shadow-2xs transition ${
+                  pathname === "/rewards"
+                    ? "border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950/70 dark:text-blue-300"
+                    : "border-slate-300 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50/50 hover:text-blue-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-blue-500 dark:hover:bg-zinc-850"
+                }`}
+              >
+                <PointBadge size="sm" />
+                <span className="hidden sm:inline">
+                  {mounted ? userPoints.toLocaleString("th-TH") : 0} แต้ม
+                </span>
+              </Link>
+            ) : null}
+
+            {/* Wishlist Link Button (Customer only) */}
+            {isCustomer ? (
+              <Link
+                href="/wishlist"
+                aria-label={`รายการที่ถูกใจ (${mounted ? wishlistCount : 0} ชิ้น)`}
+                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-red-300 hover:bg-red-50/50 hover:text-red-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-red-800 dark:hover:bg-zinc-850"
+              >
+                <Heart
+                  size={16}
+                  className={mounted && wishlistCount > 0 ? "fill-red-500 text-red-500" : ""}
+                  aria-hidden="true"
+                />
+                <span className="hidden sm:inline">สิ่งที่ชอบ</span>
+                {mounted && wishlistCount > 0 ? (
+                  <span
+                    className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white shadow-xs"
+                    aria-hidden="true"
+                  >
+                    {wishlistCount}
+                  </span>
+                ) : null}
+              </Link>
+            ) : null}
+
             {/* Cart Drawer Trigger Button (CUSTOMER only) */}
             {isCustomer ? (
               <button
@@ -755,6 +814,42 @@ export default function Navbar() {
                       >
                         <User size={14} /> ข้อมูลโปรไฟล์
                       </Link>
+
+                      {isCustomer && (
+                        <Link
+                          href="/wishlist"
+                          role="menuitem"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center justify-between rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Heart size={14} className="text-red-500" />
+                            <span>สิ่งที่ชอบ (Wishlist)</span>
+                          </span>
+                          {wishlistCount > 0 ? (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                              {wishlistCount}
+                            </span>
+                          ) : null}
+                        </Link>
+                      )}
+
+                      {isCustomer && (
+                        <Link
+                          href="/rewards"
+                          role="menuitem"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center justify-between rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        >
+                          <span className="flex items-center gap-2">
+                            <PointBadge size="xs" />
+                            <span>สะสมแต้มแลกรางวัล</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700 border border-blue-200/60 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-900/60">
+                            {userPoints.toLocaleString("th-TH")} แต้ม
+                          </span>
+                        </Link>
+                      )}
 
                       {isCustomer && (
                         <Link
@@ -951,13 +1046,43 @@ export default function Navbar() {
           <div className="border-t border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950 lg:hidden">
             <nav className="flex flex-col gap-1 text-xs font-bold">
               {isCustomer && user ? (
-                    <Link
-                      href="/orders"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
-                    >
-                      ประวัติคำสั่งซื้อของฉัน
-                    </Link>
+                <>
+                  <Link
+                    href="/rewards"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-between whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                  >
+                    <span className="flex items-center gap-2">
+                      <PointBadge size="xs" />
+                      <span>สะสมแต้มแลกรางวัล</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700 border border-blue-200/60 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-900/60">
+                      {userPoints.toLocaleString("th-TH")} แต้ม
+                    </span>
+                  </Link>
+                  <Link
+                    href="/orders"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                  >
+                    ประวัติคำสั่งซื้อของฉัน
+                  </Link>
+                  <Link
+                    href="/wishlist"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-between whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Heart size={14} className="text-red-500" />
+                      สิ่งที่ชอบ (Wishlist)
+                    </span>
+                    {wishlistCount > 0 ? (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                        {wishlistCount}
+                      </span>
+                    ) : null}
+                  </Link>
+                </>
               ) : null}
 
               {isStaff && (

@@ -8,12 +8,14 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Heart,
   ListChecks,
   PackageCheck,
   ShoppingCart,
   X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useWishlist } from "../contexts/WishlistContext";
 import {
   joinMockWaitlist,
   type MockWaitlistEntry,
@@ -74,6 +76,7 @@ export default function SeriesVolumeSelector({
 }: SeriesVolumeSelectorProps) {
   const { user } = useAuth();
   const userCanShop = canShop(user?.role);
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [selectedVolumeIds, setSelectedVolumeIds] = useState<Set<number>>(
     () => new Set(),
   );
@@ -227,6 +230,7 @@ export default function SeriesVolumeSelector({
             const isOutOfStock =
               volume.status === "OUT_OF_STOCK" || volume.stock <= 0;
             const isPreorder = volume.status === "PREORDER";
+            const isWishlisted = isInWishlist(volume.id, isNovel ? "LIGHT_NOVEL" : "MANGA");
             const isSelected = selectedVolumeIds.has(volume.id);
 
             return (
@@ -250,6 +254,34 @@ export default function SeriesVolumeSelector({
                       aria-label={`เลือกมังงะเล่ม ${volume.volumeNumber}`}
                     />
                   </label>
+                ) : null}
+
+                {userCanShop ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleWishlist({
+                        id: volume.id,
+                        itemType: isNovel ? "LIGHT_NOVEL" : "MANGA",
+                        title: volume.title,
+                        price: volume.price,
+                        imageUrl: volume.coverUrl,
+                        url: `/manga/${volume.id}`,
+                        category: isNovel ? "LIGHT_NOVEL" : "MANGA",
+                        isPreorder: isPreorder,
+                      });
+                    }}
+                    aria-label={isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"}
+                    className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-card/90 text-muted-foreground shadow-sm ring-1 ring-border/50 backdrop-blur-xs transition hover:scale-110 hover:text-red-600 sm:right-4 sm:top-4"
+                  >
+                    <Heart
+                      size={14}
+                      className={isWishlisted ? "fill-red-500 text-red-500" : ""}
+                      aria-hidden="true"
+                    />
+                  </button>
                 ) : null}
 
                 <div className="w-24 shrink-0 sm:w-28">
