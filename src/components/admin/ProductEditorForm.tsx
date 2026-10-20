@@ -5,6 +5,9 @@ import {
   ArrowLeft,
   BookOpen,
   Boxes,
+  CalendarClock,
+  Eye,
+  EyeOff,
   Package,
   Save,
   ShieldCheck,
@@ -29,6 +32,11 @@ type ProductKind =
   | "ACCESSORY";
 
 interface ProductDraft {
+  // Visibility & Scheduling
+  isHidden: boolean;
+  publishScheduleType: "IMMEDIATE" | "HIDDEN" | "SCHEDULED";
+  publishDate: string;
+
   // Common / Manga / Light Novel
   title: string;
   publisher: string;
@@ -68,6 +76,9 @@ interface ProductDraft {
 }
 
 const EMPTY_DRAFT: ProductDraft = {
+  isHidden: false,
+  publishScheduleType: "IMMEDIATE",
+  publishDate: "",
   title: "",
   publisher: "",
   seriesId: "",
@@ -104,9 +115,25 @@ const EMPTY_DRAFT: ProductDraft = {
 };
 
 function draftFromProduct(product: AdminProduct): ProductDraft {
+  const isHidden = Boolean(product.isHidden);
+  const publishDate = product.publishDate ?? "";
+  const isScheduled = Boolean(publishDate && new Date(publishDate).getTime() > Date.now());
+  const publishScheduleType: "IMMEDIATE" | "HIDDEN" | "SCHEDULED" = isHidden
+    ? "HIDDEN"
+    : isScheduled
+      ? "SCHEDULED"
+      : "IMMEDIATE";
+
+  const baseVisibility = {
+    isHidden,
+    publishScheduleType,
+    publishDate,
+  };
+
   if (product.type === "MANGA") {
     return {
       ...EMPTY_DRAFT,
+      ...baseVisibility,
       title: product.title,
       publisher: product.publisher,
       seriesId: product.seriesId,
@@ -126,6 +153,7 @@ function draftFromProduct(product: AdminProduct): ProductDraft {
   if (product.type === "LIGHT_NOVEL") {
     return {
       ...EMPTY_DRAFT,
+      ...baseVisibility,
       title: product.title,
       publisher: product.publisher,
       seriesId: product.seriesId,
@@ -145,6 +173,7 @@ function draftFromProduct(product: AdminProduct): ProductDraft {
   if (product.type === "PLAMO") {
     return {
       ...EMPTY_DRAFT,
+      ...baseVisibility,
       name: product.name,
       slug: product.slug,
       series: product.series,
@@ -167,6 +196,7 @@ function draftFromProduct(product: AdminProduct): ProductDraft {
   if (product.type === "GOODS") {
     return {
       ...EMPTY_DRAFT,
+      ...baseVisibility,
       name: product.name,
       slug: product.slug,
       series: product.series,
@@ -181,6 +211,7 @@ function draftFromProduct(product: AdminProduct): ProductDraft {
   if (product.type === "ACCESSORY") {
     return {
       ...EMPTY_DRAFT,
+      ...baseVisibility,
       name: product.name,
       slug: product.slug,
       series: product.series,
@@ -197,6 +228,7 @@ function draftFromProduct(product: AdminProduct): ProductDraft {
   }
   return {
     ...EMPTY_DRAFT,
+    ...baseVisibility,
     name: product.name,
     slug: product.slug,
     series: product.series,
@@ -271,6 +303,8 @@ export default function ProductEditorForm({
     setSaving(true);
     try {
       let input: AdminProductInput;
+      const isHidden = draft.publishScheduleType === "HIDDEN" || draft.isHidden;
+      const publishDate = draft.publishScheduleType === "SCHEDULED" ? draft.publishDate : "";
 
       if (kind === "MANGA") {
         const title = draft.title.trim();
@@ -300,6 +334,8 @@ export default function ProductEditorForm({
           expectedShippingDate: draft.mangaPreorder ? draft.expectedShippingDate : "",
           weightGrams: numeric(draft.weightGrams),
           images: [...draft.images],
+          isHidden,
+          publishDate,
         };
       } else if (kind === "LIGHT_NOVEL") {
         const title = draft.title.trim();
@@ -329,6 +365,8 @@ export default function ProductEditorForm({
           expectedShippingDate: draft.mangaPreorder ? draft.expectedShippingDate : "",
           weightGrams: numeric(draft.weightGrams),
           images: [...draft.images],
+          isHidden,
+          publishDate,
         };
       } else if (kind === "FIGURE") {
         const name = draft.name.trim();
@@ -357,6 +395,8 @@ export default function ProductEditorForm({
           heightMm: numeric(draft.heightMm),
           janCode: draft.janCode.trim(),
           images: [...draft.images],
+          isHidden,
+          publishDate,
         };
       } else if (kind === "PLAMO") {
         const name = draft.name.trim();
@@ -383,6 +423,8 @@ export default function ProductEditorForm({
           weightGrams: numeric(draft.weightGrams),
           janCode: draft.janCode.trim(),
           images: [...draft.images],
+          isHidden,
+          publishDate,
         };
       } else if (kind === "GOODS") {
         const name = draft.name.trim();
@@ -404,6 +446,8 @@ export default function ProductEditorForm({
           status: quantity > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
           weightGrams: numeric(draft.weightGrams),
           images: [...draft.images],
+          isHidden,
+          publishDate,
         };
       } else {
         const name = draft.name.trim();
@@ -435,6 +479,8 @@ export default function ProductEditorForm({
               }
             : {}),
           images: [...draft.images],
+          isHidden,
+          publishDate,
         };
       }
 
@@ -1334,6 +1380,129 @@ export default function ProductEditorForm({
               </FormSection>
             </>
           )}
+
+          {/* Section: Visibility & Schedule */}
+          <FormSection title="การมองเห็นและกำหนดวันวางจำหน่าย (Visibility & Schedule)">
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {/* 1. Immediate */}
+                <label
+                  className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${
+                    draft.publishScheduleType === "IMMEDIATE"
+                      ? "border-orange-500 bg-orange-50/50 ring-2 ring-orange-500/20 dark:border-orange-500 dark:bg-orange-950/20"
+                      : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="publishScheduleType"
+                      value="IMMEDIATE"
+                      checked={draft.publishScheduleType === "IMMEDIATE"}
+                      onChange={() => {
+                        update("publishScheduleType", "IMMEDIATE");
+                        update("isHidden", false);
+                        update("publishDate", "");
+                      }}
+                      className="text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="flex items-center gap-1.5 font-semibold text-zinc-900 dark:text-zinc-100">
+                      <Eye size={16} className="text-emerald-600" aria-hidden="true" />
+                      เปิดขายทันที
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    แสดงผลบนหน้าร้านและให้ลูกค้ากดซื้อหรือสั่งจองได้ทันที
+                  </p>
+                </label>
+
+                {/* 2. Hidden */}
+                <label
+                  className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${
+                    draft.publishScheduleType === "HIDDEN"
+                      ? "border-orange-500 bg-orange-50/50 ring-2 ring-orange-500/20 dark:border-orange-500 dark:bg-orange-950/20"
+                      : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="publishScheduleType"
+                      value="HIDDEN"
+                      checked={draft.publishScheduleType === "HIDDEN"}
+                      onChange={() => {
+                        update("publishScheduleType", "HIDDEN");
+                        update("isHidden", true);
+                        update("publishDate", "");
+                      }}
+                      className="text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="flex items-center gap-1.5 font-semibold text-zinc-900 dark:text-zinc-100">
+                      <EyeOff size={16} className="text-zinc-500" aria-hidden="true" />
+                      ซ่อนสินค้าไว้ก่อน
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    ซ่อนจากหน้าร้าน เหมาะสำหรับร่างสินค้าหรือ Pre-order ที่ยังไม่เปิดตัว
+                  </p>
+                </label>
+
+                {/* 3. Scheduled */}
+                <label
+                  className={`flex cursor-pointer flex-col rounded-xl border p-4 transition ${
+                    draft.publishScheduleType === "SCHEDULED"
+                      ? "border-orange-500 bg-orange-50/50 ring-2 ring-orange-500/20 dark:border-orange-500 dark:bg-orange-950/20"
+                      : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="publishScheduleType"
+                      value="SCHEDULED"
+                      checked={draft.publishScheduleType === "SCHEDULED"}
+                      onChange={() => {
+                        update("publishScheduleType", "SCHEDULED");
+                        update("isHidden", false);
+                      }}
+                      className="text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="flex items-center gap-1.5 font-semibold text-zinc-900 dark:text-zinc-100">
+                      <CalendarClock size={16} className="text-indigo-600" aria-hidden="true" />
+                      กำหนดวันเริ่มวางขาย
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    กำหนดวัน-เวลาเปิดขายล่วงหน้า สินค้าจะซ่อนอัตโนมัติจนกว่าจะถึงเวลา
+                  </p>
+                </label>
+              </div>
+
+              {draft.publishScheduleType === "SCHEDULED" ? (
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/30">
+                  <label className="block text-sm font-semibold text-indigo-950 dark:text-indigo-200">
+                    เลือกวันและเวลาที่เริ่มเปิดขายบนหน้าร้าน
+                    <input
+                      type="datetime-local"
+                      required={draft.publishScheduleType === "SCHEDULED"}
+                      value={draft.publishDate}
+                      onChange={(e) => update("publishDate", e.target.value)}
+                      className="mt-2 h-11 w-full max-w-sm rounded-xl border border-indigo-200 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-indigo-800 dark:bg-zinc-900 dark:text-zinc-100"
+                    />
+                  </label>
+                  <p className="mt-2 text-xs text-indigo-700 dark:text-indigo-300">
+                    ก่อนถึงวันและเวลานี้ สินค้าจะถูกซ่อนจากหน้าร้านและผลการค้นหา เมื่อถึงเวลาจะเปิดขายให้ลูกค้าสั่งซื้อได้ทันที
+                  </p>
+                </div>
+              ) : null}
+
+              {draft.publishScheduleType === "HIDDEN" ? (
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+                  สถานะปัจจุบัน: <strong>ซ่อนอยู่</strong> — สินค้าจะไม่ปรากฏในหน้าร้าน หมวดหมู่สินค้า หรือผลการค้นหาของลูกค้า แอดมินสามารถเปิดการมองเห็นได้ตลอดเวลาจากหน้ารายการสินค้า
+                </div>
+              ) : null}
+            </div>
+          </FormSection>
 
           <div className="flex justify-end gap-3 pb-8">
             <Link

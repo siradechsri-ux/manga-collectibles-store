@@ -3,6 +3,7 @@
 import {
   Award,
   Boxes,
+  CalendarDays,
   ChevronDown,
   Heart,
   Layers,
@@ -10,6 +11,7 @@ import {
   LogOut,
   Menu,
   Package,
+  Percent,
   Receipt,
   Search,
   ShieldCheck,
@@ -448,6 +450,33 @@ export default function Navbar() {
               aria-label="เมนูหลัก"
               className="hidden items-center gap-3 lg:flex xl:gap-4"
             >
+              {isCustomer && (
+                <>
+                  <Link
+                    href="/calendar"
+                    className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
+                      pathname === "/calendar"
+                        ? "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
+                        : "text-zinc-700 hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-orange-400"
+                    }`}
+                  >
+                    <CalendarDays size={14} aria-hidden="true" />
+                    <span>ตารางออกใหม่</span>
+                  </Link>
+                  <Link
+                    href="/kuji"
+                    className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
+                      pathname === "/kuji"
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                        : "text-zinc-700 hover:bg-zinc-100 hover:text-amber-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-amber-400"
+                    }`}
+                  >
+                    <Sparkles size={14} aria-hidden="true" />
+                    <span>จับฉลาก Kuji</span>
+                  </Link>
+                </>
+              )}
+
               {isStaff && (
                 <>
                   <Link
@@ -598,6 +627,45 @@ export default function Navbar() {
                           <TrendingUp size={14} className="text-emerald-600 dark:text-emerald-400" />
                           <span>รายงานภาษี & e-Tax</span>
                         </Link>
+                        <Link
+                          href="/admin/calendar"
+                          role="menuitem"
+                          onClick={() => setAdminDropdownOpen(false)}
+                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                            pathname.startsWith("/admin/calendar")
+                              ? "bg-orange-50 font-bold text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
+                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          }`}
+                        >
+                          <CalendarDays size={14} className="text-orange-600 dark:text-orange-400" />
+                          <span>จัดการตารางออกใหม่</span>
+                        </Link>
+                        <Link
+                          href="/admin/kuji"
+                          role="menuitem"
+                          onClick={() => setAdminDropdownOpen(false)}
+                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                            pathname.startsWith("/admin/kuji")
+                              ? "bg-amber-50 font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          }`}
+                        >
+                          <Sparkles size={14} className="text-amber-500" />
+                          <span>จัดการตู้จับฉลาก Kuji</span>
+                        </Link>
+                        <Link
+                          href="/admin/promotions"
+                          role="menuitem"
+                          onClick={() => setAdminDropdownOpen(false)}
+                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                            pathname.startsWith("/admin/promotions")
+                              ? "bg-rose-50 font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          }`}
+                        >
+                          <Percent size={14} className="text-rose-600 dark:text-rose-400" />
+                          <span>โปรโมชั่น & แฟลชเซลล์</span>
+                        </Link>
                       </div>
                     ) : null}
                   </div>
@@ -694,7 +762,7 @@ export default function Navbar() {
                 className={`relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold shadow-2xs transition ${
                   pathname === "/rewards"
                     ? "border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950/70 dark:text-blue-300"
-                    : "border-slate-300 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50/50 hover:text-blue-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-blue-500 dark:hover:bg-zinc-850"
+                    : "border-slate-300 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50/50 hover:text-blue-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-blue-500 dark:hover:bg-zinc-800"
                 }`}
               >
                 <PointBadge size="sm" />
@@ -709,7 +777,7 @@ export default function Navbar() {
               <Link
                 href="/wishlist"
                 aria-label={`รายการที่ถูกใจ (${mounted ? wishlistCount : 0} ชิ้น)`}
-                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-red-300 hover:bg-red-50/50 hover:text-red-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-red-800 dark:hover:bg-zinc-850"
+                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-red-300 hover:bg-red-50/50 hover:text-red-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-red-800 dark:hover:bg-zinc-800"
               >
                 <Heart
                   size={16}
@@ -731,10 +799,11 @@ export default function Navbar() {
             {/* Cart Drawer Trigger Button (CUSTOMER only) */}
             {isCustomer ? (
               <button
+                id="navbar-cart-button"
                 type="button"
                 onClick={() => setCartDrawerOpen(true)}
                 aria-label={`เปิดตะกร้าสินค้า (${mounted ? itemCount : 0} ชิ้น)`}
-                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-orange-300 hover:bg-orange-50/50 hover:text-orange-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-orange-800 dark:hover:bg-zinc-850"
+                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-orange-300 hover:bg-orange-50/50 hover:text-orange-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-orange-800 dark:hover:bg-zinc-800"
               >
                 <ShoppingBag size={16} aria-hidden="true" />
                 <span className="hidden sm:inline">ตะกร้า</span>
@@ -848,6 +917,30 @@ export default function Navbar() {
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700 border border-blue-200/60 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-900/60">
                             {userPoints.toLocaleString("th-TH")} แต้ม
                           </span>
+                        </Link>
+                      )}
+
+                      {isCustomer && (
+                        <Link
+                          href="/calendar"
+                          role="menuitem"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        >
+                          <CalendarDays size={14} className="text-orange-600 dark:text-orange-400" />
+                          <span>ตารางออกใหม่ประจำเดือน</span>
+                        </Link>
+                      )}
+
+                      {isCustomer && (
+                        <Link
+                          href="/kuji"
+                          role="menuitem"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        >
+                          <Sparkles size={14} className="text-amber-600 dark:text-amber-400" />
+                          <span>จับฉลาก Kuji (ลุ้นรางวัล)</span>
                         </Link>
                       )}
 
@@ -1068,6 +1161,22 @@ export default function Navbar() {
                     ประวัติคำสั่งซื้อของฉัน
                   </Link>
                   <Link
+                    href="/calendar"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                  >
+                    <CalendarDays size={14} className="text-orange-600 dark:text-orange-400" />
+                    <span>ตารางออกใหม่ประจำเดือน</span>
+                  </Link>
+                  <Link
+                    href="/kuji"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                  >
+                    <Sparkles size={14} className="text-amber-600 dark:text-amber-400" />
+                    <span>จับฉลาก Kuji (ลุ้นรางวัล)</span>
+                  </Link>
+                  <Link
                     href="/wishlist"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center justify-between whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
@@ -1199,6 +1308,39 @@ export default function Navbar() {
                     }`}
                   >
                     รายงานภาษี & e-Tax
+                  </Link>
+                  <Link
+                    href="/admin/calendar"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`whitespace-nowrap shrink-0 rounded-xl px-3 py-2 transition ${
+                      pathname === "/admin/calendar" || pathname.startsWith("/admin/calendar/")
+                        ? "bg-orange-50 text-orange-700 font-bold dark:bg-orange-950/60 dark:text-orange-300"
+                        : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                    }`}
+                  >
+                    จัดการตารางออกใหม่
+                  </Link>
+                  <Link
+                    href="/admin/kuji"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`whitespace-nowrap shrink-0 rounded-xl px-3 py-2 transition ${
+                      pathname === "/admin/kuji" || pathname.startsWith("/admin/kuji/")
+                        ? "bg-amber-50 text-amber-700 font-bold dark:bg-amber-950/60 dark:text-amber-300"
+                        : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                    }`}
+                  >
+                    จัดการตู้จับฉลาก Kuji
+                  </Link>
+                  <Link
+                    href="/admin/promotions"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`whitespace-nowrap shrink-0 rounded-xl px-3 py-2 transition ${
+                      pathname === "/admin/promotions" || pathname.startsWith("/admin/promotions/")
+                        ? "bg-rose-50 text-rose-700 font-bold dark:bg-rose-950/60 dark:text-rose-300"
+                        : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                    }`}
+                  >
+                    จัดการโปรโมชั่น & แฟลชเซลล์
                   </Link>
                 </>
               )}

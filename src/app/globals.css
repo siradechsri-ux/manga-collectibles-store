@@ -2,15 +2,15 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: 38 29% 97%;
-  --foreground: 240 10% 4%;
+  --background: 40 38% 97%;
+  --foreground: 24 10% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 240 10% 4%;
-  --muted: 240 5% 96%;
-  --muted-foreground: 240 4% 46%;
-  --border: 240 6% 90%;
-  --warning-surface: 48 100% 96%;
-  --warning-foreground: 28 80% 25%;
+  --card-foreground: 24 10% 10%;
+  --muted: 38 25% 93%;
+  --muted-foreground: 25 5% 45%;
+  --border: 38 20% 88%;
+  --warning-surface: 35 100% 96%;
+  --warning-foreground: 24 85% 25%;
   color-scheme: light;
 }
 
@@ -54,6 +54,30 @@ body {
   color: hsl(var(--foreground));
   font-family: Arial, "Noto Sans Thai", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Manga Warm Ivory Light Theme Enhancements */
+html:not(.dark) body,
+html:not(.dark) main {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+html:not(.dark) main.bg-zinc-50,
+html:not(.dark) main.bg-slate-50,
+html:not(.dark) .bg-zinc-50,
+html:not(.dark) .bg-slate-50 {
+  background-color: hsl(var(--background));
+}
+
+html:not(.dark) .border-zinc-200,
+html:not(.dark) .border-slate-200 {
+  border-color: hsl(var(--border));
+}
+
+html:not(.dark) .border-zinc-100,
+html:not(.dark) .border-slate-100 {
+  border-color: hsl(38 25% 92%);
 }
 
 html.dark,

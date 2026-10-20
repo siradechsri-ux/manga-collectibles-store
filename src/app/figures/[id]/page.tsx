@@ -12,6 +12,8 @@ import { CatalogFigure } from "../../../lib/catalog-client";
 import { ProductService } from "../../../services/product.service";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../../../mocks/admin-products.mock";
 import { getSafeCollectionReturnPath } from "../../../lib/collection-return";
+import ProductReviews from "../../../components/ProductReviews";
+import ProductBundleDeal from "../../../components/ProductBundleDeal";
 
 export default function FigureProductPage() {
   const params = useParams<{ id: string }>();
@@ -213,6 +215,43 @@ export default function FigureProductPage() {
                 onPreorder={preorderFigure}
                 onAddToCart={addFigureToCart}
                 onNotifyWhenAvailable={notifyWhenAvailable}
+              />
+            </div>
+
+            <div className="mt-12">
+              <ProductBundleDeal
+                mainProduct={{
+                  id: Number(figure.id) || 2001,
+                  kind: figure.category === "PLAMO" ? "PLAMO" : figure.category === "GOODS" ? "GOODS" : "FIGURE",
+                  title: figure.name,
+                  price: figure.fullPrice,
+                  imageUrl: figure.coverImage || figure.images?.[0] || "/images/products/figure-2001.jpg",
+                }}
+                companionItems={[
+                  {
+                    id: 8003,
+                    kind: "ACCESSORY",
+                    title: "กล่องอะคริลิกใสโชว์โมเดลกันฝุ่น (ขนาด 20x20x30 ซม.)",
+                    price: 390,
+                    imageUrl: "/images/products/acc-8003.jpg",
+                  },
+                  {
+                    id: 8005,
+                    kind: "ACCESSORY",
+                    title: "แปรงปัดฝุ่นโมเดลไมโครไฟเบอร์นุ่มพิเศษ ถนอมผิวสี",
+                    price: 120,
+                    imageUrl: "/images/products/acc-8005.jpg",
+                  },
+                ]}
+                discountPercent={10}
+              />
+            </div>
+
+            <div className="mt-12 pb-24">
+              <ProductReviews
+                targetId={figure.id}
+                targetType={figure.category === "PLAMO" ? "PLAMO" : figure.category === "GOODS" ? "GOODS" : "FIGURE"}
+                targetTitle={figure.name}
               />
             </div>
           </>

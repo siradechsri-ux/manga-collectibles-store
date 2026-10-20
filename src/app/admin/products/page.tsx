@@ -4,12 +4,15 @@ import {
   AlertTriangle,
   BookOpen,
   Boxes,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   CirclePlus,
   Edit3,
+  Eye,
+  EyeOff,
   Package,
   Search,
   ShieldCheck,
@@ -25,6 +28,7 @@ import {
   deleteAdminProduct,
   listAdminProducts,
   subscribeToAdminProducts,
+  toggleProductVisibility,
   type AdminProduct,
   type ProductCategoryFilter,
   type ProductStatusFilter,
@@ -153,6 +157,8 @@ function statusLabel(status: ProductStatusFilter): string {
   return "สินค้าหมด";
 }
 
+type VisibilityFilter = "ALL" | "PUBLISHED" | "HIDDEN" | "SCHEDULED";
+
 export default function AdminProductsPage() {
   const { user, isLoading } = useAuth();
   const isAdmin = canManageInventory(user?.role);
@@ -162,6 +168,7 @@ export default function AdminProductsPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<ProductCategoryFilter>("ALL");
   const [status, setStatus] = useState<ProductStatusFilter>("ALL");
+  const [visibility, setVisibility] = useState<VisibilityFilter>("ALL");
   const [error, setError] = useState<string | null>(null);
   const [stockTarget, setStockTarget] = useState<AdminProduct | null>(null);
   const [stockDirection, setStockDirection] = useState<"ADD" | "REMOVE">("ADD");
@@ -191,9 +198,18 @@ export default function AdminProductsPage() {
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
+    const now = Date.now();
     return products.filter((product) => {
       if (category !== "ALL" && product.type !== category) return false;
       if (status !== "ALL" && productStatus(product) !== status) return false;
+      if (visibility !== "ALL") {
+        const isScheduled = Boolean(
+          product.publishDate && new Date(product.publishDate).getTime() > now,
+        );
+        if (visibility === "HIDDEN" && !product.isHidden) return false;
+        if (visibility === "SCHEDULED" && (product.isHidden || !isScheduled)) return false;
+        if (visibility === "PUBLISHED" && (product.isHidden || isScheduled)) return false;
+      }
       if (!normalizedQuery) return true;
       let searchable = "";
       if (product.type === "MANGA" || product.type === "LIGHT_NOVEL") {
@@ -209,11 +225,11 @@ export default function AdminProductsPage() {
       }
       return searchable.toLocaleLowerCase().includes(normalizedQuery);
     });
-  }, [category, products, query, status]);
+  }, [category, products, query, status, visibility]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [category, query, status, itemsPerPage]);
+  }, [category, query, status, visibility, itemsPerPage]);
 
   const totalItems = filteredProducts.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
@@ -262,6 +278,20 @@ export default function AdminProductsPage() {
   const preorderCount = products.filter(
     (product) => productStatus(product) === "PREORDER",
   ).length;
+  const hiddenCount = products.filter(
+    (product) => product.isHidden || Boolean(product.publishDate && new Date(product.publishDate).getTime() > Date.now()),
+  ).length;
+
+  function handleToggleVisibility(id: string): void {
+    try {
+      toggleProductVisibility(id);
+      refreshProducts();
+    } catch (toggleError) {
+      setError(
+        toggleError instanceof Error ? toggleError.message : "ปรับการมองเห็นไม่สำเร็จ",
+      );
+    }
+  }
 
   function commitStockAdjustment(): void {
     if (!stockTarget) return;
@@ -344,10 +374,11 @@ export default function AdminProductsPage() {
 
         {error ? <p role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">{error}</p> : null}
 
-        <section aria-label="สรุปสินค้า" className="mt-6 grid gap-4 sm:grid-cols-3">
+        <section aria-label="สรุปสินค้า" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard icon={<Boxes size={19} />} label="รายการสินค้าทั้งหมด" value={products.length} />
           <MetricCard icon={<AlertTriangle size={19} />} label="รายการสต็อกต่ำ" value={lowStockCount} accent="orange" />
           <MetricCard icon={<Package size={19} />} label="รายการเปิดพรีออเดอร์" value={preorderCount} accent="violet" />
+          <MetricCard icon={<EyeOff size={19} />} label="ซ่อน / รอวางขาย" value={hiddenCount} accent="zinc" />
         </section>
 
         <section id="stock-table-card" className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -373,6 +404,12 @@ export default function AdminProductsPage() {
                 <option value="PREORDER">เปิดพรีออเดอร์</option>
                 <option value="OUT_OF_STOCK">สินค้าหมด</option>
               </select>
+              <select value={visibility} onChange={(event) => setVisibility(event.target.value as VisibilityFilter)} aria-label="กรองตามการมองเห็น" className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-950">
+                <option value="ALL">ทุกการมองเห็น</option>
+                <option value="PUBLISHED">เปิดขายปกติ</option>
+                <option value="HIDDEN">ซ่อนอยู่</option>
+                <option value="SCHEDULED">ตั้งเวลาวางขาย</option>
+              </select>
             </div>
           </div>
 
@@ -387,6 +424,7 @@ export default function AdminProductsPage() {
                   <th className="px-4 py-3 text-right">ราคา</th>
                   <th className="px-4 py-3 text-right">สต็อกคงเหลือ</th>
                   <th className="px-4 py-3">สถานะ</th>
+                  <th className="px-4 py-3">การมองเห็น</th>
                   {isAdmin ? <th className="px-4 py-3 text-right">จัดการ</th> : null}
                 </tr>
               </thead>
@@ -395,6 +433,7 @@ export default function AdminProductsPage() {
                   const state = productStatus(product);
                   const editUrl = `/admin/products/${encodeURIComponent(product.id)}/edit`;
                   const imageSrc = productImage(product);
+                  const isScheduled = Boolean(product.publishDate && new Date(product.publishDate).getTime() > Date.now());
                   return (
                     <tr key={product.id} className="align-middle hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
                       <td className="px-4 py-3 font-mono text-xs text-zinc-600 dark:text-zinc-400">{productCode(product)}</td>
@@ -441,9 +480,40 @@ export default function AdminProductsPage() {
                         {productStock(product) === 0 ? <span className="ml-2 rounded-full bg-red-100 px-2 py-1 text-[10px] font-bold text-red-800 dark:bg-red-950 dark:text-red-200">สินค้าหมด</span> : productStock(product) < 5 ? <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-[10px] font-bold text-orange-800 dark:bg-orange-950 dark:text-orange-200">สต็อกต่ำ</span> : null}
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={state} /></td>
+                      <td className="px-4 py-3">
+                        {product.isHidden ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                            <EyeOff size={12} aria-hidden="true" />
+                            ซ่อนอยู่
+                          </span>
+                        ) : isScheduled ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300">
+                            <CalendarClock size={12} aria-hidden="true" />
+                            รอวางขาย {new Date(product.publishDate!).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            <Eye size={12} aria-hidden="true" />
+                            เปิดขาย
+                          </span>
+                        )}
+                      </td>
                       {isAdmin ? (
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-1">
+                            <button
+                              type="button"
+                              aria-label={product.isHidden ? `เปิดการมองเห็น ${productName(product)}` : `ซ่อน ${productName(product)}`}
+                              title={product.isHidden ? "คลิกเพื่อเปิดการมองเห็นบนหน้าร้าน" : "คลิกเพื่อซ่อนสินค้าจากหน้าร้าน"}
+                              onClick={() => handleToggleVisibility(product.id)}
+                              className={`rounded-lg p-2 transition ${
+                                product.isHidden
+                                  ? "text-zinc-400 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300"
+                                  : "text-zinc-600 hover:bg-zinc-100 hover:text-amber-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                              }`}
+                            >
+                              {product.isHidden ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                            </button>
                             <Link href={editUrl} aria-label={`แก้ไข ${productName(product)}`} title="แก้ไขสินค้า" className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-800"><Edit3 size={16} /></Link>
                             <button type="button" aria-label={`ปรับสต็อก ${productName(product)}`} title="ปรับสต็อก" onClick={() => { setStockTarget(product); setStockDirection("ADD"); setStockQuantity("1"); }} className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 hover:text-blue-700 dark:text-zinc-300 dark:hover:bg-zinc-800"><Package size={16} /></button>
                             <button type="button" aria-label={`ลบ ${productName(product)}`} title="ลบสินค้า" onClick={() => setDeleteTarget(product)} className="rounded-lg p-2 text-zinc-600 hover:bg-red-50 hover:text-red-700 dark:text-zinc-300 dark:hover:bg-red-950/40 dark:hover:text-red-300"><Trash2 size={16} /></button>
@@ -454,7 +524,7 @@ export default function AdminProductsPage() {
                   );
                 })}
                 {paginatedProducts.length === 0 ? (
-                  <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">ไม่พบสินค้าที่ตรงกับเงื่อนไข</td></tr>
+                  <tr><td colSpan={isAdmin ? 9 : 8} className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">ไม่พบสินค้าที่ตรงกับเงื่อนไข</td></tr>
                 ) : null}
               </tbody>
             </table>

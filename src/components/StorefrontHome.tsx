@@ -6,6 +6,7 @@ import CollectionCategoryCard from "./CollectionCategoryCard";
 import BentoCategoryGrid from "./BentoCategoryGrid";
 import EditorialCategoryGrid from "./EditorialCategoryGrid";
 import HeroProductShowcase from "./HeroProductShowcase";
+import FlashSaleBanner from "./FlashSaleBanner";
 import { STORE_COLLECTIONS } from "../lib/store-collections";
 
 export default function StorefrontHome() {
@@ -40,6 +41,11 @@ export default function StorefrontHome() {
             </div>
           </div>
         </section>
+
+        {/* Daily Flash Sale Deals */}
+        <div className="mt-10">
+          <FlashSaleBanner />
+        </div>
 
         <section id="browse-collection" className="mt-10 scroll-mt-24" aria-labelledby="catalog-heading">
           <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowLeftRight,
   ArrowRight,
   BellRing,
   BookMarked,
@@ -19,6 +20,7 @@ import {
 import type { CatalogFigure, CatalogMangaSeries } from "../lib/catalog-client";
 import { useAuth } from "../contexts/AuthContext";
 import { useWishlist } from "../contexts/WishlistContext";
+import { useCompare } from "../contexts/CompareContext";
 import BackInStockModal from "./BackInStockModal";
 import { canShop } from "../utils/permissions";
 
@@ -202,7 +204,7 @@ export function CollectibleCoverImage({
       ? "border-violet-300/80 bg-gradient-to-br from-violet-50 via-zinc-50 to-purple-50/40 text-zinc-900 dark:border-violet-900/50 dark:from-zinc-900 dark:via-violet-950/30 dark:to-zinc-950 dark:text-zinc-100"
       : isAccessory
         ? "border-emerald-300/80 bg-gradient-to-br from-emerald-50 via-zinc-50 to-teal-50/40 text-zinc-900 dark:border-emerald-900/50 dark:from-zinc-900 dark:via-emerald-950/30 dark:to-zinc-950 dark:text-zinc-100"
-        : "border-zinc-200/90 bg-gradient-to-br from-zinc-50 via-zinc-100/70 to-orange-50/30 text-zinc-900 dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-900 dark:text-zinc-100";
+        : "border-zinc-200/90 bg-gradient-to-br from-zinc-50 via-zinc-100/70 to-orange-50/30 text-zinc-900 dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-800 dark:to-zinc-900 dark:text-zinc-100";
 
   const iconContainerClass = isPlamo
     ? "bg-sky-100 text-sky-700 dark:bg-sky-950/80 dark:text-sky-300"
@@ -595,8 +597,10 @@ export function CollectibleProductCard({
   const { user } = useAuth();
   const userCanShop = canShop(user?.role);
   const { isInWishlist, toggleWishlist } = useWishlist();
+  const { isInCompare, addToCompare, removeFromCompare } = useCompare();
   const [isBackInStockOpen, setIsBackInStockOpen] = useState(false);
   const isWishlisted = isInWishlist(item.id, item.category);
+  const isCompared = isInCompare(item.id);
 
   return (
     <>
@@ -611,39 +615,81 @@ export function CollectibleProductCard({
               scale={item.scale}
             />
 
-            {/* Wishlist Heart Toggle */}
-            {userCanShop ? (
+            {/* Top Right Action Icons: Compare & Wishlist */}
+            <div className="absolute top-5 right-5 z-10 flex items-center gap-1.5">
+              {/* Compare Button */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  toggleWishlist({
-                    id: item.id,
-                    itemType: (item.category as any) ?? "FIGURE",
-                    title: item.name,
-                    price:
-                      item.status === "PREORDER_OPEN" && item.depositAmount > 0
-                        ? item.depositAmount
-                        : item.fullPrice,
-                    imageUrl: item.images?.[0] ?? null,
-                    url: `/figures/${encodeURIComponent(item.slug)}`,
-                    category: item.category,
-                    isPreorder: item.status === "PREORDER_OPEN",
-                  });
+                  if (isCompared) {
+                    removeFromCompare(item.id);
+                  } else {
+                    addToCompare({
+                      id: item.id,
+                      name: item.name,
+                      category: item.category ?? "FIGURE",
+                      series: item.series,
+                      price:
+                        item.status === "PREORDER_OPEN" && item.depositAmount > 0
+                          ? item.depositAmount
+                          : item.fullPrice,
+                      depositPrice: item.depositAmount,
+                      imageUrl: item.images?.[0] ?? null,
+                      url: `/figures/${encodeURIComponent(item.slug)}`,
+                      scale: item.scale,
+                      manufacturer: item.manufacturer,
+                      status: item.status,
+                      boxDimensions: item.boxDimensions,
+                    });
+                  }
                 }}
-                aria-label={
-                  isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"
-                }
-                className="absolute top-5 right-5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-zinc-600 shadow-sm backdrop-blur-xs transition hover:scale-110 hover:text-red-600 dark:bg-zinc-800/90 dark:text-zinc-300 dark:hover:text-red-400"
+                aria-label={isCompared ? "นำออกจากตารางเปรียบเทียบ" : "เพิ่มในตารางเปรียบเทียบ"}
+                title={isCompared ? "อยู่ในตารางเปรียบเทียบแล้ว" : "เปรียบเทียบสเปก"}
+                className={`flex h-8 w-8 items-center justify-center rounded-full shadow-sm backdrop-blur-xs transition hover:scale-110 ${
+                  isCompared
+                    ? "bg-orange-600 text-white"
+                    : "bg-white/90 text-zinc-600 hover:text-orange-600 dark:bg-zinc-800/90 dark:text-zinc-300 dark:hover:text-orange-400"
+                }`}
               >
-                <Heart
-                  size={16}
-                  className={isWishlisted ? "fill-red-500 text-red-500" : ""}
-                  aria-hidden="true"
-                />
+                <ArrowLeftRight size={14} aria-hidden="true" />
               </button>
-            ) : null}
+
+              {/* Wishlist Heart Toggle */}
+              {userCanShop ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleWishlist({
+                      id: item.id,
+                      itemType: (item.category as any) ?? "FIGURE",
+                      title: item.name,
+                      price:
+                        item.status === "PREORDER_OPEN" && item.depositAmount > 0
+                          ? item.depositAmount
+                          : item.fullPrice,
+                      imageUrl: item.images?.[0] ?? null,
+                      url: `/figures/${encodeURIComponent(item.slug)}`,
+                      category: item.category,
+                      isPreorder: item.status === "PREORDER_OPEN",
+                    });
+                  }}
+                  aria-label={
+                    isWishlisted ? "นำออกจากรายการที่ถูกใจ" : "เพิ่มในรายการที่ถูกใจ"
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-zinc-600 shadow-sm backdrop-blur-xs transition hover:scale-110 hover:text-red-600 dark:bg-zinc-800/90 dark:text-zinc-300 dark:hover:text-red-400"
+                >
+                  <Heart
+                    size={16}
+                    className={isWishlisted ? "fill-red-500 text-red-500" : ""}
+                    aria-hidden="true"
+                  />
+                </button>
+              ) : null}
+            </div>
 
             {item.images?.[0] ? (
               <div className="absolute bottom-5 right-5 flex items-center gap-1.5">

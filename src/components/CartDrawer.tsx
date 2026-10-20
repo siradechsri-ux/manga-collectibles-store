@@ -8,6 +8,8 @@ import {
   BookOpen,
   Boxes,
   Check,
+  CheckCircle2,
+  Gift,
   LogIn,
   Minus,
   Package,
@@ -17,6 +19,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  Truck,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -249,6 +252,15 @@ export default function CartDrawer({
   const allItemsSelected =
     items.length > 0 && selectedItems.length === items.length;
 
+  const FREE_SHIPPING_THRESHOLD = 800;
+  const BONUS_GIFT_THRESHOLD = 1500;
+  const activeSpendTotal = immediateTotal;
+  const isFreeShippingUnlocked = activeSpendTotal >= FREE_SHIPPING_THRESHOLD;
+  const isBonusGiftUnlocked = activeSpendTotal >= BONUS_GIFT_THRESHOLD;
+  const amountToFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - activeSpendTotal);
+  const amountToBonusGift = Math.max(0, BONUS_GIFT_THRESHOLD - activeSpendTotal);
+  const freeShippingProgress = Math.min(100, Math.round((activeSpendTotal / FREE_SHIPPING_THRESHOLD) * 100));
+
   const [deleteConfirmTarget, setDeleteConfirmTarget] =
     useState<DeleteConfirmTarget | null>(null);
 
@@ -333,6 +345,83 @@ export default function CartDrawer({
             <X size={18} aria-hidden="true" />
           </button>
         </header>
+
+        {/* Free Shipping & Gift Threshold Progress Bar */}
+        {items.length > 0 ? (
+          <div className="border-b border-zinc-200 bg-zinc-50/90 px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900/70">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                    isFreeShippingUnlocked
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
+                  }`}
+                >
+                  {isFreeShippingUnlocked ? (
+                    <CheckCircle2 size={14} aria-hidden="true" />
+                  ) : (
+                    <Truck size={13} aria-hidden="true" />
+                  )}
+                </span>
+                <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                  {isFreeShippingUnlocked ? (
+                    <>
+                      <span className="font-extrabold text-emerald-700 dark:text-emerald-400">
+                        ได้รับสิทธิ์จัดส่งฟรีแล้ว
+                      </span>
+                      {!isBonusGiftUnlocked ? (
+                        <span className="text-zinc-500 dark:text-zinc-400">
+                          {" "}· ซื้อเพิ่มอีก ฿{amountToBonusGift.toLocaleString("th-TH")} รับของแถมฟรี
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      ซื้อเพิ่มอีก{" "}
+                      <span className="font-extrabold text-orange-600 dark:text-orange-400">
+                        ฿{amountToFreeShipping.toLocaleString("th-TH")}
+                      </span>{" "}
+                      เพื่อรับสิทธิ์<span className="font-extrabold">จัดส่งฟรี</span>
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {isBonusGiftUnlocked ? (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                  <Gift size={11} aria-hidden="true" />
+                  <span>รับของแถมฟรี</span>
+                </span>
+              ) : (
+                <span className="text-[11px] font-bold tabular-nums text-zinc-500 dark:text-zinc-400">
+                  {freeShippingProgress}%
+                </span>
+              )}
+            </div>
+
+            {/* Progress track */}
+            <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-zinc-200/80 dark:bg-zinc-800">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ease-out ${
+                  isFreeShippingUnlocked
+                    ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                    : "bg-gradient-to-r from-orange-500 to-amber-500"
+                }`}
+                style={{
+                  width: `${isFreeShippingUnlocked ? Math.min(100, Math.round((activeSpendTotal / BONUS_GIFT_THRESHOLD) * 100)) : freeShippingProgress}%`,
+                }}
+              />
+            </div>
+
+            {isBonusGiftUnlocked ? (
+              <p className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                <Sparkles size={12} aria-hidden="true" />
+                <span>รับฟรี! ที่คั่นหนังสือโฮโลแกรม Limited Edition บรรจุในกล่องพัสดุ</span>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="flex-1 overflow-y-auto p-5">
           {items.length === 0 ? (
@@ -724,7 +813,7 @@ export default function CartDrawer({
               </div>
             ) : !isAuthenticated || !user ? (
               <div className="mt-4 space-y-2">
-                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs font-semibold text-amber-850 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
+                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs font-semibold text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
                   <ShieldCheck size={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
                   <span>กรุณาเข้าสู่ระบบก่อนดำเนินการชำระเงิน ({selectedItems.length} รายการ)</span>
                 </div>

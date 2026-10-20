@@ -6,12 +6,17 @@ import {
   BookOpen,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Heart,
+  Layers,
   ListChecks,
   PackageCheck,
+  ShoppingBag,
   ShoppingCart,
+  Sparkles,
+  Tag,
   X,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -38,8 +43,9 @@ export interface VolumeItem {
 
 export interface SeriesVolumeSelectorProps {
   volumes: VolumeItem[];
-  onAddToCart: (volume: VolumeItem) => void;
-  onCheckoutNow: (volumes: VolumeItem[]) => void;
+  onAddToCart: (volume: VolumeItem, unitPrice?: number) => void;
+  onAddMultipleToCart?: (volumes: VolumeItem[], discountRate?: number) => void;
+  onCheckoutNow: (volumes: VolumeItem[], discountRate?: number) => void;
   isNovel?: boolean;
 }
 
@@ -71,6 +77,7 @@ function formatExpectedShippingDate(date: string | undefined): string {
 export default function SeriesVolumeSelector({
   volumes,
   onAddToCart,
+  onAddMultipleToCart,
   onCheckoutNow,
   isNovel = false,
 }: SeriesVolumeSelectorProps) {
@@ -111,10 +118,36 @@ export default function SeriesVolumeSelector({
     [purchasableVolumes, selectedVolumeIds],
   );
 
+  const allInStockCount = purchasableVolumes.length;
+  const isFullSetSelected =
+    purchasableVolumes.length > 0 &&
+    selectedVolumes.length === purchasableVolumes.length;
+
+  const currentDiscountRate = useMemo(() => {
+    const count = selectedVolumes.length;
+    if (count === 0) return 0;
+    if (isFullSetSelected || count >= 10) return 0.10;
+    if (count >= 6) return 0.08;
+    if (count >= 3) return 0.05;
+    return 0;
+  }, [selectedVolumes.length, isFullSetSelected]);
+
+  const discountPercent = Math.round(currentDiscountRate * 100);
+
   const selectedTotal = useMemo(
     () => selectedVolumes.reduce((total, volume) => total + volume.price, 0),
     [selectedVolumes],
   );
+
+  const discountedTotal = Math.round(selectedTotal * (1 - currentDiscountRate));
+  const savingsAmount = selectedTotal - discountedTotal;
+
+  const fullSetTotal = useMemo(
+    () => purchasableVolumes.reduce((sum, v) => sum + v.price, 0),
+    [purchasableVolumes],
+  );
+  const fullSetDiscounted = Math.round(fullSetTotal * 0.90);
+  const fullSetSavings = fullSetTotal - fullSetDiscounted;
 
   const selectedWeightGrams = useMemo(
     () =>
@@ -196,6 +229,64 @@ export default function SeriesVolumeSelector({
         </div>
 
       </div>
+
+      {/* Complete Set & Volume Tier Promo Banner */}
+      {userCanShop && purchasableVolumes.length >= 3 ? (
+        <div className="mb-6 overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 via-amber-50/50 to-white p-4 shadow-xs dark:border-orange-950/60 dark:from-orange-950/40 dark:via-zinc-900 dark:to-zinc-950 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 rounded-md border border-orange-200 bg-orange-100/80 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-orange-800 dark:border-orange-900/60 dark:bg-orange-950/70 dark:text-orange-300">
+                <Tag size={12} aria-hidden="true" />
+                <span>VOLUME TIER DISCOUNTS · โปรโมชันซื้อรวมเล่ม</span>
+              </div>
+              <h3 className="text-base font-extrabold text-zinc-900 dark:text-zinc-100">
+                ซื้อหลายเล่มยิ่งคุ้ม ลดสูงสุด 10% เมื่อซื้อยกชุด
+              </h3>
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                <span className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 font-semibold text-zinc-700 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+                  <span className="font-extrabold text-orange-600 dark:text-orange-400">3-5 เล่ม:</span> ลด 5%
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 font-semibold text-zinc-700 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+                  <span className="font-extrabold text-orange-600 dark:text-orange-400">6-9 เล่ม:</span> ลด 8%
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-lg border border-orange-300 bg-orange-100/60 px-2.5 py-1 font-extrabold text-orange-900 shadow-2xs dark:border-orange-800 dark:bg-orange-950/70 dark:text-orange-200">
+                  <Sparkles size={13} className="text-orange-600 dark:text-orange-400" aria-hidden="true" />
+                  <span>10+ เล่ม หรือ ยกชุด: ลด 10%</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Complete Boxset / All in-stock 1-click CTA */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 rounded-xl border border-orange-200/90 bg-white p-3.5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 lg:min-w-[340px]">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                  ซื้อยกเซ็ตพร้อมส่ง ({allInStockCount} เล่ม)
+                </p>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-xs text-zinc-400 line-through">
+                    {currencyFormatter.format(fullSetTotal)}
+                  </span>
+                  <span className="text-base font-black text-orange-600 dark:text-orange-400">
+                    {currencyFormatter.format(fullSetDiscounted)}
+                  </span>
+                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    ประหยัด ฿{fullSetSavings.toLocaleString("th-TH")}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={selectAllInStock}
+                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-orange-600 px-3.5 py-2 text-xs font-extrabold text-white shadow-xs transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+              >
+                <Layers size={15} aria-hidden="true" />
+                <span>เลือกซื้อยกเซ็ต</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {userCanShop ? (
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <button
@@ -432,27 +523,68 @@ export default function SeriesVolumeSelector({
 
       {userCanShop && selectedVolumes.length > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 text-card-foreground shadow-[0_-8px_30px_rgba(15,23,42,0.12)] backdrop-blur-md">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-7xl flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground sm:text-base">
-                เลือกแล้ว {selectedVolumes.length} เล่ม
-              </p>
-              <p className="text-sm font-bold text-orange-600 dark:text-orange-400">
-                ยอดรวม {currencyFormatter.format(selectedTotal)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                น้ำหนักรวม {selectedWeightGrams.toLocaleString("th-TH")} กรัม (
-                {(selectedWeightGrams / 1_000).toFixed(2)} กก.)
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-foreground sm:text-base">
+                  เลือกแล้ว {selectedVolumes.length} เล่ม
+                </span>
+                {currentDiscountRate > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-black text-orange-700 dark:bg-orange-950 dark:text-orange-300">
+                    <Sparkles size={12} aria-hidden="true" />
+                    <span>ลดพิเศษ {discountPercent}%</span>
+                  </span>
+                ) : selectedVolumes.length < 3 && purchasableVolumes.length >= 3 ? (
+                  <span className="text-xs font-medium text-muted-foreground">
+                    (เลือกอีก {3 - selectedVolumes.length} เล่ม เพื่อรับส่วนลด 5%)
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-0.5 flex flex-wrap items-baseline gap-2">
+                {currentDiscountRate > 0 ? (
+                  <>
+                    <span className="text-xs text-muted-foreground line-through">
+                      {currencyFormatter.format(selectedTotal)}
+                    </span>
+                    <span className="text-base sm:text-lg font-black text-orange-600 dark:text-orange-400">
+                      {currencyFormatter.format(discountedTotal)}
+                    </span>
+                    <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-extrabold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      ประหยัด ฿{savingsAmount.toLocaleString("th-TH")}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-base font-bold text-orange-600 dark:text-orange-400">
+                    ยอดรวม {currencyFormatter.format(selectedTotal)}
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  · น้ำหนัก {(selectedWeightGrams / 1_000).toFixed(2)} กก.
+                </span>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => onCheckoutNow(selectedVolumes)}
-              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 sm:px-6"
-            >
-              <ShoppingCart size={17} aria-hidden="true" />
-              สั่งซื้อทันที
-            </button>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {onAddMultipleToCart ? (
+                <button
+                  type="button"
+                  onClick={() => onAddMultipleToCart(selectedVolumes, currentDiscountRate)}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-xs sm:text-sm font-bold text-zinc-800 shadow-2xs transition hover:border-orange-500 hover:text-orange-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                >
+                  <ShoppingBag size={16} aria-hidden="true" />
+                  <span>ใส่ตะกร้า ({selectedVolumes.length})</span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => onCheckoutNow(selectedVolumes, currentDiscountRate)}
+                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+              >
+                <ShoppingCart size={16} aria-hidden="true" />
+                <span>สั่งซื้อทันที</span>
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

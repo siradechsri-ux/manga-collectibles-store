@@ -54,6 +54,22 @@ export function canRunSimulator(role?: AuthRole | null): boolean {
 }
 
 /**
+ * สิทธิ์จัดการโปรโมชั่น โค้ดส่วนลด และแฟลชเซลล์ (/admin/promotions):
+ * จริงเฉพาะ 'ADMIN'
+ */
+export function canManagePromotions(role?: AuthRole | null): boolean {
+  return role === "ADMIN";
+}
+
+/**
+ * สิทธิ์เล่นตู้สุ่มรางวัล Ichiban Kuji (/kuji):
+ * จริงเฉพาะ 'CUSTOMER' (และผู้เยี่ยมชมหน้าร้าน)
+ */
+export function canPlayKuji(role?: AuthRole | null): boolean {
+  return role === "CUSTOMER" || !role;
+}
+
+/**
  * สิทธิ์เข้าถึงแดชบอร์ดส่วนกลาง (/admin):
  * จริงเฉพาะ 'ADMIN'
  */

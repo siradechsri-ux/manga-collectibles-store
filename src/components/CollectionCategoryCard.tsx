@@ -123,7 +123,7 @@ export default function CollectionCategoryCard({
       className={`group flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xs transition duration-300 hover:-translate-y-1.5 hover:shadow-xl dark:border-zinc-800 dark:bg-zinc-900 ${theme.hoverBorder}`}
     >
       {/* Top Image Showcase Zone */}
-      <div className="relative flex h-64 sm:h-72 w-full items-center justify-center overflow-hidden bg-gradient-to-b from-zinc-50 via-zinc-100/70 to-zinc-50 p-4 transition-colors dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-900">
+      <div className="relative flex h-64 sm:h-72 w-full items-center justify-center overflow-hidden bg-gradient-to-b from-zinc-50 via-zinc-100/70 to-zinc-50 p-4 transition-colors dark:from-zinc-900 dark:via-zinc-800 dark:to-zinc-900">
         {/* Floating Feature Badge (Top-Left) */}
         <span
           className={`absolute left-3.5 top-3.5 z-10 inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-bold shadow-2xs border ${theme.badgeBg}`}
@@ -132,7 +132,7 @@ export default function CollectionCategoryCard({
         </span>
 
         {/* Floating Item Count (Top-Right) */}
-        <span className="absolute right-3.5 top-3.5 z-10 rounded-lg border border-zinc-200/90 bg-white/90 px-2 py-0.5 text-[11px] font-bold text-zinc-700 shadow-2xs backdrop-blur-xs dark:border-zinc-700/80 dark:bg-zinc-850/90 dark:text-zinc-300">
+        <span className="absolute right-3.5 top-3.5 z-10 rounded-lg border border-zinc-200/90 bg-white/90 px-2 py-0.5 text-[11px] font-bold text-zinc-700 shadow-2xs backdrop-blur-xs dark:border-zinc-700/80 dark:bg-zinc-800/90 dark:text-zinc-300">
           {collection.itemCountText}
         </span>
 

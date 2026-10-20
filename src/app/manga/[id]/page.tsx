@@ -15,6 +15,8 @@ import { CatalogMangaSeries } from "../../../lib/catalog-client";
 import { ProductService } from "../../../services/product.service";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../../../mocks/admin-products.mock";
 import { getSafeCollectionReturnPath } from "../../../lib/collection-return";
+import ProductReviews from "../../../components/ProductReviews";
+import ProductBundleDeal from "../../../components/ProductBundleDeal";
 
 export default function MangaSeriesPage() {
   const params = useParams<{ id: string }>();
@@ -106,10 +108,14 @@ export default function MangaSeriesPage() {
     }
   }
 
-  function addSelectedVolumes(volumes: VolumeItem[]): void {
+  function addMultipleVolumesToCart(volumes: VolumeItem[], discountRate = 0): void {
     try {
       for (const volume of volumes) {
         const img = volume.coverUrl || series?.coverImage || series?.coverUrl || null;
+        const finalPrice =
+          discountRate > 0
+            ? Math.round(volume.price * (1 - discountRate))
+            : volume.price;
         addItem({
           kind: isNovel ? "LIGHT_NOVEL" : "MANGA",
           id: volume.id,
@@ -119,7 +125,41 @@ export default function MangaSeriesPage() {
           image: img,
           coverImage: img,
           imageUrl: img,
-          price: volume.price,
+          price: finalPrice,
+          isPreorder: volume.status === "PREORDER",
+          quantity: 1,
+        });
+      }
+      setCartNotice(
+        `เพิ่ม ${volumes.length} เล่มลงตะกร้าแล้ว${
+          discountRate > 0 ? ` (ส่วนลด ${Math.round(discountRate * 100)}%)` : ""
+        }`,
+      );
+    } catch (cartError) {
+      setCartNotice(
+        cartError instanceof Error ? cartError.message : "เพิ่มสินค้าลงตะกร้าไม่สำเร็จ",
+      );
+    }
+  }
+
+  function addSelectedVolumes(volumes: VolumeItem[], discountRate = 0): void {
+    try {
+      for (const volume of volumes) {
+        const img = volume.coverUrl || series?.coverImage || series?.coverUrl || null;
+        const finalPrice =
+          discountRate > 0
+            ? Math.round(volume.price * (1 - discountRate))
+            : volume.price;
+        addItem({
+          kind: isNovel ? "LIGHT_NOVEL" : "MANGA",
+          id: volume.id,
+          title: series?.title ?? volume.title,
+          volume: volume.volumeNumber,
+          ...(volume.variantLabel ? { variantLabel: volume.variantLabel } : {}),
+          image: img,
+          coverImage: img,
+          imageUrl: img,
+          price: finalPrice,
           isPreorder: volume.status === "PREORDER",
           quantity: 1,
         });
@@ -242,12 +282,57 @@ export default function MangaSeriesPage() {
               </div>
             ) : null}
 
-            <div className="mt-8 pb-24">
+            <div className="mt-8">
               <SeriesVolumeSelector
                 volumes={series.volumes}
                 onAddToCart={addVolume}
+                onAddMultipleToCart={addMultipleVolumesToCart}
                 onCheckoutNow={addSelectedVolumes}
                 isNovel={isNovel}
+              />
+            </div>
+
+            <div className="mt-12">
+              <ProductBundleDeal
+                mainProduct={{
+                  id: series.volumes[0]?.id || 1001,
+                  kind: isNovel ? "LIGHT_NOVEL" : "MANGA",
+                  title: `${series.title} เล่ม 1`,
+                  price: series.volumes[0]?.price || 95,
+                  imageUrl:
+                    series.volumes[0]?.coverUrl ||
+                    series.coverImage ||
+                    series.coverUrl ||
+                    "/images/products/jjk-v1.jpg",
+                }}
+                companionItems={[
+                  {
+                    id: series.volumes[1]?.id || 1002,
+                    kind: isNovel ? "LIGHT_NOVEL" : "MANGA",
+                    title: `${series.title} เล่ม 2`,
+                    price: series.volumes[1]?.price || 95,
+                    imageUrl:
+                      series.volumes[1]?.coverUrl ||
+                      series.coverImage ||
+                      "/images/products/jjk-v1.jpg",
+                  },
+                  {
+                    id: 8001,
+                    kind: "ACCESSORY",
+                    title: "ซองใสถนอมหนังสือมังงะ OPP หนาพิเศษ (Pack 10 แผ่น)",
+                    price: 40,
+                    imageUrl: "/images/rewards/reward-manga-sleeves.jpg",
+                  },
+                ]}
+                discountPercent={8}
+              />
+            </div>
+
+            <div className="mt-12 pb-24">
+              <ProductReviews
+                targetId={series.id}
+                targetType={isNovel ? "LIGHT_NOVEL" : "MANGA"}
+                targetTitle={series.title}
               />
             </div>
           </>

@@ -78,6 +78,9 @@ export const MOCK_REWARDS: RewardItem[] = [
 
 export const MOCK_REWARDS_CATALOG = MOCK_REWARDS;
 
+export const REWARDS_STORAGE_KEY = "mock_rewards_catalog";
+export const MOCK_REWARDS_UPDATED_EVENT = "mock_rewards_catalog_updated";
+
 /**
  * แปลง string id เช่น 'rew-001' เป็นตัวเลขที่ปลอดภัยสำหรับตะกร้าและระบบ Checkout
  */
@@ -92,15 +95,71 @@ export function getRewardNumericId(rewardId: string | number): number {
 }
 
 export function listRewards(): RewardItem[] {
-  return [...MOCK_REWARDS];
+  if (typeof window === "undefined") return [...MOCK_REWARDS];
+  try {
+    const raw = localStorage.getItem(REWARDS_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(REWARDS_STORAGE_KEY, JSON.stringify(MOCK_REWARDS));
+      return [...MOCK_REWARDS];
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return [...MOCK_REWARDS];
+  } catch {
+    return [...MOCK_REWARDS];
+  }
 }
 
 export function findRewardItem(id: string | number): RewardItem | undefined {
   const strId = String(id);
   const numId = typeof id === "number" ? id : getRewardNumericId(id);
-  return MOCK_REWARDS.find(
+  const currentRewards = listRewards();
+  return currentRewards.find(
     (item) => item.id === strId || getRewardNumericId(item.id) === numId,
   );
+}
+
+export function saveRewardItem(item: RewardItem): void {
+  const current = listRewards();
+  const index = current.findIndex((r) => r.id === item.id);
+  let updated: RewardItem[];
+  if (index >= 0) {
+    updated = [...current];
+    updated[index] = item;
+  } else {
+    updated = [item, ...current];
+  }
+
+  if (typeof window !== "undefined") {
+    localStorage.setItem(REWARDS_STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new Event(MOCK_REWARDS_UPDATED_EVENT));
+  }
+}
+
+export function resetRewardsCatalog(): RewardItem[] {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(REWARDS_STORAGE_KEY, JSON.stringify(MOCK_REWARDS));
+    window.dispatchEvent(new Event(MOCK_REWARDS_UPDATED_EVENT));
+  }
+  return [...MOCK_REWARDS];
+}
+
+export function subscribeRewards(callback: (rewards: RewardItem[]) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  const handler = () => {
+    callback(listRewards());
+  };
+
+  window.addEventListener(MOCK_REWARDS_UPDATED_EVENT, handler);
+  window.addEventListener("storage", handler);
+
+  return () => {
+    window.removeEventListener(MOCK_REWARDS_UPDATED_EVENT, handler);
+    window.removeEventListener("storage", handler);
+  };
 }
 
 /**
@@ -110,6 +169,17 @@ export function findRewardItem(id: string | number): RewardItem | undefined {
 export function findRewardCheckoutVariant(
   productVariantId: number,
 ): MockCatalogVariant | null {
+  if (productVariantId >= 99000 && productVariantId < 99999) {
+    return {
+      productType: "GOODS",
+      title: "รางวัลตู้จับฉลาก Ichiban Kuji",
+      price: 0,
+      weightGrams: 50,
+      isPreorder: false,
+      stockOrQuotaRemaining: 999,
+      subcategory: "REWARD",
+    };
+  }
   const reward = findRewardItem(productVariantId);
   if (!reward) return null;
 

@@ -13,10 +13,15 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { useAuth } from "../../../contexts/AuthContext";
+import { getRoleHomeUrl } from "../../../utils/permissions";
 import {
   getMockOrder,
   updateMockOrderPayment,
 } from "../../../mocks/storage.mock";
+import {
+  addPoints,
+  calculateEarnedPoints,
+} from "../../../services/points.service";
 
 interface PaymentResult {
   orderId: number;
@@ -105,9 +110,14 @@ function CheckoutPaymentContent() {
   const orderIdValid = orderIdSchema.safeParse(orderIdValue).success;
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !user)) {
+    if (isLoading) return;
+    if (!isAuthenticated || !user) {
       const search = typeof window !== "undefined" ? window.location.search : "";
       router.replace(`/login?redirect=${encodeURIComponent(`/checkout/payment${search}`)}`);
+      return;
+    }
+    if (user.role !== "CUSTOMER") {
+      router.replace(`${getRoleHomeUrl(user.role)}?notice=shopping-disabled`);
     }
   }, [isLoading, isAuthenticated, user, router]);
 
@@ -244,6 +254,18 @@ function CheckoutPaymentContent() {
           parsedSuccess.data.data.transactionRef,
           parsedSuccess.data.data.paymentStage,
         );
+
+        // Award points earned from order
+        const paidAmount = Number(paymentAmount) || 0;
+        const { totalEarnedPoints } = calculateEarnedPoints(paidAmount);
+        if (totalEarnedPoints > 0) {
+          addPoints(
+            totalEarnedPoints,
+            `รับแต้มจากการชำระเงินคำสั่งซื้อ #${displayOrderNumber || orderIdValue}`,
+            "EARN_ORDER",
+            orderIdValue,
+          );
+        }
       }
       if (useMockMode) {
         router.replace(`/orders/${orderIdValue}`);

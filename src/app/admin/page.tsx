@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   BellRing,
   Calendar,
+  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -11,9 +12,11 @@ import {
   Download,
   Loader2,
   PackageCheck,
+  Percent,
   Plus,
   Power,
   Search,
+  Sparkles,
   Tag,
   Trash2,
   UsersRound,
@@ -28,7 +31,6 @@ import {
   type MockStoredOrder,
   type MockWaitlistEntry,
   getMockWaitlistEntries,
-  simulateMock14DayExpiry,
   MOCK_WAITLIST_UPDATED_EVENT,
 } from "../../mocks/storage.mock";
 import {
@@ -49,7 +51,6 @@ export default function AdminDashboardPage() {
   const [coupons, setCoupons] = useState<PromoCoupon[]>([]);
   const [shoppingDisabledNotice, setShoppingDisabledNotice] = useState(false);
   const [isTriggeringArrival, setIsTriggeringArrival] = useState(false);
-  const [isSimulatingExpiry, setIsSimulatingExpiry] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,28 +116,6 @@ export default function AdminDashboardPage() {
       );
     } finally {
       setIsTriggeringArrival(false);
-    }
-  }
-
-  async function simulateFourteenDays(): Promise<void> {
-    setError(null);
-    setNotice(null);
-    setIsSimulatingExpiry(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const result = simulateMock14DayExpiry();
-      refreshDashboard();
-      const summary = `ปรับสถานะออเดอร์หมดอายุแล้ว ${result.expiredCount} รายการ และโอนสิทธิ์ให้คิว Waitlist ลำดับถัดไปสำเร็จ ${result.waitlistTransfers} รายการ`;
-      setNotice(summary);
-      window.alert(summary);
-    } catch (simulationError) {
-      setError(
-        simulationError instanceof Error
-          ? simulationError.message
-          : "จำลองวันหมดอายุและจัดสรรคิว Waitlist ไม่สำเร็จ",
-      );
-    } finally {
-      setIsSimulatingExpiry(false);
     }
   }
 
@@ -469,6 +448,27 @@ export default function AdminDashboardPage() {
           <PackageCheck size={17} aria-hidden="true" />
           จัดการสินค้าและสต็อก
         </Link>
+        <Link
+          href="/admin/calendar"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-800 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-orange-800 dark:hover:bg-zinc-800"
+        >
+          <CalendarDays size={17} className="text-orange-600 dark:text-orange-400" aria-hidden="true" />
+          จัดการตารางวางจำหน่าย
+        </Link>
+        <Link
+          href="/admin/kuji"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-800 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-amber-800 dark:hover:bg-zinc-800"
+        >
+          <Sparkles size={17} className="text-amber-500" aria-hidden="true" />
+          จัดการตู้จับฉลาก Kuji
+        </Link>
+        <Link
+          href="/admin/promotions"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-bold text-zinc-800 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-rose-800 dark:hover:bg-zinc-800"
+        >
+          <Percent size={17} className="text-rose-600 dark:text-rose-400" aria-hidden="true" />
+          จัดการโปรโมชั่น & แฟลชเซลล์
+        </Link>
         <button
           type="button"
           onClick={exportOrdersToCsv}
@@ -476,19 +476,6 @@ export default function AdminDashboardPage() {
         >
           <Download size={17} aria-hidden="true" />
           ส่งออกรายงานยอดขาย (CSV)
-        </button>
-        <button
-          type="button"
-          onClick={simulateFourteenDays}
-          disabled={isSimulatingExpiry}
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-bold text-violet-900 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-200 dark:hover:bg-violet-900/60"
-        >
-          {isSimulatingExpiry ? (
-            <Loader2 size={17} className="animate-spin text-violet-700 dark:text-violet-300" aria-hidden="true" />
-          ) : (
-            <Clock3 size={17} aria-hidden="true" />
-          )}
-          <span>{isSimulatingExpiry ? "กำลังจำลองเวลา 14 วัน..." : "จำลองเวลา: ผ่านไป 14 วัน"}</span>
         </button>
       </div>
 

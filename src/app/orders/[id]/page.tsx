@@ -341,7 +341,7 @@ export default function MockOrderDetailPage() {
     <>
       <div className="mx-auto max-w-6xl space-y-4 px-4 pt-6 sm:px-6">
         {isStaffRole ? (
-          <div className="flex flex-col gap-2 rounded-2xl border border-sky-300 bg-sky-50 p-4 text-sky-950 sm:flex-row sm:items-center sm:justify-between dark:border-sky-850 dark:bg-sky-950/40 dark:text-sky-100">
+          <div className="flex flex-col gap-2 rounded-2xl border border-sky-300 bg-sky-50 p-4 text-sky-950 sm:flex-row sm:items-center sm:justify-between dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden="true" />
               <div>

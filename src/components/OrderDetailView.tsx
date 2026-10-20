@@ -10,12 +10,15 @@ import {
   Clock3,
   Copy,
   CreditCard,
+  FileText,
   Package,
   PackageCheck,
+  Printer,
   QrCode,
   Truck,
   X,
 } from "lucide-react";
+import TaxInvoiceModal from "./TaxInvoiceModal";
 
 export type OrderTrackingStatus =
   | "UNPAID"
@@ -235,6 +238,7 @@ export default function OrderDetailView({
     null,
   );
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [isTaxInvoiceModalOpen, setIsTaxInvoiceModalOpen] = useState(false);
 
   const dueDateTimestamp = order.balanceDueDate
     ? new Date(order.balanceDueDate).getTime()
@@ -612,6 +616,51 @@ export default function OrderDetailView({
                 </a>
               </div>
             </div>
+
+            {/* Live Carrier Transit Checkpoints Log */}
+            <div className="mt-4 border-t border-slate-200/80 pt-3 dark:border-zinc-700/80">
+              <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-bold text-slate-700 dark:text-zinc-300">
+                <Truck size={13} className="text-blue-600 dark:text-blue-400" />
+                <span>ไทม์ไลน์การจัดส่งพัสดุจริง (Transit Checkpoints)</span>
+              </p>
+              <div className="relative space-y-3.5 border-l-2 border-blue-500/30 pl-4 text-xs">
+                <div className="relative">
+                  <div className={`absolute -left-[23px] top-1 h-3 w-3 rounded-full ${
+                    shipment.status === "DELIVERED"
+                      ? "bg-emerald-500 ring-4 ring-emerald-100 dark:ring-emerald-950/60"
+                      : "bg-blue-500 ring-4 ring-blue-100 dark:ring-blue-950/60"
+                  }`} />
+                  <p className="font-bold text-slate-900 dark:text-zinc-100">
+                    {shipment.status === "DELIVERED"
+                      ? "พัสดุจัดส่งถึงผู้รับเรียบร้อยแล้ว"
+                      : "พัสดุกำลังอยู่ระหว่างการนำจ่ายให้ผู้รับ"}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    {shipment.status === "DELIVERED"
+                      ? "ปลายทางลงชื่อรับพัสดุสำเร็จ (เซ็นรับตรง)"
+                      : "พนักงานขนส่งกำลังเดินทางนำพัสดุไปส่งตามที่อยู่ที่ระบุ"}
+                  </p>
+                </div>
+                <div className="relative">
+                  <div className="absolute -left-[23px] top-1 h-3 w-3 rounded-full bg-blue-500 ring-4 ring-blue-100 dark:ring-blue-950/60" />
+                  <p className="font-bold text-slate-800 dark:text-zinc-200">
+                    พัสดุถึงศูนย์คัดแยกปลายทาง
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    ศูนย์กระจายพัสดุ {getCarrierName(shipment.carrier)} ได้รับและตรวจรับเข้าสาขาเรียบร้อย
+                  </p>
+                </div>
+                <div className="relative">
+                  <div className="absolute -left-[23px] top-1 h-3 w-3 rounded-full bg-slate-300 dark:bg-zinc-600" />
+                  <p className="font-semibold text-slate-700 dark:text-zinc-300">
+                    ต้นทางส่งมอบพัสดุให้ขนส่งเรียบร้อย
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    คลังสินค้า Manga Collectibles Store ส่งมอบพัสดุเข้าระบบ ({formatDateTime(shipment.shippedAt)})
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         ) : null}
       </article>
@@ -631,30 +680,43 @@ export default function OrderDetailView({
             สั่งซื้อเมื่อ {formatDateTime(order.createdAt)}
           </p>
         </div>
-        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
-          <Clock3 size={16} aria-hidden="true" />
-          {order.status === "AWAITING_BALANCE_PAYMENT"
-            ? "รอชำระยอดคงเหลือ"
-            : order.status === "PAYMENT_REJECTED"
-              ? "สลิปถูกปฏิเสธ"
-              : order.status === "PAYMENT_REVIEW_PENDING"
-                ? "รอตรวจสอบสลิป"
-            : order.status === "DEPOSIT_FORFEITED"
-              ? "หมดเขตชำระยอดคงเหลือ"
-              : order.status === "DELIVERED"
-                ? "จัดส่งสำเร็จ"
-                : order.status === "SHIPPED"
-                  ? "จัดส่งแล้ว"
-                  : order.status === "PACKING"
-                    ? "กำลังแพ็กสินค้า"
-                    : order.status === "PAID"
-                      ? "ชำระเงินแล้ว"
-                      : order.status === "DEPOSIT_PAID"
-                        ? "ชำระมัดจำแล้ว"
-                        : order.status === "CANCELLED"
-                          ? "ยกเลิกแล้ว"
-                          : "ได้รับคำสั่งซื้อ"}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {order.paymentStatus === "PAID" || order.paymentStatus === "DEPOSIT_PAID" ? (
+            <button
+              type="button"
+              onClick={() => setIsTaxInvoiceModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-blue-500 hover:text-blue-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-blue-500"
+            >
+              <Printer size={14} className="text-blue-600 dark:text-blue-400" aria-hidden="true" />
+              <span>พิมพ์ใบกำกับภาษี / ใบเสร็จ</span>
+            </button>
+          ) : null}
+
+          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 dark:bg-zinc-800 dark:text-zinc-200">
+            <Clock3 size={16} aria-hidden="true" />
+            {order.status === "AWAITING_BALANCE_PAYMENT"
+              ? "รอชำระยอดคงเหลือ"
+              : order.status === "PAYMENT_REJECTED"
+                ? "สลิปถูกปฏิเสธ"
+                : order.status === "PAYMENT_REVIEW_PENDING"
+                  ? "รอตรวจสอบสลิป"
+              : order.status === "DEPOSIT_FORFEITED"
+                ? "หมดเขตชำระยอดคงเหลือ"
+                : order.status === "DELIVERED"
+                  ? "จัดส่งสำเร็จ"
+                  : order.status === "SHIPPED"
+                    ? "จัดส่งแล้ว"
+                    : order.status === "PACKING"
+                      ? "กำลังแพ็กสินค้า"
+                      : order.status === "PAID"
+                        ? "ชำระเงินแล้ว"
+                        : order.status === "DEPOSIT_PAID"
+                          ? "ชำระมัดจำแล้ว"
+                          : order.status === "CANCELLED"
+                            ? "ยกเลิกแล้ว"
+                            : "ได้รับคำสั่งซื้อ"}
+          </span>
+        </div>
       </header>
 
       {copyError ? (
@@ -1024,6 +1086,12 @@ export default function OrderDetailView({
           </section>
         </div>
       ) : null}
+
+      <TaxInvoiceModal
+        isOpen={isTaxInvoiceModalOpen}
+        onClose={() => setIsTaxInvoiceModalOpen(false)}
+        order={order}
+      />
     </main>
   );
 }

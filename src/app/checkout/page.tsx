@@ -44,6 +44,12 @@ import {
 } from "../../components/TaxInvoiceForm";
 import { useAuth } from "../../contexts/AuthContext";
 import {
+  calculateEarnedPoints,
+  getUserPoints,
+  subscribeUserPoints,
+} from "../../services/points.service";
+import PointBadge from "../../components/PointBadge";
+import {
   getUserProfile,
   listShippingAddresses,
   saveShippingAddress,
@@ -283,6 +289,7 @@ export default function CheckoutPage() {
     promoDiscount,
     promoTitle,
     discountedImmediateTotal,
+    isFreeShipping,
     removeItem,
     updateQuantity,
     updateFigurePaymentType,
@@ -330,6 +337,17 @@ export default function CheckoutPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userPoints, setUserPoints] = useState<number>(() => getUserPoints());
+
+  useEffect(() => {
+    return subscribeUserPoints((p) => setUserPoints(p));
+  }, []);
+
+  const pointsReward = useMemo(
+    () => calculateEarnedPoints(discountedImmediateTotal, userPoints),
+    [discountedImmediateTotal, userPoints],
+  );
+
   const isStaffAccount =
     user?.role === "STAFF" ||
     user?.role === "FINANCE" ||
@@ -1199,8 +1217,8 @@ export default function CheckoutPage() {
                   ) : null}
                   <div className="flex justify-between text-sm text-zinc-600 dark:text-zinc-400">
                     <span>ค่าจัดส่ง</span>
-                    <span className="text-xs text-zinc-600 dark:text-zinc-400">
-                      {appliedPromoCode === "FREESHIP" ? "ฟรีค่าจัดส่ง" : "คำนวณตามพื้นที่"}
+                    <span className={`text-xs font-semibold ${isFreeShipping || appliedPromoCode === "FREESHIP" ? "text-emerald-700 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-400"}`}>
+                      {isFreeShipping ? "ฟรีค่าจัดส่ง (โปรส่งฟรีเมื่อช้อปครบ ฿800)" : appliedPromoCode === "FREESHIP" ? "ฟรีค่าจัดส่ง (โค้ด FREESHIP)" : "คำนวณตามพื้นที่"}
                     </span>
                   </div>
                   <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/40">
@@ -1222,6 +1240,24 @@ export default function CheckoutPage() {
                     <p className="mt-1 text-xs leading-5 text-amber-900/80 dark:text-amber-300/80">
                       * ยอดนี้ยังไม่รวมค่าจัดส่ง ซึ่งระบบจะแจ้งยอดจริงเมื่อสร้างคำสั่งซื้อ
                     </p>
+                  </div>
+
+                  {/* Points Earned Preview Card */}
+                  <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-blue-950 dark:border-blue-900/60 dark:bg-blue-950/40">
+                    <div className="flex items-center gap-2">
+                      <PointBadge size="sm" />
+                      <div>
+                        <p className="text-xs font-bold text-blue-900 dark:text-blue-200">
+                          แต้มสะสมที่จะได้รับจากคำสั่งซื้อนี้
+                        </p>
+                        <p className="text-[11px] text-blue-700/80 dark:text-blue-300/80">
+                          อัตรา 50 บาท = 1 P ({pointsReward.tier.name} คูณ x{pointsReward.multiplier})
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-base font-black text-blue-700 dark:text-blue-300">
+                      +{pointsReward.totalEarnedPoints} P
+                    </span>
                   </div>
                   {remainingBalanceTotal > 0 ? (
                     <div className="flex justify-between gap-3 text-sm">

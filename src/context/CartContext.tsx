@@ -11,6 +11,7 @@ import {
 } from "react";
 import { z } from "zod";
 import { validatePromoCode } from "../utils/promo";
+import { triggerFlyToCart } from "../utils/fly-to-cart";
 
 export interface FigureBoxDimensions {
   widthCm: number;
@@ -132,7 +133,10 @@ export interface CartContextValue extends CartSummary {
   selectedItems: readonly CartItem[];
   selectedCartItemKeys: readonly string[];
   isReady: boolean;
-  addItem: (item: CartItem) => void;
+  addItem: (
+    item: CartItem,
+    triggerTarget?: React.MouseEvent | HTMLElement | { getBoundingClientRect: () => DOMRect } | null,
+  ) => void;
   removeItem: (kind: CartItem["kind"], id: number) => void;
   updateQuantity: (kind: CartItem["kind"], id: number, quantity: number) => void;
   updateFigurePaymentType: (
@@ -393,10 +397,15 @@ export function CartProvider({ children }: CartProviderProps) {
     }
   }, [bookCoverAddon, isReady, items, selectedCartItemKeys]);
 
-  const addItem = useCallback((input: CartItem): void => {
-    const item = validateCartItem(input);
-    const itemKey = getCartItemKey(item);
-    setItems((current) => {
+  const addItem = useCallback(
+    (
+      input: CartItem,
+      triggerTarget?: React.MouseEvent | HTMLElement | { getBoundingClientRect: () => DOMRect } | null,
+    ): void => {
+      const item = validateCartItem(input);
+      const itemKey = getCartItemKey(item);
+      triggerFlyToCart(triggerTarget, item.image || item.imageUrl || item.coverImage);
+      setItems((current) => {
       const index = current.findIndex(
         (candidate) =>
           candidate.kind === item.kind && candidate.id === item.id,
@@ -580,13 +589,15 @@ export function CartProvider({ children }: CartProviderProps) {
 
     let promoDiscount = 0;
     let promoTitle: string | null = null;
-    let isFreeShipping = false;
+    let isFreeShipping = selectedItems.length > 0 && immediateTotal >= 800;
     if (appliedPromoCode && selectedItems.length > 0) {
       const res = validatePromoCode(appliedPromoCode, merchandiseTotal);
       if (res.valid) {
         promoDiscount = res.discountAmount;
         promoTitle = res.coupon?.title ?? null;
-        isFreeShipping = res.freeShipping;
+        if (res.freeShipping) {
+          isFreeShipping = true;
+        }
       }
     }
 

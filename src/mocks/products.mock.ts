@@ -73,6 +73,18 @@ export function findMockVariant(productVariantId: number): MockCatalogVariant | 
     };
   }
 
+  if (productVariantId >= 99000 && productVariantId < 99999) {
+    return {
+      productType: "GOODS",
+      title: "รางวัลตู้จับฉลาก Ichiban Kuji",
+      price: 0,
+      weightGrams: 50,
+      isPreorder: false,
+      stockOrQuotaRemaining: 999,
+      subcategory: "REWARD",
+    };
+  }
+
   for (const series of mangaSeries) {
     const volume = series.volumes.find((item) => item.id === productVariantId);
     if (volume) {

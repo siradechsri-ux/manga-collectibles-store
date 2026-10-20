@@ -49,6 +49,8 @@ const mangaProductSchema = z
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
     coverUrl: z.string().nullable().optional(),
+    isHidden: z.boolean().optional().default(false),
+    publishDate: z.string().optional().default(""),
   })
   .strict();
 
@@ -74,6 +76,8 @@ const lightNovelProductSchema = z
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
     coverUrl: z.string().nullable().optional(),
+    isHidden: z.boolean().optional().default(false),
+    publishDate: z.string().optional().default(""),
   })
   .strict();
 
@@ -102,6 +106,8 @@ const figureProductSchema = z
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
     coverUrl: z.string().nullable().optional(),
+    isHidden: z.boolean().optional().default(false),
+    publishDate: z.string().optional().default(""),
   })
   .strict();
 
@@ -128,6 +134,8 @@ const plamoProductSchema = z
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
     coverUrl: z.string().nullable().optional(),
+    isHidden: z.boolean().optional().default(false),
+    publishDate: z.string().optional().default(""),
   })
   .strict();
 
@@ -149,6 +157,8 @@ const goodsProductSchema = z
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
     coverUrl: z.string().nullable().optional(),
+    isHidden: z.boolean().optional().default(false),
+    publishDate: z.string().optional().default(""),
   })
   .strict();
 
@@ -171,6 +181,8 @@ const accessoryProductSchema = z
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
     coverUrl: z.string().nullable().optional(),
+    isHidden: z.boolean().optional().default(false),
+    publishDate: z.string().optional().default(""),
   })
   .strict();
 
@@ -281,6 +293,8 @@ function createInitialProducts(): AdminProduct[] {
             ? 450
             : 250,
         images: volume.coverUrl ? [volume.coverUrl] : (volume.images ?? []),
+        isHidden: false,
+        publishDate: "",
       });
     }
   }
@@ -310,6 +324,8 @@ function createInitialProducts(): AdminProduct[] {
         expectedShippingDate: volume.expectedShippingDate ?? "",
         weightGrams: volume.variantLabel?.includes("Special") ? 420 : 280,
         images: volume.coverUrl ? [volume.coverUrl] : (volume.images ?? []),
+        isHidden: false,
+        publishDate: "",
       });
     }
   }
@@ -337,6 +353,8 @@ function createInitialProducts(): AdminProduct[] {
       heightMm: figure.heightMm,
       janCode: figure.janCode,
       images: [...figure.images],
+      isHidden: false,
+      publishDate: "",
     });
   }
 
@@ -361,6 +379,8 @@ function createInitialProducts(): AdminProduct[] {
       weightGrams: item.scale.includes("1/100") ? 850 : 450,
       janCode: item.janCode,
       images: [...item.images],
+      isHidden: false,
+      publishDate: "",
     });
   }
 
@@ -379,6 +399,8 @@ function createInitialProducts(): AdminProduct[] {
       status: item.stockOrQuotaRemaining > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
       weightGrams: item.subcategory === "BADGE" ? 45 : 100,
       images: [...item.images],
+      isHidden: false,
+      publishDate: "",
     });
   }
 
@@ -407,6 +429,8 @@ function createInitialProducts(): AdminProduct[] {
       images: [...item.images],
       coverImage: item.coverImage ?? item.images[0] ?? null,
       imageUrl: item.coverUrl ?? item.images[0] ?? null,
+      isHidden: false,
+      publishDate: "",
     });
   }
 
@@ -522,6 +546,17 @@ function nextCatalogVariantId(products: AdminProduct[]): number {
   return Math.max(maxMangaId + 1, 50_000);
 }
 
+export function isProductVisibleToPublic(product: AdminProduct): boolean {
+  if (product.isHidden) return false;
+  if (product.publishDate && product.publishDate.trim() !== "") {
+    const publishTime = new Date(product.publishDate).getTime();
+    if (!Number.isNaN(publishTime) && publishTime > Date.now()) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function productToCatalog(products: AdminProduct[]): CatalogData {
   const mangaSeriesMap = new Map<string, CatalogMangaSeries>();
   const lightNovelSeriesMap = new Map<string, CatalogMangaSeries>();
@@ -531,6 +566,9 @@ function productToCatalog(products: AdminProduct[]): CatalogData {
   const accessories: CatalogFigure[] = [];
 
   for (const product of products) {
+    if (!isProductVisibleToPublic(product)) {
+      continue;
+    }
     if (product.type === "MANGA") {
       const volumeId = Number(product.id.replace(/^manga-/, ""));
       const coverUrl = product.images[0] ?? "";
@@ -858,6 +896,22 @@ export function adjustAdminProductStock(
   return updated;
 }
 
+export function toggleProductVisibility(id: string): AdminProduct {
+  const products = readProducts();
+  const index = products.findIndex((product) => product.id === id);
+  if (index < 0) throw new Error("ไม่พบสินค้าที่ต้องการปรับการมองเห็น");
+  const target = products[index];
+  if (!target) throw new Error("ไม่พบข้อมูลสินค้า");
+
+  const updated: AdminProduct = {
+    ...target,
+    isHidden: !target.isHidden,
+  };
+  products[index] = updated;
+  writeProducts(products);
+  return updated;
+}
+
 export function getAdminProductsCatalog(): CatalogData {
   return productToCatalog(readProducts());
 }
@@ -876,6 +930,7 @@ export function getCheckoutInventorySnapshot(): CheckoutInventorySnapshotItem[] 
   ];
 
   for (const product of readProducts()) {
+    if (!isProductVisibleToPublic(product)) continue;
     if (product.type === "MANGA") {
       const productVariantId = Number(product.id.replace(/^manga-/, ""));
       if (Number.isSafeInteger(productVariantId) && productVariantId > 0) {
@@ -1171,7 +1226,7 @@ export function findAdminCheckoutVariant(
     return false;
   });
 
-  if (!product) return null;
+  if (!product || !isProductVisibleToPublic(product)) return null;
 
   if (product.type === "MANGA") {
     return {

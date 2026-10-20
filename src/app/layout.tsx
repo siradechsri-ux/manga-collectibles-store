@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ReactNode, Suspense } from "react";
 import RouteGuard from "../components/auth/RouteGuard";
 import Navbar from "../components/layout/Navbar";
+import FlyToCartOverlay from "../components/FlyToCartOverlay";
 import Providers from "./providers";
 import "./globals.css";
 
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <Suspense fallback={null}>
               <Navbar />
             </Suspense>
+            <FlyToCartOverlay />
             {children}
           </RouteGuard>
         </Providers>

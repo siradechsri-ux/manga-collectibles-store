@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeftRight,
   Bell,
   CalendarClock,
   CalendarDays,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useWishlist } from "../contexts/WishlistContext";
+import { useCompare } from "../contexts/CompareContext";
 import { joinMockWaitlist } from "../mocks/storage.mock";
 import { canShop } from "../utils/permissions";
 
@@ -136,6 +138,7 @@ export default function FigureDetailCard({
   const { user } = useAuth();
   const userCanShop = canShop(user?.role);
   const { isInWishlist, toggleWishlist } = useWishlist();
+  const { isInCompare, addToCompare, removeFromCompare, openCompare } = useCompare();
   const [paymentOption, setPaymentOption] = useState<FigurePaymentOption>("FULL");
   const [quantity, setQuantity] = useState(1);
   const [now, setNow] = useState(() => Date.now());
@@ -147,6 +150,7 @@ export default function FigureDetailCard({
 
   const figureItemType = (product.category as any) || "FIGURE";
   const isWishlisted = isInWishlist(product.id, figureItemType);
+  const isCompared = isInCompare(product.id);
 
   function handleToggleWishlist(): void {
     toggleWishlist({
@@ -323,7 +327,7 @@ export default function FigureDetailCard({
                 </div>
               </div>
             ) : (
-              <div className="flex h-full w-full flex-col justify-between p-6 text-zinc-900 dark:text-zinc-100 sm:p-8 bg-gradient-to-br from-zinc-50 via-zinc-100/70 to-orange-50/40 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-950">
+              <div className="flex h-full w-full flex-col justify-between p-6 text-zinc-900 dark:text-zinc-100 sm:p-8 bg-gradient-to-br from-zinc-50 via-zinc-100/70 to-orange-50/40 dark:from-zinc-900 dark:via-zinc-800 dark:to-zinc-950">
                 <div className="flex items-center justify-between">
                   <span className="rounded-md bg-orange-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-orange-800 dark:bg-orange-950 dark:text-orange-300">
                     OFFICIAL COLLECTIBLE
@@ -667,6 +671,45 @@ export default function FigureDetailCard({
                     {canPurchase ? "หยิบใส่ตะกร้า" : "สินค้าหมด"}
                   </button>
                 )}
+
+                {/* Compare Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isCompared) {
+                      removeFromCompare(product.id);
+                    } else {
+                      addToCompare({
+                        id: product.id,
+                        name: product.name,
+                        category: product.category || "FIGURE",
+                        series: product.series,
+                        character: product.character,
+                        price: product.fullPrice,
+                        depositPrice: product.depositAmount,
+                        imageUrl: product.images?.[0] || null,
+                        url: `/figures/${encodeURIComponent(product.slug || product.id)}`,
+                        scale: product.scale,
+                        height: product.heightMm ? `${product.heightMm} mm` : undefined,
+                        manufacturer: product.manufacturer,
+                        status: product.status,
+                        boxDimensions: product.boxDimensions,
+                      });
+                    }
+                  }}
+                  aria-label={isCompared ? "นำออกจากตารางเปรียบเทียบ" : "เพิ่มในตารางเปรียบเทียบ"}
+                  title={isCompared ? "อยู่ในตารางเปรียบเทียบแล้ว" : "เปรียบเทียบสเปกสินค้า"}
+                  className={`inline-flex min-h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition hover:scale-105 ${
+                    isCompared
+                      ? "border-orange-500 bg-orange-50 text-orange-600 dark:border-orange-600 dark:bg-orange-950/40 dark:text-orange-400"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-orange-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:text-orange-400"
+                  }`}
+                >
+                  <ArrowLeftRight
+                    size={20}
+                    aria-hidden="true"
+                  />
+                </button>
 
                 {userCanShop ? (
                   <button

@@ -397,6 +397,10 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
           : 12_000;
 
   let finalShippingFeeCents = rawShippingFeeCents;
+  // Free shipping threshold promotion: orders >= 800 THB receive 100% free shipping!
+  if (immediateMerchandiseCents >= 80_000) {
+    finalShippingFeeCents = 0;
+  }
   let promoDiscountCents = 0;
   if (parsed.data.promoCode) {
     const promoRes = validatePromoCode(
