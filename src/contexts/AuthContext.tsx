@@ -64,7 +64,7 @@ interface AuthContextValue {
     role: "GUEST" | "CUSTOMER" | "ADMIN" | "STAFF" | "FINANCE",
   ) => Promise<AuthUser | null>;
   register: (credentials: RegisterCredentials) => Promise<AuthUser>;
-  updateUserDetails: (fullName: string) => void;
+  updateUserDetails: (fullName: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<AuthUser | null>;
   authenticatedFetch: (
@@ -395,48 +395,6 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
     [apiBase],
   );
 
-  const updateUserDetails = useCallback((fullName: string): void => {
-    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-      throw new Error("การแก้ไขชื่อบัญชีต้องเชื่อมต่อ API โปรไฟล์");
-    }
-    const updatedUser = updateMockUserDetails(fullName);
-    if (!updatedUser) {
-      throw new Error("กรุณาเข้าสู่ระบบก่อนแก้ไขข้อมูลบัญชี");
-    }
-    setUser(updatedUser);
-  }, []);
-
-  const logout = useCallback(async (): Promise<void> => {
-    if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
-      logoutMockUser();
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("mock_current_role", "GUEST");
-        window.dispatchEvent(
-          new StorageEvent("storage", { key: "manga-collectibles-mock-user-v1" }),
-        );
-        window.dispatchEvent(
-          new StorageEvent("storage", { key: "mock_current_role" }),
-        );
-      }
-      setUser(null);
-      return;
-    }
-    try {
-      const response = await fetch(`${apiBase}/api/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        throw await parseError(response);
-      }
-    } finally {
-      accessTokenRef.current = null;
-      setUser(null);
-    }
-  }, [apiBase]);
-
   const authenticatedFetch = useCallback(
     async (
       input: RequestInfo | URL,
@@ -476,6 +434,75 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
     },
     [refreshSession],
   );
+
+  const updateUserDetails = useCallback(async (fullName: string): Promise<void> => {
+    if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
+      const updatedUser = updateMockUserDetails(fullName);
+      if (!updatedUser) {
+        throw new Error("กรุณาเข้าสู่ระบบก่อนแก้ไขข้อมูลบัญชี");
+      }
+      setUser(updatedUser);
+      return;
+    }
+    // Live mode — call PATCH /api/auth/me
+    const response = await authenticatedFetch(`${apiBase}/api/auth/me`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fullName }),
+    });
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      throw new Error("เซิร์ฟเวอร์ส่งข้อมูลตอบกลับไม่ถูกต้อง");
+    }
+    if (!response.ok) {
+      const parsedError = apiErrorSchema.safeParse(body);
+      throw new Error(
+        parsedError.success && parsedError.data.error?.message
+          ? parsedError.data.error.message
+          : `อัปเดตข้อมูลบัญชีไม่สำเร็จ (HTTP ${response.status})`,
+      );
+    }
+    const resultSchema = z
+      .object({ success: z.literal(true), data: z.object({ user: authUserSchema }) })
+      .passthrough();
+    const parsed = resultSchema.safeParse(body);
+    if (parsed.success) {
+      setUser(parsed.data.data.user);
+    }
+  }, [apiBase, authenticatedFetch]);
+
+  const logout = useCallback(async (): Promise<void> => {
+    if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
+      logoutMockUser();
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("mock_current_role", "GUEST");
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: "manga-collectibles-mock-user-v1" }),
+        );
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: "mock_current_role" }),
+        );
+      }
+      setUser(null);
+      return;
+    }
+    try {
+      const response = await fetch(`${apiBase}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw await parseError(response);
+      }
+    } finally {
+      accessTokenRef.current = null;
+      setUser(null);
+    }
+  }, [apiBase]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

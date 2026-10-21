@@ -80,6 +80,7 @@ export function createAuthController(
   refreshToken: RequestHandler;
   logout: RequestHandler;
   me: RequestHandler;
+  updateProfile: RequestHandler;
 } {
   const refreshCookieName = options.refreshCookieName ?? "refresh_token";
   const accessCookieName = "access_token";
@@ -213,7 +214,29 @@ export function createAuthController(
     response.status(200).json({ success: true, data: { user: request.user } });
   };
 
-  return { register, login, refreshToken, logout, me };
+  const updateProfile: RequestHandler = async (request, response): Promise<void> => {
+    if (!request.user) {
+      response.status(401).json({
+        success: false,
+        error: { code: "AUTHENTICATION_REQUIRED", message: "กรุณาเข้าสู่ระบบ" },
+      });
+      return;
+    }
+    const fullNameSchema = z.object({ fullName: z.string().min(1).max(200) }).strict();
+    const parsed = fullNameSchema.safeParse(request.body);
+    if (!parsed.success) {
+      sendValidationError(response, parsed.error);
+      return;
+    }
+    try {
+      const updatedUser = await authService.updateProfile(request.user.id, parsed.data.fullName);
+      response.status(200).json({ success: true, data: { user: updatedUser } });
+    } catch (error) {
+      sendAuthError(response, error);
+    }
+  };
+
+  return { register, login, refreshToken, logout, me, updateProfile };
 }
 
 export function createAuthRouter(
@@ -227,5 +250,6 @@ export function createAuthRouter(
   router.post("/refresh", controller.refreshToken);
   router.post("/logout", controller.logout);
   router.get("/me", authenticateToken(authService), controller.me);
+  router.patch("/me", authenticateToken(authService), controller.updateProfile);
   return router;
 }
