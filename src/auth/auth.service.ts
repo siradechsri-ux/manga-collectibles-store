@@ -345,6 +345,25 @@ export class AuthService {
     };
   }
 
+  async updateProfile(userId: number, fullName: string): Promise<PublicUser> {
+    const trimmed = fullName.trim();
+    if (!trimmed) {
+      throw new AuthError(400, "INVALID_FULL_NAME", "ชื่อ-นามสกุลไม่ถูกต้อง");
+    }
+    const result = await this.pool.query<UserDatabaseRow>(
+      `UPDATE users
+       SET full_name = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING id, email, full_name, phone_number, role, is_active`,
+      [trimmed, userId],
+    );
+    const user = result.rows[0];
+    if (!user) {
+      throw new AuthError(404, "USER_NOT_FOUND", "ไม่พบข้อมูลผู้ใช้");
+    }
+    return this.toPublicUser(user);
+  }
+
   private toPublicUser(user: UserDatabaseRow): PublicUser {
     return {
       ...this.toAuthenticatedUser(user),

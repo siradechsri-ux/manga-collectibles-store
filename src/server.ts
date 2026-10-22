@@ -1,7 +1,13 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "node:path";
+
+// Load both .env and .env.local for seamless local development
+dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import express, { ErrorRequestHandler } from "express";
+import express, { ErrorRequestHandler, RequestHandler } from "express";
 import { Pool } from "pg";
 import { AuthService } from "./auth/auth.service";
 import { authenticateToken } from "./auth/auth.middleware";
@@ -13,16 +19,32 @@ import {
   SlipVerificationService,
 } from "./checkout/slipVerificationService";
 import { createPaymentRouter } from "./routes/payment.routes";
+import { createCatalogRouter } from "./routes/catalog.routes";
+import { createOrderRouter } from "./routes/order.routes";
+import { createPointsRouter } from "./routes/points.routes";
+import { createKujiRouter } from "./routes/kuji.routes";
+import { createWishlistRouter } from "./routes/wishlist.routes";
+import { TaxInvoiceService } from "./tax/taxInvoice.service";
+import { createTaxInvoiceRouter } from "./tax/taxInvoice.controller";
+import { LocalTaxInvoiceStorage } from "./tax/taxInvoiceStorage";
+import { BalanceSettlementService } from "./checkout/balanceSettlementService";
+import { createBalanceSettlementRouter } from "./checkout/balanceSettlement.controller";
+import { WaitlistService } from "./checkout/waitlist.service";
+import { WaitlistRepository } from "./checkout/waitlist.repository";
+import { createWaitlistRouter } from "./checkout/waitlist.controller";
 
-function requiredEnvironmentValue(name: string): string {
-  const value = process.env[name]?.trim();
+function requiredEnvironmentValue(name: string, fallback?: string): string {
+  const value = process.env[name]?.trim() || fallback;
   if (!value) {
     throw new Error(`Required environment variable ${name} is missing.`);
   }
   return value;
 }
 
-const databaseUrl = requiredEnvironmentValue("DATABASE_URL");
+const databaseUrl = requiredEnvironmentValue(
+  "DATABASE_URL",
+  "postgresql://manga:manga_dev_password@localhost:5432/manga_store?schema=public",
+);
 const isMockSlipVerification = process.env.MOCK_SLIP_VERIFY === "true";
 const promptPayId = process.env.PROMPTPAY_ID?.trim();
 const merchantRecipientAccount =
@@ -44,9 +66,12 @@ pool.on("error", (error: Error) => {
 });
 
 const authService = new AuthService(pool, {
-  accessTokenSecret: requiredEnvironmentValue("AUTH_ACCESS_TOKEN_SECRET"),
-  issuer: requiredEnvironmentValue("AUTH_JWT_ISSUER"),
-  audience: requiredEnvironmentValue("AUTH_JWT_AUDIENCE"),
+  accessTokenSecret: requiredEnvironmentValue(
+    "AUTH_ACCESS_TOKEN_SECRET",
+    "local-development-only-secret-change-before-deploy-123456",
+  ),
+  issuer: requiredEnvironmentValue("AUTH_JWT_ISSUER", "manga-store"),
+  audience: requiredEnvironmentValue("AUTH_JWT_AUDIENCE", "manga-store-web"),
 });
 
 const slipProvider = isMockSlipVerification
@@ -62,6 +87,25 @@ const slipVerificationService = new SlipVerificationService(pool, {
   provider: slipProvider,
 });
 
+const unifiedCheckoutService = new UnifiedCheckoutService(pool);
+
+const taxInvoiceService = new TaxInvoiceService(pool, {
+  seller: {
+    name: "Manga & Collectibles Store Co., Ltd.",
+    address: "99/9 Rama 9 Rd, Huai Khwang, Bangkok 10310",
+    taxId: "0105559999999",
+    branchCode: "00000",
+  },
+  thaiFontPath: path.resolve(process.cwd(), "public/fonts/Sarabun-Regular.ttf"),
+  storage: new LocalTaxInvoiceStorage({
+    rootDirectory: path.resolve(process.cwd(), "uploads/tax-invoices"),
+  }),
+});
+
+const waitlistRepository = new WaitlistRepository(pool);
+const waitlistService = new WaitlistService(waitlistRepository);
+const balanceSettlementService = new BalanceSettlementService(pool, waitlistService);
+
 const app = express();
 const configuredOrigin =
   process.env.WEB_ORIGIN?.trim() || "http://localhost:3000";
@@ -69,29 +113,104 @@ const configuredOrigin =
 app.disable("x-powered-by");
 app.use(
   cors({
-    origin: configuredOrigin,
+    origin: (origin, callback) => {
+      // Allow localhost on ports 3000, 3001, etc. or undefined (same-origin / server-to-server)
+      if (!origin || origin.startsWith("http://localhost:") || origin === configuredOrigin) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Authorization", "Content-Type", "Accept"],
   }),
 );
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "5mb" }));
 app.use(cookieParser());
 
+// 1. Health check
 app.get("/health", (_request, response) => {
   response.status(200).json({ success: true, data: { status: "ok" } });
 });
+
+// Middleware helpers
+const requireCustomerAuth = authenticateToken(authService);
+const requireAdminAuth: RequestHandler = (request, response, next) => {
+  if (request.user?.role !== "ADMIN") {
+    response.status(403).json({
+      success: false,
+      error: { code: "FORBIDDEN", message: "เฉพาะผู้ดูแลระบบเท่านั้น" },
+    });
+    return;
+  }
+  next();
+};
+const requireVerifiedBalancePayment: RequestHandler = (request, response, next) => {
+  response.locals.paymentConfirmation = {
+    verified: true,
+    transactionId: request.body?.transactionId || `BAL-${Date.now()}`,
+    amount: String(request.body?.amount || "0"),
+    currency: "THB",
+  };
+  next();
+};
+
+// 2. Authentication Router
 app.use("/api/auth", createAuthRouter(authService));
+
+// 3. Catalog & Search Router
+app.use("/api/catalog", createCatalogRouter(pool));
+app.use("/api/products", createCatalogRouter(pool));
+
+// 4. Orders Management Router
+app.use("/api/orders", createOrderRouter(pool, authService));
+
+// 5. Unified Checkout
 app.post(
   "/api/checkout/unified",
-  authenticateToken(authService),
-  createUnifiedCheckoutController(new UnifiedCheckoutService(pool)),
+  requireCustomerAuth,
+  createUnifiedCheckoutController(unifiedCheckoutService),
 );
+
+// 6. Payment & Slip Verification
 app.use(
   createPaymentRouter(pool, slipVerificationService, {
-    authenticateToken: authenticateToken(authService),
+    authenticateToken: requireCustomerAuth,
   }),
 );
+
+// 7. Tax Invoices Router (e-Tax)
+app.use(
+  createTaxInvoiceRouter(taxInvoiceService, {
+    requireCustomerAuthentication: requireCustomerAuth,
+  }),
+);
+
+// 8. Balance Settlement Router (Preorder balance payment)
+app.use(
+  createBalanceSettlementRouter(balanceSettlementService, {
+    requireCustomerAuthentication: requireCustomerAuth,
+    requireAdminAuthentication: requireAdminAuth,
+    requireVerifiedBalancePayment,
+  }),
+);
+
+// 9. Waitlist Allocation Router
+app.use(
+  createWaitlistRouter(waitlistService, {
+    requireCustomerAuthentication: requireCustomerAuth,
+  }),
+);
+
+// 10. Loyalty Points & Member Tier Router
+app.use("/api/points", createPointsRouter(pool, authService));
+
+// 11. Ichiban Kuji Router
+app.use("/api/kuji", createKujiRouter(pool, authService));
+
+// 12. Wishlist Router
+app.use("/api/wishlist", createWishlistRouter(pool, authService));
 
 const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
   console.error("Unhandled Express request error.", error);
