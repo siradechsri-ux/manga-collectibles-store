@@ -62,6 +62,51 @@ export interface OrderTrackingLineItem {
   isPreorder: boolean;
 }
 
+export function resolveOrderItemImage(item: { title?: string; imageUrl?: string; productType?: string }): string | null {
+  if (item.imageUrl) return item.imageUrl;
+  const t = (item.title || "").toLowerCase();
+  if (t.includes("มหาเวทย์") || t.includes("jujutsu") || t.includes("jjk")) {
+    const vol = t.match(/เล่ม\s*(\d+)/)?.[1] || "01";
+    return `/images/products/jjk-vol-${String(vol).padStart(2, "0")}.jpg`;
+  }
+  if (t.includes("chainsaw") || t.includes("เลื่อยยนต์")) {
+    const vol = t.match(/เล่ม\s*(\d+)/)?.[1] || "01";
+    return `/images/products/chainsaw-vol-${String(vol).padStart(2, "0")}.jpg`;
+  }
+  if (t.includes("spy")) {
+    const vol = t.match(/เล่ม\s*(\d+)/)?.[1] || "01";
+    return `/images/products/spy-family-vol-${String(vol).padStart(2, "0")}.jpg`;
+  }
+  if (t.includes("frieren") || t.includes("ฟรีเรน") || t.includes("คำอธิษฐาน")) {
+    return "/images/products/frieren-vol-01.jpg";
+  }
+  if (t.includes("gojo") || t.includes("โกโจ")) {
+    return "/images/products/figure-2001.jpg";
+  }
+  if (t.includes("sukuna") || t.includes("สุคุนะ")) {
+    return "/images/products/figure-2002.jpg";
+  }
+  if (t.includes("tanjiro") || t.includes("ทันจิโร่")) {
+    return "/images/products/figure-2004.jpg";
+  }
+  if (t.includes("hi-nu") || t.includes("6005")) {
+    return "/images/products/plamo-6005.jpg";
+  }
+  if (t.includes("gundam") || t.includes("rx-78")) {
+    return "/images/products/plamo-6001.jpg";
+  }
+  if (t.includes("ซองใส") || t.includes("8001")) {
+    return "/images/products/acc-8001.jpg";
+  }
+  if (t.includes("กล่องอะคริลิก") || t.includes("8002")) {
+    return "/images/products/acc-8002.jpg";
+  }
+  if (t.includes("สแตนดี้") || t.includes("7001")) {
+    return "/images/products/goods-7001.jpg";
+  }
+  return null;
+}
+
 export interface OrderTimelineEvent {
   stage: OrderTimelineStage;
   label: string;
@@ -656,7 +701,7 @@ export default function OrderDetailView({
                     ต้นทางส่งมอบพัสดุให้ขนส่งเรียบร้อย
                   </p>
                   <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                    คลังสินค้า Manga Collectibles Store ส่งมอบพัสดุเข้าระบบ ({formatDateTime(shipment.shippedAt)})
+                    คลังสินค้า ChanSasom Store ส่งมอบพัสดุเข้าระบบ ({formatDateTime(shipment.shippedAt)})
                   </p>
                 </div>
               </div>
@@ -855,9 +900,9 @@ export default function OrderDetailView({
                       className="flex gap-3 rounded-xl border border-slate-100 p-3"
                     >
                       <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                        {item.imageUrl ? (
+                        {item.imageUrl || resolveOrderItemImage(item) ? (
                           <img
-                            src={item.imageUrl}
+                            src={item.imageUrl || resolveOrderItemImage(item)!}
                             alt={item.title}
                             referrerPolicy="no-referrer"
                             className="h-full w-full object-cover"

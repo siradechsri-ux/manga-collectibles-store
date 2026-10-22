@@ -1,12 +1,13 @@
 "use client";
 
-import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, PackageCheck, Printer, ScanLine } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Package, PackageCheck, Printer, ScanLine } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 import { OrderService } from "../../../services/order.service";
 import type { MockStoredOrder } from "../../../mocks/storage.mock";
 import type { ShipmentCarrier } from "../../../components/OrderDetailView";
+import { resolveOrderItemImage } from "../../../components/OrderDetailView";
 
 export default function StaffPackingPage() {
   const { user, isLoading } = useAuth();
@@ -233,16 +234,32 @@ export default function StaffPackingPage() {
                     </button>
                     {detailsExpanded ? (
                       <ul id={`order-items-${order.detail.id}`} className="mt-3 space-y-2">
-                        {order.detail.items.map((item) => (
-                          <li key={item.id} className="flex justify-between gap-4 text-sm">
-                            <span className="text-slate-700 dark:text-zinc-300">
-                              {item.title} × {item.quantity}
-                            </span>
-                            <span className="shrink-0 font-semibold text-slate-900 dark:text-zinc-100">
-                              ฿{item.lineTotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                            </span>
-                          </li>
-                        ))}
+                        {order.detail.items.map((item) => {
+                          const thumb = item.imageUrl || resolveOrderItemImage(item);
+                          return (
+                            <li key={item.id} className="flex items-center justify-between gap-4 text-sm py-1 border-b border-zinc-100 last:border-0 dark:border-zinc-800">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {thumb ? (
+                                  <img
+                                    src={thumb}
+                                    alt={item.title}
+                                    className="h-10 w-8 shrink-0 rounded object-cover border border-zinc-200 dark:border-zinc-700"
+                                  />
+                                ) : (
+                                  <div className="flex h-10 w-8 shrink-0 items-center justify-center rounded bg-zinc-100 text-zinc-400 dark:bg-zinc-800">
+                                    <Package size={14} aria-hidden="true" />
+                                  </div>
+                                )}
+                                <span className="text-slate-700 dark:text-zinc-300 font-medium truncate">
+                                  {item.title} <span className="font-bold text-orange-600 dark:text-orange-400">× {item.quantity}</span>
+                                </span>
+                              </div>
+                              <span className="shrink-0 font-semibold text-slate-900 dark:text-zinc-100">
+                                ฿{item.lineTotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                              </span>
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : null}
                     <p className="mt-4 text-sm font-extrabold text-slate-950 dark:text-zinc-50">
@@ -375,7 +392,7 @@ export default function StaffPackingPage() {
             <div className="grid gap-5 py-5 sm:grid-cols-2">
               <div className="border-b border-zinc-300 pb-4 sm:border-b-0 sm:border-r sm:pr-4">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-zinc-500">ผู้ส่ง</h3>
-                <p className="mt-2 font-extrabold">Manga & Collectibles Store</p>
+                <p className="mt-2 font-extrabold">ChanSasom Store</p>
                 <p className="text-sm">ฝ่ายคลังสินค้าและจัดส่ง</p>
               </div>
               <div className="pb-4">

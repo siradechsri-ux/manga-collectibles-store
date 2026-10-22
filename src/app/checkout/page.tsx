@@ -47,6 +47,9 @@ import {
   calculateEarnedPoints,
   getUserPoints,
   subscribeUserPoints,
+  POINTS_TO_BAHT_RATE,
+  calculatePointsDiscount,
+  redeemPointsForDiscount,
 } from "../../services/points.service";
 import PointBadge from "../../components/PointBadge";
 import {
@@ -338,14 +341,35 @@ export default function CheckoutPage() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userPoints, setUserPoints] = useState<number>(() => getUserPoints());
+  const [redeemedPoints, setRedeemedPoints] = useState<number>(0);
 
   useEffect(() => {
     return subscribeUserPoints((p) => setUserPoints(p));
   }, []);
 
+  // Max points redeemable: cannot exceed userPoints or the payable bill in points
+  const maxRedeemablePoints = useMemo(() => {
+    const maxPointsForBill = Math.floor(discountedImmediateTotal * POINTS_TO_BAHT_RATE);
+    return Math.max(0, Math.min(userPoints, maxPointsForBill));
+  }, [userPoints, discountedImmediateTotal]);
+
+  useEffect(() => {
+    if (redeemedPoints > maxRedeemablePoints) {
+      setRedeemedPoints(maxRedeemablePoints);
+    }
+  }, [maxRedeemablePoints, redeemedPoints]);
+
+  const pointsDiscountBaht = useMemo(() => {
+    return calculatePointsDiscount(redeemedPoints);
+  }, [redeemedPoints]);
+
+  const finalImmediateTotal = useMemo(() => {
+    return Math.max(0, Number((discountedImmediateTotal - pointsDiscountBaht).toFixed(2)));
+  }, [discountedImmediateTotal, pointsDiscountBaht]);
+
   const pointsReward = useMemo(
-    () => calculateEarnedPoints(discountedImmediateTotal, userPoints),
-    [discountedImmediateTotal, userPoints],
+    () => calculateEarnedPoints(finalImmediateTotal, Math.max(0, userPoints - redeemedPoints)),
+    [finalImmediateTotal, userPoints, redeemedPoints],
   );
 
   const isStaffAccount =
@@ -588,6 +612,7 @@ export default function CheckoutPage() {
       shippingPolicy: shipmentPolicy,
       shippingAddress: parsedAddress.data,
       promoCode: appliedPromoCode || undefined,
+      redeemedPoints: redeemedPoints > 0 ? redeemedPoints : undefined,
       ...(useMockMode
         ? { catalogSnapshot: getCheckoutInventorySnapshot() }
         : {}),
@@ -627,6 +652,9 @@ export default function CheckoutPage() {
       }
 
       const order = parsedResponse.data.data;
+      if (redeemedPoints > 0) {
+        redeemPointsForDiscount(redeemedPoints, order.orderNumber);
+      }
       if (useMockMode) {
         saveMockOrder(order, user?.id);
       }
@@ -1194,6 +1222,173 @@ export default function CheckoutPage() {
                     ) : null}
                   </div>
 
+                  {/* Points Redemption Box */}
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
+                    {/* Header */}
+                    <div className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-3 dark:border-zinc-800">
+                      <div className="flex items-center gap-2.5">
+                        <PointBadge size="md" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-zinc-950 dark:text-zinc-100">
+                              ใช้แต้มสะสมแลกส่วนลด
+                            </span>
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-950/70 dark:text-blue-300">
+                              10 แต้ม = ฿1
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                            คุณมีแต้มสะสมทั้งหมด{" "}
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                              {userPoints.toLocaleString()} P
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {userPoints >= 10 && maxRedeemablePoints >= 10 ? (
+                        <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          ลดได้สูงสุด ฿{Math.floor(maxRedeemablePoints / 10).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="rounded-lg bg-zinc-100 px-2 py-1 text-[10px] font-bold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                          ขั้นต่ำ 10 P
+                        </span>
+                      )}
+                    </div>
+
+                    {userPoints >= 10 && maxRedeemablePoints >= 10 ? (
+                      <div className="mt-3.5 space-y-3">
+                        {/* Number Input & Max Button Row */}
+                        <div>
+                          <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">
+                            ระบุจำนวนแต้มที่ต้องการใช้ (พิมพ์ตัวเลขหรือเลื่อนแถบ):
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max={maxRedeemablePoints}
+                                step="10"
+                                value={redeemedPoints === 0 ? "" : redeemedPoints}
+                                placeholder="0"
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  if (raw === "") {
+                                    setRedeemedPoints(0);
+                                    return;
+                                  }
+                                  const num = Number(raw);
+                                  if (Number.isNaN(num)) return;
+                                  const clamped = Math.max(0, Math.min(maxRedeemablePoints, num));
+                                  setRedeemedPoints(clamped);
+                                }}
+                                className="w-full rounded-xl border border-zinc-300 bg-white py-2 pl-3 pr-10 text-sm font-black text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                              />
+                              <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                                P
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setRedeemedPoints(maxRedeemablePoints)}
+                              className={`rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-2xs ${
+                                redeemedPoints === maxRedeemablePoints
+                                  ? "bg-blue-600 text-white"
+                                  : "border border-zinc-200 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                              }`}
+                            >
+                              ใช้สูงสุด ({maxRedeemablePoints} P)
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Interactive Range Slider */}
+                        <div className="space-y-1.5 pt-1">
+                          <input
+                            type="range"
+                            min="0"
+                            max={maxRedeemablePoints}
+                            step="10"
+                            value={redeemedPoints}
+                            onChange={(e) => setRedeemedPoints(Number(e.target.value))}
+                            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-zinc-200 accent-blue-600 dark:bg-zinc-700"
+                          />
+                          <div className="flex items-center justify-between text-[10px] font-semibold text-zinc-400">
+                            <span>0 P</span>
+                            <span>{Math.floor(maxRedeemablePoints / 2)} P</span>
+                            <span>{maxRedeemablePoints} P</span>
+                          </div>
+                        </div>
+
+                        {/* Quick Preset Buttons (Non-duplicate) */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mr-1">
+                            ปุ่มลัด:
+                          </span>
+                          {[50, 100, 200, 500]
+                            .filter((pts) => pts <= maxRedeemablePoints && pts !== maxRedeemablePoints)
+                            .map((pts) => (
+                              <button
+                                key={pts}
+                                type="button"
+                                onClick={() => setRedeemedPoints(pts)}
+                                className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold transition ${
+                                  redeemedPoints === pts
+                                    ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/80 dark:text-blue-300"
+                                    : "border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300"
+                                }`}
+                              >
+                                {pts} P (-฿{Math.floor(pts / 10)})
+                              </button>
+                            ))}
+                          {redeemedPoints > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setRedeemedPoints(0)}
+                              className="ml-auto rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-500 hover:border-rose-300 hover:text-rose-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:text-rose-400"
+                            >
+                              ไม่ใช้แต้ม
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Live Discount Summary Highlight */}
+                        {redeemedPoints > 0 && (
+                          <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5 text-xs dark:border-emerald-900/60 dark:bg-emerald-950/40">
+                            <div className="flex items-center gap-2">
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white dark:bg-emerald-500">
+                                <Check size={12} strokeWidth={3} />
+                              </span>
+                              <div>
+                                <p className="font-bold text-emerald-900 dark:text-emerald-200">
+                                  รับส่วนลด ฿{pointsDiscountBaht.toLocaleString("th-TH")}
+                                </p>
+                                <p className="text-[10px] text-emerald-700 dark:text-emerald-300/80">
+                                  ใช้ {redeemedPoints} แต้ม • แต้มคงเหลือหลังสั่งซื้อ{" "}
+                                  <span className="font-bold">
+                                    {(userPoints - redeemedPoints).toLocaleString()} P
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-base font-black text-emerald-700 dark:text-emerald-400">
+                              -฿{pointsDiscountBaht.toLocaleString("th-TH")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="mt-2.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {userPoints < 10
+                          ? "คุณยังไม่มีแต้มสะสมเพียงพอสำหรับการแลกส่วนลด (ต้องการอย่างน้อย 10 P)"
+                          : "ยอดสั่งซื้อไม่สามารถใช้แต้มแลกส่วนลดเพิ่มเติมได้"}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="flex justify-between text-sm text-zinc-600 dark:text-zinc-400">
                     <span>ยอดสินค้าที่ชำระวันนี้</span>
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">{money(subtotal)}</span>
@@ -1215,6 +1410,15 @@ export default function CheckoutPage() {
                       <span className="font-bold">-{money(promoDiscount)}</span>
                     </div>
                   ) : null}
+                  {pointsDiscountBaht > 0 ? (
+                    <div className="flex justify-between text-xs text-blue-700 dark:text-blue-400">
+                      <span className="flex items-center gap-1 font-medium">
+                        <PointBadge size="xs" />
+                        ส่วนลดจากแต้มสะสม ({redeemedPoints} P)
+                      </span>
+                      <span className="font-bold">-{money(pointsDiscountBaht)}</span>
+                    </div>
+                  ) : null}
                   <div className="flex justify-between text-sm text-zinc-600 dark:text-zinc-400">
                     <span>ค่าจัดส่ง</span>
                     <span className={`text-xs font-semibold ${isFreeShipping || appliedPromoCode === "FREESHIP" ? "text-emerald-700 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-400"}`}>
@@ -1227,13 +1431,13 @@ export default function CheckoutPage() {
                         ยอดชำระทันที*
                       </span>
                       <div className="text-right">
-                        {promoDiscount > 0 ? (
+                        {promoDiscount > 0 || pointsDiscountBaht > 0 ? (
                           <span className="mr-2 text-xs text-zinc-400 line-through">
                             {money(subtotal)}
                           </span>
                         ) : null}
                         <span className="text-lg font-bold text-orange-700 dark:text-amber-400">
-                          {money(discountedImmediateTotal)}
+                          {money(finalImmediateTotal)}
                         </span>
                       </div>
                     </div>

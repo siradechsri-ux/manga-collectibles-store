@@ -108,6 +108,7 @@ const checkoutInputSchema = z
     taxInvoiceRequest: taxInvoiceRequestSchema.optional(),
     catalogSnapshot: catalogSnapshotSchema.optional(),
     promoCode: z.string().trim().optional(),
+    redeemedPoints: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -418,13 +419,17 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
   }
 
   const shippingFeeCents = finalShippingFeeCents;
+  let pointsDiscountCents = 0;
+  if (parsed.data.redeemedPoints && parsed.data.redeemedPoints > 0) {
+    pointsDiscountCents = Math.floor(parsed.data.redeemedPoints / 10) * 100;
+  }
   const immediateAmountCents = Math.max(
     0,
-    immediateMerchandiseCents + shippingFeeCents - promoDiscountCents,
+    immediateMerchandiseCents + shippingFeeCents - promoDiscountCents - pointsDiscountCents,
   );
   const totalAmountCents = Math.max(
     0,
-    fullMerchandiseCents + shippingFeeCents - promoDiscountCents,
+    fullMerchandiseCents + shippingFeeCents - promoDiscountCents - pointsDiscountCents,
   );
   const taxGrossCents = figureTaxableGrossCents + shippingFeeCents;
   const vatAmountCents = Math.round((taxGrossCents * 7) / 107);

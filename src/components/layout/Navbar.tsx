@@ -1,10 +1,16 @@
 "use client";
 
+import ChanSasomLogo from "../brand/ChanSasomLogo";
+
 import {
   Award,
+  BookMarked,
+  BookOpen,
   Boxes,
   CalendarDays,
+  Check,
   ChevronDown,
+  Flame,
   Heart,
   Layers,
   LogIn,
@@ -18,6 +24,7 @@ import {
   ShoppingBag,
   Sparkles,
   Store,
+  Tag,
   TrendingUp,
   Truck,
   User,
@@ -47,103 +54,165 @@ interface SearchSuggestion {
   category: string;
 }
 
-function findProductSuggestions(catalog: CatalogData, query: string): SearchSuggestion[] {
+export type SearchCategoryFilter = "ALL" | "MANGA" | "NOVEL" | "FIGURE" | "GOODS";
+
+export const SEARCH_CATEGORY_LABELS: Record<SearchCategoryFilter, string> = {
+  ALL: "ทั้งหมด",
+  MANGA: "มังงะ",
+  NOVEL: "ไลท์โนเวล",
+  FIGURE: "ฟิกเกอร์",
+  GOODS: "ของสะสม",
+};
+
+const POPULAR_KEYWORDS = [
+  "วันพีซ",
+  "Frieren",
+  "Jujutsu Kaisen",
+  "Spy x Family",
+  "Blue Lock",
+  "Nendoroid",
+  "กันพลา HG",
+  "Flash Sale",
+  "มีของแถม",
+];
+
+const RECENT_SEARCHES_KEY = "mock_recent_searches";
+
+function getRecentSearches(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    return raw ? JSON.parse(raw) : ["Frieren", "วันพีซ", "Nendoroid"];
+  } catch {
+    return ["Frieren", "วันพีซ", "Nendoroid"];
+  }
+}
+
+function addRecentSearch(term: string): void {
+  if (typeof window === "undefined" || !term.trim()) return;
+  try {
+    const current = getRecentSearches();
+    const updated = [term.trim(), ...current.filter((t) => t.toLowerCase() !== term.trim().toLowerCase())].slice(0, 6);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+  } catch {
+    // Ignore
+  }
+}
+
+function clearRecentSearches(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  } catch {
+    // Ignore
+  }
+}
+
+function findProductSuggestions(
+  catalog: CatalogData,
+  query: string,
+  categoryFilter: SearchCategoryFilter = "ALL",
+): SearchSuggestion[] {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   if (!normalizedQuery) return [];
 
   const candidates: Array<{ suggestion: SearchSuggestion; searchable: string }> = [];
 
-  for (const series of catalog.mangaSeries) {
-    candidates.push({
-      suggestion: {
-        title: series.title,
-        detail: `${series.publisher} · ${series.volumes.length} เล่ม`,
-        image:
-          series.coverUrl ||
-          series.coverImage ||
-          series.images?.[0] ||
-          series.volumes[0]?.coverUrl ||
-          series.volumes[0]?.images?.[0] ||
-          null,
-        href: `/manga/${encodeURIComponent(series.id)}`,
-        category: "มังงะ",
-      },
-      searchable: [
-        series.title,
-        series.publisher,
-        series.author ?? "",
-        ...(series.altTitles ?? []),
-        ...series.volumes.flatMap((volume) => [
-          volume.title,
-          volume.variantLabel ?? "",
-          volume.isbn ?? "",
-        ]),
-      ].join(" ").toLocaleLowerCase(),
-    });
+  if (categoryFilter === "ALL" || categoryFilter === "MANGA") {
+    for (const series of catalog.mangaSeries) {
+      candidates.push({
+        suggestion: {
+          title: series.title,
+          detail: `${series.publisher} · ${series.volumes.length} เล่ม`,
+          image:
+            series.coverUrl ||
+            series.coverImage ||
+            series.images?.[0] ||
+            series.volumes[0]?.coverUrl ||
+            series.volumes[0]?.images?.[0] ||
+            null,
+          href: `/manga/${encodeURIComponent(series.id)}`,
+          category: "มังงะ",
+        },
+        searchable: [
+          series.title,
+          series.publisher,
+          series.author ?? "",
+          ...(series.altTitles ?? []),
+          ...series.volumes.flatMap((volume) => [
+            volume.title,
+            volume.variantLabel ?? "",
+            volume.isbn ?? "",
+          ]),
+        ].join(" ").toLocaleLowerCase(),
+      });
+    }
   }
 
-  for (const series of catalog.lightNovelSeries) {
-    candidates.push({
-      suggestion: {
-        title: series.title,
-        detail: `${series.publisher} · ${series.volumes.length} เล่ม`,
-        image:
-          series.coverUrl ||
-          series.coverImage ||
-          series.images?.[0] ||
-          series.volumes[0]?.coverUrl ||
-          series.volumes[0]?.images?.[0] ||
-          null,
-        href: `/manga/${encodeURIComponent(series.id)}`,
-        category: "ไลท์โนเวล",
-      },
-      searchable: [
-        series.title,
-        series.publisher,
-        series.author ?? "",
-        ...(series.altTitles ?? []),
-        ...series.volumes.flatMap((volume) => [
-          volume.title,
-          volume.variantLabel ?? "",
-          volume.isbn ?? "",
-        ]),
-      ].join(" ").toLocaleLowerCase(),
-    });
+  if (categoryFilter === "ALL" || categoryFilter === "NOVEL") {
+    for (const series of catalog.lightNovelSeries) {
+      candidates.push({
+        suggestion: {
+          title: series.title,
+          detail: `${series.publisher} · ${series.volumes.length} เล่ม`,
+          image:
+            series.coverUrl ||
+            series.coverImage ||
+            series.images?.[0] ||
+            series.volumes[0]?.coverUrl ||
+            series.volumes[0]?.images?.[0] ||
+            null,
+          href: `/manga/${encodeURIComponent(series.id)}`,
+          category: "ไลท์โนเวล",
+        },
+        searchable: [
+          series.title,
+          series.publisher,
+          series.author ?? "",
+          ...(series.altTitles ?? []),
+          ...series.volumes.flatMap((volume) => [
+            volume.title,
+            volume.variantLabel ?? "",
+            volume.isbn ?? "",
+          ]),
+        ].join(" ").toLocaleLowerCase(),
+      });
+    }
   }
 
-  const collectibles = [
-    ...catalog.figures,
-    ...catalog.plamo,
-    ...catalog.goods,
-    ...catalog.accessories,
-  ];
-  for (const item of collectibles) {
-    candidates.push({
-      suggestion: {
-        title: item.name,
-        detail: item.series || item.manufacturer,
-        image: item.coverImage || item.coverUrl || item.images[0] || null,
-        href: `/figures/${encodeURIComponent(item.slug)}`,
-        category:
-          item.category === "PLAMO"
-            ? "พลาสติกโมเดล"
-            : item.category === "GOODS"
-              ? "กู้ดส์"
-              : item.category === "ACCESSORY"
-                ? "อุปกรณ์ดูแล"
-                : "ฟิกเกอร์",
-      },
-      searchable: [
-        item.name,
-        item.series,
-        item.character,
-        item.manufacturer,
-        item.janCode,
-        item.grade ?? "",
-        item.subcategory ?? "",
-        ...(item.altTitles ?? []),
-      ].join(" ").toLocaleLowerCase(),
-    });
+  if (categoryFilter === "ALL" || categoryFilter === "FIGURE" || categoryFilter === "GOODS") {
+    const collectibles = [
+      ...(categoryFilter === "ALL" || categoryFilter === "FIGURE" ? [...catalog.figures, ...catalog.plamo] : []),
+      ...(categoryFilter === "ALL" || categoryFilter === "GOODS" ? [...catalog.goods, ...catalog.accessories] : []),
+    ];
+    for (const item of collectibles) {
+      candidates.push({
+        suggestion: {
+          title: item.name,
+          detail: item.series || item.manufacturer,
+          image: item.coverImage || item.coverUrl || item.images[0] || null,
+          href: `/figures/${encodeURIComponent(item.slug)}`,
+          category:
+            item.category === "PLAMO"
+              ? "พลาสติกโมเดล"
+              : item.category === "GOODS"
+                ? "กู้ดส์"
+                : item.category === "ACCESSORY"
+                  ? "อุปกรณ์ดูแล"
+                  : "ฟิกเกอร์",
+        },
+        searchable: [
+          item.name,
+          item.series,
+          item.character,
+          item.manufacturer,
+          item.janCode,
+          item.grade ?? "",
+          item.subcategory ?? "",
+          ...(item.altTitles ?? []),
+        ].join(" ").toLocaleLowerCase(),
+      });
+    }
   }
 
   return candidates
@@ -165,6 +234,9 @@ function SearchSuggestionList({
   activeIndex,
   open,
   onSelect,
+  recentSearches,
+  onSelectKeyword,
+  onClearRecentSearches,
 }: {
   id: string;
   query: string;
@@ -173,42 +245,137 @@ function SearchSuggestionList({
   activeIndex: number;
   open: boolean;
   onSelect: (suggestion: SearchSuggestion) => void;
+  recentSearches: string[];
+  onSelectKeyword: (keyword: string) => void;
+  onClearRecentSearches: () => void;
 }) {
-  if (!open || query.trim().length < 2) return null;
+  if (!open) return null;
 
+  // When query is empty or less than 2 chars -> show Bookwalker Discovery Overlay (Popular & Recent searches)
+  if (query.trim().length < 2) {
+    return (
+      <div
+        id={id}
+        className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        {/* Recent Searches Section */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-xs font-bold text-zinc-500 dark:text-zinc-400">
+            <span>ค้นหาล่าสุด</span>
+            {recentSearches.length > 0 && (
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onClearRecentSearches();
+                }}
+                className="text-[11px] font-semibold text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400"
+              >
+                ล้างทั้งหมด
+              </button>
+            )}
+          </div>
+          {recentSearches.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {recentSearches.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onSelectKeyword(item);
+                  }}
+                  className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-700 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-orange-800 dark:hover:bg-zinc-800/80 dark:hover:text-orange-400"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-1.5 text-xs text-zinc-400 dark:text-zinc-500">ไม่มีประวัติการค้นหาล่าสุด</p>
+          )}
+        </div>
+
+        {/* Popular Keywords Section (Bookwalker Style) */}
+        <div className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+          <div className="text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2">
+            คีย์เวิร์ดยอดนิยม
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {POPULAR_KEYWORDS.map((kw) => (
+              <button
+                key={kw}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onSelectKeyword(kw);
+                }}
+                className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-700 shadow-2xs transition hover:border-orange-400 hover:bg-orange-50 hover:text-orange-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-orange-700 dark:hover:text-orange-300"
+              >
+                <Tag size={11} className="text-orange-500" />
+                <span>{kw}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // When query has >= 2 characters -> show live product suggestions
   return (
-    <div id={id} className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
+    <div
+      id={id}
+      className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-zinc-200 bg-white py-1 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
+    >
       {loading ? (
         <p className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">กำลังค้นหาสินค้า...</p>
       ) : suggestions.length > 0 ? (
-        <ul role="listbox" aria-label="ผลการค้นหาสินค้า" className="max-h-96 overflow-y-auto">
+        <ul role="listbox" aria-label="ผลการค้นหาสินค้า" className="max-h-96 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
           {suggestions.map((suggestion, index) => (
-            <li id={`${id}-option-${index}`} key={`${suggestion.href}-${suggestion.title}`} role="option" aria-selected={activeIndex === index}>
+            <li
+              id={`${id}-option-${index}`}
+              key={`${suggestion.href}-${suggestion.title}`}
+              role="option"
+              aria-selected={activeIndex === index}
+            >
               <Link
                 href={suggestion.href}
                 onClick={() => onSelect(suggestion)}
-                className={`flex items-center gap-3 px-3 py-2.5 transition ${
+                className={`flex items-center gap-3 px-3.5 py-2.5 transition ${
                   activeIndex === index
                     ? "bg-orange-50 dark:bg-zinc-800"
                     : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 }`}
               >
                 {suggestion.image ? (
-                  <img src={suggestion.image} alt="" className="h-11 w-9 shrink-0 rounded-md border border-zinc-200 object-cover dark:border-zinc-700" />
+                  <img
+                    src={suggestion.image}
+                    alt=""
+                    className="h-12 w-9 shrink-0 rounded-md border border-zinc-200 object-cover dark:border-zinc-700"
+                  />
                 ) : (
-                  <span className="h-11 w-9 shrink-0 rounded-md bg-zinc-100 dark:bg-zinc-800" />
+                  <span className="h-12 w-9 shrink-0 rounded-md bg-zinc-100 dark:bg-zinc-800" />
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold text-zinc-900 dark:text-zinc-100">{suggestion.title}</span>
-                  <span className="mt-0.5 block truncate text-xs text-zinc-500 dark:text-zinc-400">{suggestion.detail}</span>
+                  <span className="block truncate text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                    {suggestion.title}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {suggestion.detail}
+                  </span>
                 </span>
-                <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-1 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{suggestion.category}</span>
+                <span className="shrink-0 rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  {suggestion.category}
+                </span>
               </Link>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">ไม่พบสินค้าที่ตรงกับ “{query.trim()}”</p>
+        <p className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">
+          ไม่พบสินค้าที่ตรงกับ “{query.trim()}”
+        </p>
       )}
     </div>
   );
@@ -260,13 +427,19 @@ export default function Navbar() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchCategory, setSearchCategory] = useState<SearchCategoryFilter>("ALL");
   const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [searchCategoryMenuOpen, setSearchCategoryMenuOpen] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const adminDropdownRef = useRef<HTMLDivElement>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+  const searchCategoryMenuRef = useRef<HTMLDivElement>(null);
   const searchCatalogRef = useRef<CatalogData | null>(null);
   const searchCatalogRequestRef = useRef<Promise<CatalogData> | null>(null);
 
@@ -274,6 +447,7 @@ export default function Navbar() {
   useEffect(() => {
     setMounted(true);
     setUserPoints(getUserPoints());
+    setRecentSearches(getRecentSearches());
     const unsubscribe = subscribeUserPoints((points) => {
       setUserPoints(points);
     });
@@ -313,7 +487,7 @@ export default function Navbar() {
             searchCatalogRef.current = catalog;
           }
           if (isCurrent) {
-            setSearchSuggestions(findProductSuggestions(catalog, query));
+            setSearchSuggestions(findProductSuggestions(catalog, query, searchCategory));
           }
         } catch {
           if (isCurrent) setSearchSuggestions([]);
@@ -328,23 +502,23 @@ export default function Navbar() {
       isCurrent = false;
       clearTimeout(timeout);
     };
-  }, [searchFocused, searchQuery]);
+  }, [searchFocused, searchQuery, searchCategory]);
 
   // Handle clicking outside of dropdown menus
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(target)
-      ) {
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
         setUserMenuOpen(false);
       }
-      if (
-        adminDropdownRef.current &&
-        !adminDropdownRef.current.contains(target)
-      ) {
+      if (adminDropdownRef.current && !adminDropdownRef.current.contains(target)) {
         setAdminDropdownOpen(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(target)) {
+        setCategoryDropdownOpen(false);
+      }
+      if (searchCategoryMenuRef.current && !searchCategoryMenuRef.current.contains(target)) {
+        setSearchCategoryMenuOpen(false);
       }
     }
 
@@ -352,7 +526,10 @@ export default function Navbar() {
       if (event.key === "Escape") {
         setUserMenuOpen(false);
         setAdminDropdownOpen(false);
+        setCategoryDropdownOpen(false);
+        setSearchCategoryMenuOpen(false);
         setMobileMenuOpen(false);
+        setSearchFocused(false);
       }
     }
 
@@ -366,10 +543,34 @@ export default function Navbar() {
 
   function handleSearchSubmit(e: FormEvent) {
     e.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
+    addRecentSearch(query);
+    setRecentSearches(getRecentSearches());
     const suggestion = searchSuggestions[activeSuggestionIndex] ?? searchSuggestions[0];
-    if (suggestion) router.push(suggestion.href);
+    if (suggestion) {
+      router.push(suggestion.href);
+    } else {
+      router.push(`/collections/manga?q=${encodeURIComponent(query)}`);
+    }
     setSearchFocused(false);
     setMobileMenuOpen(false);
+    setMobileSearchOpen(false);
+  }
+
+  function handleSelectKeyword(keyword: string): void {
+    addRecentSearch(keyword);
+    setRecentSearches(getRecentSearches());
+    setSearchQuery(keyword);
+    setSearchFocused(false);
+    setMobileMenuOpen(false);
+    setMobileSearchOpen(false);
+    router.push(`/collections/manga?q=${encodeURIComponent(keyword)}`);
+  }
+
+  function handleClearRecentSearches(): void {
+    clearRecentSearches();
+    setRecentSearches([]);
   }
 
   function handleSearchSuggestionKeyDown(event: ReactKeyboardEvent<HTMLInputElement>): void {
@@ -389,6 +590,8 @@ export default function Navbar() {
   }
 
   function selectSearchSuggestion(suggestion: SearchSuggestion): void {
+    addRecentSearch(suggestion.title);
+    setRecentSearches(getRecentSearches());
     setSearchQuery(suggestion.title);
     setSearchFocused(false);
     setMobileSearchOpen(false);
@@ -424,259 +627,16 @@ export default function Navbar() {
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-white/95 text-zinc-900 backdrop-blur-md transition-colors dark:border-zinc-800 dark:bg-zinc-950/95 dark:text-zinc-100">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* ===================== [1. ฝั่งซ้าย - flex items-center shrink-0]: โลโก้ร้าน + เมนูลิงก์ ===================== */}
-          <div className="flex shrink-0 items-center gap-4 lg:gap-6">
-            <Link
-              href="/"
-              className="group inline-flex shrink-0 items-center gap-2.5 transition"
-              aria-label="Manga & Collectibles Storefront Home"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white shadow-xs transition group-hover:bg-orange-700">
-                <Store aria-hidden="true" size={19} />
-              </span>
-              <span className="shrink-0">
-                <span className="block truncate text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">
-                  MANGA & COLLECTIBLES
-                </span>
-                <span className="hidden text-[10px] font-medium text-zinc-500 dark:text-zinc-400 sm:block">
-                  อ่านสนุก สะสมได้ ส่งถึงบ้าน
-                </span>
-              </span>
-            </Link>
-
-            {/* Menu Links by Role (gap-3 to gap-4, whitespace-nowrap) */}
-            <nav
-              aria-label="เมนูหลัก"
-              className="hidden items-center gap-3 lg:flex xl:gap-4"
-            >
-              {isCustomer && (
-                <>
-                  <Link
-                    href="/calendar"
-                    className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                      pathname === "/calendar"
-                        ? "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
-                        : "text-zinc-700 hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-orange-400"
-                    }`}
-                  >
-                    <CalendarDays size={14} aria-hidden="true" />
-                    <span>ตารางออกใหม่</span>
-                  </Link>
-                  <Link
-                    href="/kuji"
-                    className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                      pathname === "/kuji"
-                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
-                        : "text-zinc-700 hover:bg-zinc-100 hover:text-amber-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-amber-400"
-                    }`}
-                  >
-                    <Sparkles size={14} aria-hidden="true" />
-                    <span>จับฉลาก Kuji</span>
-                  </Link>
-                </>
-              )}
-
-              {isStaff && (
-                <>
-                  <Link
-                    href="/staff/packing"
-                    className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                      pathname === "/staff/packing" || pathname.startsWith("/staff/packing/")
-                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
-                        : "text-zinc-700 hover:bg-zinc-100 hover:text-indigo-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-indigo-400"
-                    }`}
-                  >
-                    <Truck size={14} aria-hidden="true" />
-                    <span>จัดเตรียมพัสดุ (Packing)</span>
-                  </Link>
-                  <Link
-                    href="/admin/products"
-                    className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                      pathname === "/admin/products" || pathname.startsWith("/admin/products/")
-                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
-                        : "text-zinc-700 hover:bg-zinc-100 hover:text-indigo-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-indigo-400"
-                    }`}
-                  >
-                    <Boxes size={14} aria-hidden="true" />
-                    <span>ตรวจเช็กสต็อกสินค้า</span>
-                  </Link>
-                </>
-              )}
-
-              {isFinance && (
-                <>
-                  <Link
-                    href="/finance/slips"
-                    className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                      pathname === "/finance/slips" || pathname.startsWith("/finance/slips/")
-                        ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300"
-                        : "text-zinc-700 hover:bg-zinc-100 hover:text-emerald-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-emerald-400"
-                    }`}
-                  >
-                    <Receipt size={14} aria-hidden="true" />
-                    <span>ตรวจสอบสลิปโอนเงิน (Slips)</span>
-                  </Link>
-                  <Link
-                    href="/finance/tax"
-                    className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                      pathname === "/finance/tax" || pathname.startsWith("/finance/tax/")
-                        ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300"
-                        : "text-zinc-700 hover:bg-zinc-100 hover:text-emerald-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-emerald-400"
-                    }`}
-                  >
-                    <TrendingUp size={14} aria-hidden="true" />
-                    <span>รายงานภาษี & e-Tax</span>
-                  </Link>
-                </>
-              )}
-
-              {isAdmin && (
-                <>
-                  <Link
-                    href="/admin"
-                    className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                      pathname === "/admin"
-                        ? "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
-                        : "text-zinc-700 hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-orange-400"
-                    }`}
-                  >
-                    <Store size={14} aria-hidden="true" />
-                    <span>แดชบอร์ดส่วนกลาง</span>
-                  </Link>
-
-                  <div className="relative shrink-0" ref={adminDropdownRef}>
-                    <button
-                      type="button"
-                      onClick={() => setAdminDropdownOpen((prev) => !prev)}
-                      aria-expanded={adminDropdownOpen}
-                      aria-haspopup="menu"
-                      className={`inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
-                        pathname.startsWith("/admin/products") ||
-                        pathname.startsWith("/staff/packing") ||
-                        pathname.startsWith("/finance/slips") ||
-                        pathname.startsWith("/finance/tax")
-                          ? "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
-                          : "text-zinc-700 hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-orange-400"
-                      }`}
-                    >
-                      <Layers size={14} aria-hidden="true" />
-                      <span>ระบบงานหลังบ้าน</span>
-                      <ChevronDown
-                        size={13}
-                        aria-hidden="true"
-                        className={`transition-transform duration-200 ${adminDropdownOpen ? "rotate-180" : ""}`}
-                      />
-                    </button>
-
-                    {adminDropdownOpen ? (
-                      <div
-                        role="menu"
-                        aria-label="ระบบงานหลังบ้าน"
-                        className="absolute left-0 top-[calc(100%+0.5rem)] z-50 w-56 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-xl shadow-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-900"
-                      >
-                        <Link
-                          href="/admin/products"
-                          role="menuitem"
-                          onClick={() => setAdminDropdownOpen(false)}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                            pathname.startsWith("/admin/products")
-                              ? "bg-orange-50 font-bold text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
-                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                          }`}
-                        >
-                          <Boxes size={14} className="text-orange-600 dark:text-orange-400" />
-                          <span>จัดการสินค้า (CRUD)</span>
-                        </Link>
-                        <Link
-                          href="/staff/packing"
-                          role="menuitem"
-                          onClick={() => setAdminDropdownOpen(false)}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                            pathname.startsWith("/staff/packing")
-                              ? "bg-indigo-50 font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
-                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                          }`}
-                        >
-                          <Truck size={14} className="text-indigo-600 dark:text-indigo-400" />
-                          <span>จัดเตรียมพัสดุ (Packing)</span>
-                        </Link>
-                        <Link
-                          href="/finance/slips"
-                          role="menuitem"
-                          onClick={() => setAdminDropdownOpen(false)}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                            pathname.startsWith("/finance/slips")
-                              ? "bg-emerald-50 font-bold text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300"
-                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                          }`}
-                        >
-                          <Receipt size={14} className="text-emerald-600 dark:text-emerald-400" />
-                          <span>ตรวจสอบสลิป (Slips)</span>
-                        </Link>
-                        <Link
-                          href="/finance/tax"
-                          role="menuitem"
-                          onClick={() => setAdminDropdownOpen(false)}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                            pathname.startsWith("/finance/tax")
-                              ? "bg-emerald-50 font-bold text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300"
-                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                          }`}
-                        >
-                          <TrendingUp size={14} className="text-emerald-600 dark:text-emerald-400" />
-                          <span>รายงานภาษี & e-Tax</span>
-                        </Link>
-                        <Link
-                          href="/admin/calendar"
-                          role="menuitem"
-                          onClick={() => setAdminDropdownOpen(false)}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                            pathname.startsWith("/admin/calendar")
-                              ? "bg-orange-50 font-bold text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
-                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                          }`}
-                        >
-                          <CalendarDays size={14} className="text-orange-600 dark:text-orange-400" />
-                          <span>จัดการตารางออกใหม่</span>
-                        </Link>
-                        <Link
-                          href="/admin/kuji"
-                          role="menuitem"
-                          onClick={() => setAdminDropdownOpen(false)}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                            pathname.startsWith("/admin/kuji")
-                              ? "bg-amber-50 font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
-                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                          }`}
-                        >
-                          <Sparkles size={14} className="text-amber-500" />
-                          <span>จัดการตู้จับฉลาก Kuji</span>
-                        </Link>
-                        <Link
-                          href="/admin/promotions"
-                          role="menuitem"
-                          onClick={() => setAdminDropdownOpen(false)}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                            pathname.startsWith("/admin/promotions")
-                              ? "bg-rose-50 font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
-                              : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                          }`}
-                        >
-                          <Percent size={14} className="text-rose-600 dark:text-rose-400" />
-                          <span>โปรโมชั่น & แฟลชเซลล์</span>
-                        </Link>
-                      </div>
-                    ) : null}
-                  </div>
-                </>
-              )}
-            </nav>
+        {/* ===================== [ROW 1]: Main Header (Logo, Big Search Bar, Main Actions) ===================== */}
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:gap-6 lg:px-8">
+          {/* Logo (Left) */}
+          <div className="flex shrink-0 items-center">
+            <ChanSasomLogo href="/" size="md" />
           </div>
 
-          {/* ===================== [2. ตรงกลาง - flex-1 max-w-md mx-4]: กล่องค้นหาสินค้า (CUSTOMER & ADMIN Only) ===================== */}
+          {/* Center: Large, Spacious Search Bar (Bookwalker Style) for Customer & Admin, or Role Header for Staff & Finance */}
           {(isCustomer || isAdmin) ? (
-            <div className="mx-4 hidden min-w-0 flex-1 items-center md:flex">
+            <div className="hidden min-w-0 flex-1 max-w-2xl items-center md:flex">
               <form
                 onSubmit={handleSearchSubmit}
                 className="relative w-full"
@@ -684,60 +644,139 @@ export default function Navbar() {
                 onBlur={(event) => {
                   if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
                     setSearchFocused(false);
+                    setSearchCategoryMenuOpen(false);
                   }
                 }}
               >
-                <div className="relative flex items-center w-full">
-                  <Search
-                    size={15}
-                    className="pointer-events-none absolute left-3 text-slate-400 dark:text-zinc-500"
-                    aria-hidden="true"
-                  />
+                <div className="flex h-10 w-full items-center rounded-2xl border border-zinc-300 bg-white shadow-2xs transition focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-900">
+                  {/* Category Dropdown Prefix inside Search Bar */}
+                  <div className="relative shrink-0 border-r border-zinc-200 dark:border-zinc-700" ref={searchCategoryMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchCategoryMenuOpen((prev) => {
+                          const next = !prev;
+                          if (next) setSearchFocused(false);
+                          return next;
+                        });
+                      }}
+                      className="flex h-9 items-center gap-1.5 pl-3 pr-2.5 text-xs font-bold text-zinc-700 hover:text-orange-600 dark:text-zinc-200 dark:hover:text-orange-400 transition"
+                      aria-label="เลือกหมวดหมู่ค้นหา"
+                      aria-expanded={searchCategoryMenuOpen}
+                    >
+                      <span>{SEARCH_CATEGORY_LABELS[searchCategory]}</span>
+                      <ChevronDown
+                        size={11}
+                        className={`text-zinc-400 transition-transform duration-200 ${searchCategoryMenuOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {searchCategoryMenuOpen && (
+                      <div
+                        role="menu"
+                        className="absolute left-0 top-[calc(100%+0.35rem)] z-[60] w-36 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
+                      >
+                        {(Object.keys(SEARCH_CATEGORY_LABELS) as SearchCategoryFilter[]).map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => {
+                              setSearchCategory(cat);
+                              setSearchCategoryMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition ${
+                              searchCategory === cat
+                                ? "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300 font-black"
+                                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                            }`}
+                          >
+                            <span>{SEARCH_CATEGORY_LABELS[cat]}</span>
+                            {searchCategory === cat && (
+                              <Check size={12} className="text-orange-600 dark:text-orange-400" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Search Input Field */}
                   <input
                     type="search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onFocus={() => setSearchFocused(true)}
+                    onFocus={() => {
+                      setSearchFocused(true);
+                      setSearchCategoryMenuOpen(false);
+                    }}
+                    onClick={() => setSearchCategoryMenuOpen(false)}
                     onKeyDown={handleSearchSuggestionKeyDown}
-                    placeholder="ค้นหาสินค้า ชื่อเรื่อง หรือรหัส..."
+                    placeholder="ค้นหาชื่อเรื่อง, สินค้า, ตัวละคร หรือ ISBN..."
                     aria-label="ค้นหาสินค้าในร้าน"
                     role="combobox"
                     aria-autocomplete="list"
-                    aria-expanded={searchFocused && searchQuery.trim().length >= 2}
+                    aria-expanded={searchFocused && !searchCategoryMenuOpen}
                     aria-controls="desktop-product-search-suggestions"
                     aria-activedescendant={activeSuggestionIndex >= 0 ? `desktop-product-search-suggestions-option-${activeSuggestionIndex}` : undefined}
-                    className="h-9 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-8 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                    className="h-full flex-1 bg-transparent px-3 text-xs font-medium text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-500"
                   />
+
                   {searchQuery ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setSearchQuery("");
-                      }}
+                      onClick={() => setSearchQuery("")}
                       aria-label="ล้างการค้นหา"
-                      className="absolute right-2.5 text-slate-400 hover:text-slate-600 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      className="px-2 text-zinc-400 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-200"
                     >
-                      <X size={13} />
+                      <X size={14} />
                     </button>
                   ) : null}
+
+                  {/* Search Magnifier Button */}
+                  <button
+                    type="submit"
+                    className="flex h-full items-center justify-center rounded-r-2xl px-3.5 text-zinc-500 hover:text-orange-600 dark:text-zinc-400 dark:hover:text-orange-400 transition"
+                    aria-label="ค้นหา"
+                  >
+                    <Search size={16} />
+                  </button>
                 </div>
+
                 <SearchSuggestionList
                   id="desktop-product-search-suggestions"
                   query={searchQuery}
                   suggestions={searchSuggestions}
                   loading={searchLoading}
                   activeIndex={activeSuggestionIndex}
-                  open={searchFocused}
+                  open={searchFocused && !searchCategoryMenuOpen}
                   onSelect={selectSearchSuggestion}
+                  recentSearches={recentSearches}
+                  onSelectKeyword={handleSelectKeyword}
+                  onClearRecentSearches={handleClearRecentSearches}
                 />
               </form>
+            </div>
+          ) : isStaff ? (
+            <div className="hidden min-w-0 flex-1 max-w-2xl items-center justify-center md:flex">
+              <div className="flex items-center gap-2 rounded-xl border border-indigo-200/80 bg-indigo-50/80 px-3.5 py-1.5 text-xs font-black text-indigo-900 shadow-2xs dark:border-indigo-900/60 dark:bg-indigo-950/60 dark:text-indigo-300">
+                <Truck size={15} className="text-indigo-600 dark:text-indigo-400" />
+                <span>ระบบจัดการคลังและแพ็คสินค้า (Warehouse & Logistics Workspace)</span>
+              </div>
+            </div>
+          ) : isFinance ? (
+            <div className="hidden min-w-0 flex-1 max-w-2xl items-center justify-center md:flex">
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-3.5 py-1.5 text-xs font-black text-emerald-900 shadow-2xs dark:border-emerald-900/60 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <Receipt size={15} className="text-emerald-600 dark:text-emerald-400" />
+                <span>ระบบตรวจสอบการเงินและภาษี (Finance & Slips Verification)</span>
+              </div>
             </div>
           ) : (
             <div className="flex-1" />
           )}
 
-          {/* ===================== [3. ฝั่งขวา - flex items-center shrink-0]: ตะกร้าสินค้า, สลับธีม, โปรไฟล์เดียว ===================== */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+          {/* Right Action Buttons */}
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {/* Mobile Search Button */}
             {(isCustomer || isAdmin) ? (
               <button
                 type="button"
@@ -748,7 +787,7 @@ export default function Navbar() {
                 }}
                 aria-label={mobileSearchOpen ? "ปิดการค้นหา" : "เปิดการค้นหา"}
                 aria-expanded={mobileSearchOpen}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 text-slate-700 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-orange-800 dark:hover:bg-zinc-900 dark:hover:text-orange-400 md:hidden"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900 md:hidden"
               >
                 {mobileSearchOpen ? <X size={17} aria-hidden="true" /> : <Search size={17} aria-hidden="true" />}
               </button>
@@ -762,12 +801,12 @@ export default function Navbar() {
                 className={`relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold shadow-2xs transition ${
                   pathname === "/rewards"
                     ? "border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950/70 dark:text-blue-300"
-                    : "border-slate-300 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50/50 hover:text-blue-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-blue-500 dark:hover:bg-zinc-800"
+                    : "border-zinc-200 bg-white text-zinc-800 hover:border-blue-400 hover:bg-blue-50/50 hover:text-blue-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-blue-500 dark:hover:bg-zinc-800"
                 }`}
               >
                 <PointBadge size="sm" />
-                <span className="hidden sm:inline">
-                  {mounted ? userPoints.toLocaleString("th-TH") : 0} แต้ม
+                <span className="hidden xl:inline">
+                  {mounted ? userPoints.toLocaleString("th-TH") : 0} P
                 </span>
               </Link>
             ) : null}
@@ -777,17 +816,17 @@ export default function Navbar() {
               <Link
                 href="/wishlist"
                 aria-label={`รายการที่ถูกใจ (${mounted ? wishlistCount : 0} ชิ้น)`}
-                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-red-300 hover:bg-red-50/50 hover:text-red-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-red-800 dark:hover:bg-zinc-800"
+                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2.5 text-xs font-bold text-zinc-800 shadow-2xs transition hover:border-rose-300 hover:bg-rose-50/50 hover:text-rose-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-rose-800 dark:hover:bg-zinc-800"
               >
                 <Heart
                   size={16}
-                  className={mounted && wishlistCount > 0 ? "fill-red-500 text-red-500" : ""}
+                  className={mounted && wishlistCount > 0 ? "fill-rose-500 text-rose-500" : ""}
                   aria-hidden="true"
                 />
-                <span className="hidden sm:inline">สิ่งที่ชอบ</span>
+                <span className="hidden xl:inline">สิ่งที่ชอบ</span>
                 {mounted && wishlistCount > 0 ? (
                   <span
-                    className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white shadow-xs"
+                    className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white shadow-xs"
                     aria-hidden="true"
                   >
                     {wishlistCount}
@@ -796,20 +835,20 @@ export default function Navbar() {
               </Link>
             ) : null}
 
-            {/* Cart Drawer Trigger Button (CUSTOMER only) */}
+            {/* Cart Button (CUSTOMER only) */}
             {isCustomer ? (
               <button
                 id="navbar-cart-button"
                 type="button"
                 onClick={() => setCartDrawerOpen(true)}
                 aria-label={`เปิดตะกร้าสินค้า (${mounted ? itemCount : 0} ชิ้น)`}
-                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-orange-300 hover:bg-orange-50/50 hover:text-orange-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-orange-800 dark:hover:bg-zinc-800"
+                className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-zinc-950 px-3 text-xs font-bold text-white shadow-xs transition hover:bg-orange-600 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-orange-500 dark:hover:text-white"
               >
-                <ShoppingBag size={16} aria-hidden="true" />
+                <ShoppingBag size={15} aria-hidden="true" />
                 <span className="hidden sm:inline">ตะกร้า</span>
                 {mounted && itemCount > 0 ? (
                   <span
-                    className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-black text-white shadow-xs"
+                    className="flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-600 px-1 text-[9px] font-black text-white shadow-xs dark:bg-orange-500"
                     aria-hidden="true"
                   >
                     {itemCount}
@@ -818,12 +857,12 @@ export default function Navbar() {
               </button>
             ) : null}
 
-            {/* Theme Toggle (Light / Dark Mode) */}
+            {/* Theme Toggle */}
             <div className="shrink-0">
               <ThemeToggle />
             </div>
 
-            {/* ปุ่มโปรไฟล์เดียวทางขวาสุด (Consolidated Single Profile Button) */}
+            {/* Single Profile Button / Login */}
             {mounted && user ? (
               <div className="relative shrink-0" ref={userMenuRef}>
                 <button
@@ -832,7 +871,7 @@ export default function Navbar() {
                   aria-expanded={userMenuOpen}
                   aria-haspopup="menu"
                   aria-label={`โปรไฟล์ผู้ใช้: ${roleConfig.label}`}
-                  className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-orange-400 hover:bg-orange-50/40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-orange-800 dark:hover:bg-zinc-800"
+                  className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-2.5 text-xs font-bold text-zinc-800 shadow-2xs transition hover:border-orange-400 hover:bg-orange-50/40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-orange-800 dark:hover:bg-zinc-800"
                 >
                   <span
                     className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs font-black shadow-2xs ${roleConfig.badgeBg}`}
@@ -843,7 +882,7 @@ export default function Navbar() {
                     {roleConfig.label}
                   </span>
                   <ChevronDown
-                    size={13}
+                    size={12}
                     aria-hidden="true"
                     className={`transition-transform duration-200 ${userMenuOpen ? "rotate-180" : ""}`}
                   />
@@ -853,14 +892,14 @@ export default function Navbar() {
                   <div
                     role="menu"
                     aria-label="เมนูผู้ใช้งาน"
-                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-60 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-xl shadow-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-900"
                   >
                     {/* Header info */}
-                    <div className="border-b border-slate-100 px-3 py-2.5 dark:border-zinc-800">
-                      <p className="truncate text-xs font-black text-slate-900 dark:text-zinc-100">
+                    <div className="border-b border-zinc-100 px-3 py-2.5 dark:border-zinc-800">
+                      <p className="truncate text-xs font-black text-zinc-900 dark:text-zinc-100">
                         {user.fullName}
                       </p>
-                      <p className="truncate text-[10px] text-slate-500 dark:text-zinc-400">
+                      <p className="truncate text-[10px] text-zinc-500 dark:text-zinc-400">
                         {user.email}
                       </p>
                       <div className="mt-1.5 flex items-center gap-1.5">
@@ -879,7 +918,7 @@ export default function Navbar() {
                         href="/profile"
                         role="menuitem"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                        className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                       >
                         <User size={14} /> ข้อมูลโปรไฟล์
                       </Link>
@@ -889,14 +928,14 @@ export default function Navbar() {
                           href="/wishlist"
                           role="menuitem"
                           onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center justify-between rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          className="flex items-center justify-between rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         >
                           <span className="flex items-center gap-2">
-                            <Heart size={14} className="text-red-500" />
+                            <Heart size={14} className="text-rose-500" />
                             <span>สิ่งที่ชอบ (Wishlist)</span>
                           </span>
                           {wishlistCount > 0 ? (
-                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
                               {wishlistCount}
                             </span>
                           ) : null}
@@ -908,7 +947,7 @@ export default function Navbar() {
                           href="/rewards"
                           role="menuitem"
                           onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center justify-between rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          className="flex items-center justify-between rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         >
                           <span className="flex items-center gap-2">
                             <PointBadge size="xs" />
@@ -925,7 +964,7 @@ export default function Navbar() {
                           href="/calendar"
                           role="menuitem"
                           onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         >
                           <CalendarDays size={14} className="text-orange-600 dark:text-orange-400" />
                           <span>ตารางออกใหม่ประจำเดือน</span>
@@ -937,7 +976,7 @@ export default function Navbar() {
                           href="/kuji"
                           role="menuitem"
                           onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         >
                           <Sparkles size={14} className="text-amber-600 dark:text-amber-400" />
                           <span>จับฉลาก Kuji (ลุ้นรางวัล)</span>
@@ -949,7 +988,7 @@ export default function Navbar() {
                           href="/orders"
                           role="menuitem"
                           onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                         >
                           <Package size={14} /> คำสั่งซื้อของฉัน
                         </Link>
@@ -969,7 +1008,7 @@ export default function Navbar() {
                             href="/admin/products"
                             role="menuitem"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                           >
                             <Boxes size={14} /> ตรวจเช็กสต็อกสินค้า
                           </Link>
@@ -985,7 +1024,7 @@ export default function Navbar() {
                             className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
                               pathname === "/finance/slips"
                                 ? "bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/70 dark:text-emerald-300"
-                                : "text-slate-700 hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                             }`}
                           >
                             <Receipt size={14} /> ตรวจสอบสลิปโอนเงิน (Slips)
@@ -997,7 +1036,7 @@ export default function Navbar() {
                             className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
                               pathname === "/finance/tax"
                                 ? "bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/70 dark:text-emerald-300"
-                                : "text-slate-700 hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                             }`}
                           >
                             <TrendingUp size={14} /> รายงานภาษี & e-Tax
@@ -1019,15 +1058,15 @@ export default function Navbar() {
                             href="/admin/products"
                             role="menuitem"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                           >
-                            <Layers size={14} /> จัดการสินค้า (CRUD)
+                            <Boxes size={14} /> จัดการสินค้า (CRUD)
                           </Link>
                           <Link
                             href="/staff/packing"
                             role="menuitem"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                           >
                             <Truck size={14} /> จัดเตรียมพัสดุ
                           </Link>
@@ -1035,7 +1074,7 @@ export default function Navbar() {
                             href="/finance/slips"
                             role="menuitem"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                           >
                             <Receipt size={14} /> ตรวจสลิป
                           </Link>
@@ -1043,14 +1082,22 @@ export default function Navbar() {
                             href="/finance/tax"
                             role="menuitem"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
                           >
                             <TrendingUp size={14} /> รายงานภาษี & e-Tax
+                          </Link>
+                          <Link
+                            href="/admin/promotions"
+                            role="menuitem"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                          >
+                            <Percent size={14} /> โปรโมชั่น & แฟลชเซลล์
                           </Link>
                         </>
                       )}
 
-                      <div className="my-1 border-t border-slate-100 dark:border-zinc-800" />
+                      <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
 
                       <button
                         type="button"
@@ -1067,7 +1114,7 @@ export default function Navbar() {
             ) : mounted && !isLoading ? (
               <Link
                 href="/login"
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-slate-900 px-3 text-xs font-bold text-white transition hover:bg-orange-600 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-orange-500 dark:hover:text-white"
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-zinc-950 px-3 text-xs font-bold text-white transition hover:bg-orange-600 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-orange-500 dark:hover:text-white"
               >
                 <LogIn size={14} aria-hidden="true" />
                 <span>เข้าสู่ระบบ</span>
@@ -1079,10 +1126,500 @@ export default function Navbar() {
               type="button"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
               aria-label={mobileMenuOpen ? "ปิดเมนู" : "เปิดเมนูนำทาง"}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900 lg:hidden"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900 lg:hidden"
             >
               {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
+          </div>
+        </div>
+
+        {/* ===================== [ROW 2]: Role-Based Sub-Navigation Bar ===================== */}
+        <div className="relative border-t border-zinc-200/70 bg-zinc-50/80 dark:border-zinc-800/70 dark:bg-zinc-900/40">
+          <div className="relative mx-auto flex min-h-10 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+            {/* 1. CUSTOMER: Full Store Discovery Links & Activity Features */}
+            {isCustomer && (
+              <nav className="flex flex-1 items-center justify-between gap-2 py-1 text-xs font-bold text-zinc-700 dark:text-zinc-300 overflow-x-auto scrollbar-none">
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Manga */}
+                  <Link
+                    href="/collections/manga"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/collections/manga"
+                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                    }`}
+                  >
+                    <BookOpen size={13} className="text-orange-600 dark:text-orange-400" />
+                    <span>มังงะ</span>
+                  </Link>
+
+                  {/* Light Novel */}
+                  <Link
+                    href="/collections/light-novel"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/collections/light-novel"
+                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                    }`}
+                  >
+                    <BookMarked size={13} className="text-sky-600 dark:text-sky-400" />
+                    <span>ไลท์โนเวล</span>
+                  </Link>
+
+                  {/* Figures */}
+                  <Link
+                    href="/collections/figures"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/collections/figures"
+                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                    }`}
+                  >
+                    <Boxes size={13} className="text-blue-600 dark:text-blue-400" />
+                    <span>ฟิกเกอร์</span>
+                  </Link>
+
+                  {/* Plamo */}
+                  <Link
+                    href="/collections/plamo"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/collections/plamo"
+                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                    }`}
+                  >
+                    <Layers size={13} className="text-indigo-600 dark:text-indigo-400" />
+                    <span>กันพลา / พลาโม</span>
+                  </Link>
+
+                  {/* Goods */}
+                  <Link
+                    href="/collections/goods"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/collections/goods"
+                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                    }`}
+                  >
+                    <Package size={13} className="text-emerald-600 dark:text-emerald-400" />
+                    <span>ของสะสม</span>
+                  </Link>
+
+                  {/* Accessories */}
+                  <Link
+                    href="/collections/accessories"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/collections/accessories"
+                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                    }`}
+                  >
+                    <Sparkles size={13} className="text-teal-600 dark:text-teal-400" />
+                    <span>อุปกรณ์ดูแล</span>
+                  </Link>
+
+                  {/* Category Mega Dropdown Menu */}
+                  <div className="relative shrink-0" ref={categoryDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setCategoryDropdownOpen((prev) => !prev)}
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                        categoryDropdownOpen
+                          ? "bg-purple-100 text-purple-900 font-black dark:bg-purple-950/80 dark:text-purple-200 shadow-2xs"
+                          : "text-zinc-700 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                      }`}
+                      aria-expanded={categoryDropdownOpen}
+                      aria-haspopup="menu"
+                    >
+                      <Layers size={13} className="text-purple-600 dark:text-purple-400" />
+                      <span>หมวดทั้งหมด</span>
+                      <ChevronDown
+                        size={11}
+                        className={`transition-transform duration-200 ${categoryDropdownOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {categoryDropdownOpen && (
+                      <div
+                        role="menu"
+                        className="absolute left-0 top-full mt-2 z-50 w-80 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 animate-in fade-in zoom-in-95 duration-100"
+                      >
+                        <div className="grid gap-2.5 text-xs">
+                          {/* Books & Manga */}
+                          <div className="border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                              หนังสือ & มังงะ (Books & Comics)
+                            </p>
+                            <div className="mt-1.5 space-y-1">
+                              <Link
+                                href="/collections/manga"
+                                onClick={() => setCategoryDropdownOpen(false)}
+                                className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-zinc-700 hover:bg-orange-50 hover:text-orange-700 dark:text-zinc-200 dark:hover:bg-orange-950/40 dark:hover:text-orange-300 font-semibold transition"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <BookOpen size={13} className="text-orange-600" />
+                                  <span>มังงะแปลไทยลิขสิทธิ์</span>
+                                </span>
+                                <span className="text-[10px] font-bold text-zinc-400">Manga</span>
+                              </Link>
+                              <Link
+                                href="/collections/light-novel"
+                                onClick={() => setCategoryDropdownOpen(false)}
+                                className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-zinc-700 hover:bg-orange-50 hover:text-orange-700 dark:text-zinc-200 dark:hover:bg-orange-950/40 dark:hover:text-orange-300 font-semibold transition"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <BookOpen size={13} className="text-amber-600" />
+                                  <span>ไลท์โนเวลแปลไทย</span>
+                                </span>
+                                <span className="text-[10px] font-bold text-zinc-400">Light Novel</span>
+                              </Link>
+                            </div>
+                          </div>
+
+                          {/* Figures & Hobby */}
+                          <div className="border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                              ฟิกเกอร์ & ของสะสม (Figures & Goods)
+                            </p>
+                            <div className="mt-1.5 space-y-1">
+                              <Link
+                                href="/collections/figures"
+                                onClick={() => setCategoryDropdownOpen(false)}
+                                className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-zinc-700 hover:bg-blue-50 hover:text-blue-700 dark:text-zinc-200 dark:hover:bg-blue-950/40 dark:hover:text-blue-300 font-semibold transition"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Boxes size={13} className="text-blue-600" />
+                                  <span>สเกลฟิกเกอร์ & Nendoroid</span>
+                                </span>
+                                <span className="text-[10px] font-bold text-zinc-400">Figures</span>
+                              </Link>
+                              <Link
+                                href="/collections/plamo"
+                                onClick={() => setCategoryDropdownOpen(false)}
+                                className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-zinc-700 hover:bg-blue-50 hover:text-blue-700 dark:text-zinc-200 dark:hover:bg-blue-950/40 dark:hover:text-blue-300 font-semibold transition"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Layers size={13} className="text-indigo-600" />
+                                  <span>กันพลา & พลาโมเดล</span>
+                                </span>
+                                <span className="text-[10px] font-bold text-zinc-400">Gunpla</span>
+                              </Link>
+                              <Link
+                                href="/collections/goods"
+                                onClick={() => setCategoryDropdownOpen(false)}
+                                className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-zinc-700 hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-200 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300 font-semibold transition"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Package size={13} className="text-emerald-600" />
+                                  <span>สแตนดี้ & พวงกุญแจกู๊ดส์</span>
+                                </span>
+                                <span className="text-[10px] font-bold text-zinc-400">Goods</span>
+                              </Link>
+                              <Link
+                                href="/collections/accessories"
+                                onClick={() => setCategoryDropdownOpen(false)}
+                                className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-zinc-700 hover:bg-emerald-50 hover:text-emerald-700 dark:text-zinc-200 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300 font-semibold transition"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Sparkles size={13} className="text-teal-600" />
+                                  <span>ซองแก้ว & อุปกรณ์ถนอมมังงะ</span>
+                                </span>
+                                <span className="text-[10px] font-bold text-zinc-400">Care</span>
+                              </Link>
+                            </div>
+                          </div>
+
+                          {/* Best Sellers shortcut */}
+                          <div>
+                            <Link
+                              href="/collections/manga?filter=best-seller"
+                              onClick={() => setCategoryDropdownOpen(false)}
+                              className="flex items-center justify-between rounded-lg bg-rose-50 px-2.5 py-2 font-bold text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/70 transition"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <Flame size={14} className="text-rose-600 dark:text-rose-400" />
+                                <span>ดูสินค้าขายดีติดอันดับทั้งหมด</span>
+                              </span>
+                              <span>→</span>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                                  </div>
+
+                {/* Right Feature Shortcuts */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="hidden h-3.5 w-px bg-zinc-300 dark:bg-zinc-700 sm:inline-block mx-0.5" />
+
+                  {/* Best Sellers */}
+                  <Link
+                    href="/collections/manga?filter=best-seller"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname.includes("filter=best-seller")
+                        ? "bg-rose-100 text-rose-800 font-black dark:bg-rose-950/70 dark:text-rose-300"
+                        : "hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+                    }`}
+                  >
+                    <Flame size={13} className="text-rose-600 dark:text-rose-400" />
+                    <span>สินค้าขายดี</span>
+                  </Link>
+
+                  {/* Release Calendar */}
+                  <Link
+                    href="/calendar"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/calendar"
+                        ? "bg-orange-100 text-orange-800 font-black dark:bg-orange-950/70 dark:text-orange-300"
+                        : "hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950/40 dark:hover:text-orange-400"
+                    }`}
+                  >
+                    <CalendarDays size={13} className="text-orange-600 dark:text-orange-400" />
+                    <span>ตารางออกใหม่</span>
+                  </Link>
+
+                  {/* Kuji Lucky Draw */}
+                  <Link
+                    href="/kuji"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/kuji"
+                        ? "bg-amber-100 text-amber-800 font-black dark:bg-amber-950/70 dark:text-amber-300"
+                        : "hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/40 dark:hover:text-amber-400"
+                    }`}
+                  >
+                    <Sparkles size={13} className="text-amber-500" />
+                    <span>จับฉลาก Kuji</span>
+                  </Link>
+
+                  {/* Rewards Points Redemption */}
+                  <Link
+                    href="/rewards"
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/rewards"
+                        ? "bg-blue-100 text-blue-800 font-black dark:bg-blue-950/70 dark:text-blue-300"
+                        : "hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/40 dark:hover:text-blue-400"
+                    }`}
+                  >
+                    <Award size={13} className="text-blue-600 dark:text-blue-400" />
+                    <span>แลกของรางวัล</span>
+                  </Link>
+                </div>
+              </nav>
+            )}
+
+            {/* 2. STAFF: Warehouse Operations Bar */}
+            {isStaff && (
+              <>
+                <nav className="flex items-center gap-1 sm:gap-2 py-1 text-xs font-bold">
+                  <Link
+                    href="/staff/packing"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 transition ${
+                      pathname.startsWith("/staff/packing")
+                        ? "bg-indigo-100 text-indigo-900 font-black dark:bg-indigo-950 dark:text-indigo-200"
+                        : "text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <Truck size={14} className="text-indigo-600 dark:text-indigo-400" />
+                    <span>จัดเตรียมพัสดุ (Packing)</span>
+                  </Link>
+                  <Link
+                    href="/admin/products"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 transition ${
+                      pathname.startsWith("/admin/products")
+                        ? "bg-indigo-100 text-indigo-900 font-black dark:bg-indigo-950 dark:text-indigo-200"
+                        : "text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <Boxes size={14} className="text-indigo-600 dark:text-indigo-400" />
+                    <span>ตรวจเช็กสต็อกสินค้า</span>
+                  </Link>
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/60 transition"
+                  >
+                    <Store size={14} />
+                    <span>ดูหน้าเว็บไซต์ร้านค้า</span>
+                  </Link>
+                </nav>
+                <div className="hidden lg:flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-black text-indigo-700 border border-indigo-200/60 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900/60">
+                  <Package size={12} />
+                  <span>เจ้าหน้าที่คลังสินค้า (Staff Workspace)</span>
+                </div>
+              </>
+            )}
+
+            {/* 3. FINANCE: Slips & Tax Reports Bar */}
+            {isFinance && (
+              <>
+                <nav className="flex items-center gap-1 sm:gap-2 py-1 text-xs font-bold">
+                  <Link
+                    href="/finance/slips"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 transition ${
+                      pathname.startsWith("/finance/slips")
+                        ? "bg-emerald-100 text-emerald-900 font-black dark:bg-emerald-950 dark:text-emerald-200"
+                        : "text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <Receipt size={14} className="text-emerald-600 dark:text-emerald-400" />
+                    <span>ตรวจสอบสลิปโอนเงิน (Slips)</span>
+                  </Link>
+                  <Link
+                    href="/finance/tax"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1 transition ${
+                      pathname.startsWith("/finance/tax")
+                        ? "bg-emerald-100 text-emerald-900 font-black dark:bg-emerald-950 dark:text-emerald-200"
+                        : "text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <TrendingUp size={14} className="text-emerald-600 dark:text-emerald-400" />
+                    <span>รายงานภาษี & e-Tax</span>
+                  </Link>
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/60 transition"
+                  >
+                    <Store size={14} />
+                    <span>ดูหน้าเว็บไซต์ร้านค้า</span>
+                  </Link>
+                </nav>
+                <div className="hidden lg:flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-black text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-900/60">
+                  <Wallet size={12} />
+                  <span>ฝ่ายการเงินและบัญชี (Finance Workspace)</span>
+                </div>
+              </>
+            )}
+
+            {/* 4. ADMIN: Central Admin Management Bar */}
+            {isAdmin && (
+              <>
+                <nav className="flex items-center gap-1 sm:gap-1.5 py-1 text-xs font-bold">
+                  <Link
+                    href="/admin"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname === "/admin"
+                        ? "bg-purple-100 text-purple-900 font-black dark:bg-purple-950 dark:text-purple-200"
+                        : "text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <Store size={13} className="text-purple-600 dark:text-purple-400" />
+                    <span>แดชบอร์ด (/admin)</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/products"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname.startsWith("/admin/products")
+                        ? "bg-purple-100 text-purple-900 font-black dark:bg-purple-950 dark:text-purple-200"
+                        : "text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <Boxes size={13} className="text-orange-600 dark:text-orange-400" />
+                    <span>จัดการสินค้า (CRUD)</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/promotions"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname.startsWith("/admin/promotions")
+                        ? "bg-rose-100 text-rose-900 font-black dark:bg-rose-950 dark:text-rose-200"
+                        : "text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <Percent size={13} className="text-rose-600 dark:text-rose-400" />
+                    <span>โปรโมชั่น & แฟลชเซลล์</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/calendar"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname.startsWith("/admin/calendar")
+                        ? "bg-orange-100 text-orange-900 font-black dark:bg-orange-950 dark:text-orange-200"
+                        : "text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <CalendarDays size={13} className="text-orange-600 dark:text-orange-400" />
+                    <span>จัดการตารางออกใหม่</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/kuji"
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                      pathname.startsWith("/admin/kuji")
+                        ? "bg-amber-100 text-amber-900 font-black dark:bg-amber-950 dark:text-amber-200"
+                        : "text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+                    }`}
+                  >
+                    <Sparkles size={13} className="text-amber-500" />
+                    <span>จัดการตู้ Kuji</span>
+                  </Link>
+
+                  {/* Admin Backoffice Operations Dropdown */}
+                  <div className="relative shrink-0" ref={adminDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setAdminDropdownOpen((prev) => !prev)}
+                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold text-zinc-700 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/60 transition"
+                      aria-expanded={adminDropdownOpen}
+                      aria-haspopup="menu"
+                    >
+                      <Layers size={13} className="text-indigo-600 dark:text-indigo-400" />
+                      <span>งานพัสดุ & บัญชี</span>
+                      <ChevronDown size={11} className={`transition-transform duration-200 ${adminDropdownOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {adminDropdownOpen && (
+                      <div
+                        role="menu"
+                        className="absolute left-0 top-full mt-2 z-50 w-56 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 animate-in fade-in zoom-in-95 duration-100"
+                      >
+                        <Link
+                          href="/staff/packing"
+                          role="menuitem"
+                          onClick={() => setAdminDropdownOpen(false)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800 transition"
+                        >
+                          <Truck size={14} className="text-indigo-600 dark:text-indigo-400" />
+                          <span>จัดเตรียมพัสดุ (Packing)</span>
+                        </Link>
+                        <Link
+                          href="/finance/slips"
+                          role="menuitem"
+                          onClick={() => setAdminDropdownOpen(false)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800 transition"
+                        >
+                          <Receipt size={14} className="text-emerald-600 dark:text-emerald-400" />
+                          <span>ตรวจสอบสลิป (Slips)</span>
+                        </Link>
+                        <Link
+                          href="/finance/tax"
+                          role="menuitem"
+                          onClick={() => setAdminDropdownOpen(false)}
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800 transition"
+                        >
+                          <TrendingUp size={14} className="text-emerald-600 dark:text-emerald-400" />
+                          <span>รายงานภาษี & e-Tax</span>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/60 transition"
+                  >
+                    <ShoppingBag size={13} />
+                    <span>ไปหน้าร้านค้า</span>
+                  </Link>
+                </nav>
+
+                <div className="hidden lg:flex items-center gap-1.5 rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-black text-purple-700 border border-purple-200/60 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-900/60">
+                  <ShieldCheck size={12} />
+                  <span>ผู้ดูแลระบบ (Admin)</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -1110,7 +1647,7 @@ export default function Navbar() {
                   aria-label="ค้นหาสินค้าในร้าน"
                   role="combobox"
                   aria-autocomplete="list"
-                  aria-expanded={searchFocused && searchQuery.trim().length >= 2}
+                  aria-expanded={searchFocused}
                   aria-controls="mobile-product-search-suggestions"
                   aria-activedescendant={activeSuggestionIndex >= 0 ? `mobile-product-search-suggestions-option-${activeSuggestionIndex}` : undefined}
                   className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-9 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
@@ -1128,7 +1665,22 @@ export default function Navbar() {
                 loading={searchLoading}
                 activeIndex={activeSuggestionIndex}
                 open={searchFocused}
-                onSelect={selectSearchSuggestion}
+                onSelect={(suggestion) => {
+                  selectSearchSuggestion(suggestion);
+                  setMobileSearchOpen(false);
+                }}
+                recentSearches={recentSearches}
+                onSelectKeyword={(kw) => {
+                  setSearchQuery(kw);
+                  addRecentSearch(kw);
+                  setRecentSearches(getRecentSearches());
+                  setMobileSearchOpen(false);
+                  router.push(`/collections/manga?search=${encodeURIComponent(kw)}`);
+                }}
+                onClearRecentSearches={() => {
+                  clearRecentSearches();
+                  setRecentSearches([]);
+                }}
               />
             </form>
           </div>
@@ -1138,6 +1690,47 @@ export default function Navbar() {
         {mobileMenuOpen ? (
           <div className="border-t border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950 lg:hidden">
             <nav className="flex flex-col gap-1 text-xs font-bold">
+              {/* Quick Category Grid for Customer */}
+              {isCustomer && (
+                <>
+                  <div className="grid grid-cols-2 gap-2 pb-2">
+                    <Link
+                      href="/collections/manga"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl bg-zinc-100 p-2.5 text-zinc-800 transition hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    >
+                      <BookOpen size={14} className="text-orange-600" />
+                      <span>มังงะ & LN</span>
+                    </Link>
+                    <Link
+                      href="/collections/figures"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl bg-zinc-100 p-2.5 text-zinc-800 transition hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    >
+                      <Boxes size={14} className="text-blue-600" />
+                      <span>ฟิกเกอร์</span>
+                    </Link>
+                    <Link
+                      href="/collections/goods"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl bg-zinc-100 p-2.5 text-zinc-800 transition hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    >
+                      <Package size={14} className="text-emerald-600" />
+                      <span>ของสะสม</span>
+                    </Link>
+                    <Link
+                      href="/#flash-sale"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl bg-orange-500/10 p-2.5 font-black text-orange-600 transition hover:bg-orange-500/20 dark:bg-orange-950/40 dark:text-orange-400"
+                    >
+                      <Percent size={14} />
+                      <span>โปรโมชัน</span>
+                    </Link>
+                  </div>
+                  <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
+                </>
+              )}
+
               {isCustomer && user ? (
                 <>
                   <Link
@@ -1159,6 +1752,14 @@ export default function Navbar() {
                     className="whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
                   >
                     ประวัติคำสั่งซื้อของฉัน
+                  </Link>
+                  <Link
+                    href="/collections/manga?filter=best-seller"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 whitespace-nowrap shrink-0 rounded-xl px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900 font-bold text-rose-700 dark:text-rose-400"
+                  >
+                    <Flame size={14} className="text-rose-600 dark:text-rose-400" />
+                    <span>สินค้าขายดี</span>
                   </Link>
                   <Link
                     href="/calendar"

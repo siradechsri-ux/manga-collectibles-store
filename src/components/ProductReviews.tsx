@@ -368,7 +368,7 @@ export default function ProductReviews({
               </p>
 
               <div className="mt-4 flex items-center justify-between border-t border-zinc-50 pt-3 text-[11px] text-zinc-500 dark:border-zinc-800/80 dark:text-zinc-400">
-                <span className="text-[10px]">ตรวจสอบแล้วโดยระบบ Manga Collectibles Store</span>
+                <span className="text-[10px]">ตรวจสอบแล้วโดยระบบ ChanSasom Store</span>
                 <button
                   type="button"
                   onClick={() => handleLike(r.id)}

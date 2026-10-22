@@ -10,6 +10,7 @@ import {
   BookOpen,
   Boxes,
   CalendarDays,
+  Flame,
   Heart,
   Layers,
   Package,
@@ -23,6 +24,11 @@ import { useWishlist } from "../contexts/WishlistContext";
 import { useCompare } from "../contexts/CompareContext";
 import BackInStockModal from "./BackInStockModal";
 import { canShop } from "../utils/permissions";
+import { getMangaGenreMeta, COLLECTIBLE_BEST_SELLER_MAP } from "../lib/manga-genres";
+import {
+  getProductEffectiveBestSellerRank,
+  BEST_SELLER_SETTINGS_CHANGED_EVENT,
+} from "../services/best-seller-settings.service";
 
 const moneyFormatter = new Intl.NumberFormat("th-TH", {
   style: "currency",
@@ -300,6 +306,33 @@ export function MangaSeriesCard({ series, type, returnTo }: MangaSeriesCardProps
       : null;
   const preorderVolume = series.volumes.find((v) => v.status === "PREORDER");
   const isWishlisted = isInWishlist(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA");
+  const [bestSellerRankInfo, setBestSellerRankInfo] = useState(() =>
+    getProductEffectiveBestSellerRank(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA"),
+  );
+
+  useEffect(() => {
+    const update = () => {
+      setBestSellerRankInfo(
+        getProductEffectiveBestSellerRank(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA"),
+      );
+    };
+    update();
+    window.addEventListener(BEST_SELLER_SETTINGS_CHANGED_EVENT, update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener(BEST_SELLER_SETTINGS_CHANGED_EVENT, update);
+      window.removeEventListener("storage", update);
+    };
+  }, [series.id, isNovel]);
+
+  const genreMeta = !isNovel ? getMangaGenreMeta(series.id) : null;
+  const isNewArrival =
+    series.id === "jujutsu-kaisen" ||
+    series.id === "frieren" ||
+    series.id === "spy-family" ||
+    series.id === "chainsaw-man" ||
+    series.id === "konosuba-novel" ||
+    series.volumes.some((v) => v.volumeNumber >= 14);
 
   return (
     <Link
@@ -357,7 +390,7 @@ export function MangaSeriesCard({ series, type, returnTo }: MangaSeriesCardProps
           </div>
           <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="rounded bg-orange-100 px-2 py-0.5 text-[10px] font-extrabold text-orange-800 dark:bg-orange-950 dark:text-orange-300">
                   {isNovel ? "LIGHT NOVEL" : "MANGA"}
                 </span>
@@ -379,11 +412,33 @@ export function MangaSeriesCard({ series, type, returnTo }: MangaSeriesCardProps
                 <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
                   VAT 0%
                 </span>
+                {genreMeta ? (
+                  <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    {genreMeta.genreLabel}
+                  </span>
+                ) : null}
+                {bestSellerRankInfo ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
+                    <Flame size={10} aria-hidden="true" />
+                    <span>#{bestSellerRankInfo.rank} ขายดี</span>
+                  </span>
+                ) : genreMeta?.bestSellerRank && genreMeta.bestSellerRank <= 10 ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
+                    <Flame size={10} aria-hidden="true" />
+                    <span>#{genreMeta.bestSellerRank} ขายดี</span>
+                  </span>
+                ) : null}
+                {isNewArrival ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-300">
+                    <Sparkles size={10} aria-hidden="true" />
+                    <span>NEW สัปดาห์นี้</span>
+                  </span>
+                ) : null}
               </div>
               <p className="mt-1.5 truncate text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                 {series.publisher}
               </p>
-              <h3 className="mt-1 line-clamp-2 text-sm font-extrabold text-zinc-950 group-hover:text-orange-700 dark:text-zinc-100 sm:text-base">
+              <h3 className="mt-1 line-clamp-2 text-sm font-extrabold text-zinc-950 group-hover:text-orange-700 dark:text-zinc-100 sm:text-base break-words">
                 {series.title}
               </h3>
             </div>
@@ -471,6 +526,33 @@ export function MangaShowcaseCard({ series }: { series: CatalogMangaSeries }) {
   const { user } = useAuth();
   const userCanShop = canShop(user?.role);
   const isWishlisted = isInWishlist(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA");
+  const [bestSellerRankInfo, setBestSellerRankInfo] = useState(() =>
+    getProductEffectiveBestSellerRank(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA"),
+  );
+
+  useEffect(() => {
+    const update = () => {
+      setBestSellerRankInfo(
+        getProductEffectiveBestSellerRank(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA"),
+      );
+    };
+    update();
+    window.addEventListener(BEST_SELLER_SETTINGS_CHANGED_EVENT, update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener(BEST_SELLER_SETTINGS_CHANGED_EVENT, update);
+      window.removeEventListener("storage", update);
+    };
+  }, [series.id, isNovel]);
+
+  const genreMeta = !isNovel ? getMangaGenreMeta(series.id) : null;
+  const isNewArrival =
+    series.id === "jujutsu-kaisen" ||
+    series.id === "frieren" ||
+    series.id === "spy-family" ||
+    series.id === "chainsaw-man" ||
+    series.id === "konosuba-novel" ||
+    series.volumes.some((v) => v.volumeNumber >= 14);
 
   return (
     <Link
@@ -555,6 +637,24 @@ export function MangaShowcaseCard({ series }: { series: CatalogMangaSeries }) {
       </div>
       <div className="flex flex-1 flex-col justify-between p-5">
         <div>
+          {genreMeta ? (
+            <div className="mb-1.5 flex items-center gap-1.5 flex-wrap">
+              <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                {genreMeta.genreLabel}
+              </span>
+              {bestSellerRankInfo ? (
+                <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
+                  <Flame size={10} aria-hidden="true" />
+                  <span>#{bestSellerRankInfo.rank} ขายดี</span>
+                </span>
+              ) : genreMeta.bestSellerRank && genreMeta.bestSellerRank <= 5 ? (
+                <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
+                  <Flame size={10} aria-hidden="true" />
+                  <span>#{genreMeta.bestSellerRank} ขายดี</span>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <p className="truncate text-xs font-semibold text-zinc-500 dark:text-zinc-400">
             {series.publisher}
           </p>
@@ -601,19 +701,49 @@ export function CollectibleProductCard({
   const [isBackInStockOpen, setIsBackInStockOpen] = useState(false);
   const isWishlisted = isInWishlist(item.id, item.category);
   const isCompared = isInCompare(item.id);
+  const [bestSellerRankInfo, setBestSellerRankInfo] = useState(() =>
+    getProductEffectiveBestSellerRank(item.id, item.category),
+  );
+
+  useEffect(() => {
+    const update = () => {
+      setBestSellerRankInfo(
+        getProductEffectiveBestSellerRank(item.id, item.category),
+      );
+    };
+    update();
+    window.addEventListener(BEST_SELLER_SETTINGS_CHANGED_EVENT, update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener(BEST_SELLER_SETTINGS_CHANGED_EVENT, update);
+      window.removeEventListener("storage", update);
+    };
+  }, [item.id, item.category]);
+
+  const collectibleRank = COLLECTIBLE_BEST_SELLER_MAP[item.id];
+  const isNewCollectible =
+    item.id === "2002" ||
+    item.id === "6005" ||
+    item.id === "2001" ||
+    (Boolean(item.releaseMonthYear) && item.releaseMonthYear.startsWith("2026-10"));
 
   return (
     <>
       <div className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xs transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-orange-800">
         <div>
           <div className="relative p-3">
-            <CollectibleCoverImage
-              src={item.images?.[0]}
-              alt={item.name}
-              name={item.name}
-              category={item.category}
-              scale={item.scale}
-            />
+            <Link
+              href={`/figures/${encodeURIComponent(item.slug || item.id)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
+              className="block cursor-pointer"
+            >
+              <CollectibleCoverImage
+                src={item.images?.[0]}
+                alt={item.name}
+                name={item.name}
+                category={item.category}
+                scale={item.scale}
+              />
+            </Link>
 
             {/* Top Right Action Icons: Compare & Wishlist */}
             <div className="absolute top-5 right-5 z-10 flex items-center gap-1.5">
@@ -735,9 +865,30 @@ export function CollectibleProductCard({
               <p className="truncate text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                 {item.series || "สินค้าสะสม"}
               </p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {bestSellerRankInfo ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
+                    <Flame size={10} aria-hidden="true" />
+                    <span>#{bestSellerRankInfo.rank} ขายดี</span>
+                  </span>
+                ) : collectibleRank ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
+                    <Flame size={10} aria-hidden="true" />
+                    <span>#{collectibleRank.bestSellerRank} ขายดี</span>
+                  </span>
+                ) : null}
+                {isNewCollectible ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-300">
+                    <Sparkles size={10} aria-hidden="true" />
+                    <span>NEW</span>
+                  </span>
+                ) : null}
+              </div>
             </div>
             <h3 className="mt-1 line-clamp-2 min-h-12 text-sm font-extrabold leading-tight text-zinc-950 group-hover:text-orange-700 dark:text-zinc-100 sm:text-base">
-              {item.name}
+              <Link href={`/figures/${encodeURIComponent(item.slug || item.id)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}>
+                {item.name}
+              </Link>
             </h3>
             <div className="mt-2 flex items-baseline justify-between gap-2">
               <div>
@@ -766,7 +917,7 @@ export function CollectibleProductCard({
         <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
           <div className="flex items-center gap-2">
             <Link
-              href={`/figures/${encodeURIComponent(item.slug)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
+              href={`/figures/${encodeURIComponent(item.slug || item.id)}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
               className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-zinc-200 bg-white text-xs font-bold text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
             >
               รายละเอียด

@@ -2097,8 +2097,16 @@ export function getMockWaitlistEntries(): MockWaitlistEntry[] {
     }
     return validated;
   } catch (error) {
-    console.error("Could not read mock waitlist entries.", error);
-    throw new Error("อ่านข้อมูลคิว Waitlist ไม่สำเร็จ", { cause: error });
+    console.error("Could not read mock waitlist entries. Resetting to defaults.", error);
+    try {
+      window.localStorage.setItem(
+        MOCK_WAITLIST_STORAGE_KEY,
+        JSON.stringify(MOCK_WAITLIST_ENTRIES),
+      );
+    } catch {
+      // ignore
+    }
+    return [...MOCK_WAITLIST_ENTRIES];
   }
 }
 

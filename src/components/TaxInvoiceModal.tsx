@@ -195,7 +195,7 @@ export default function TaxInvoiceModal({
                 หนังสือและสิ่งพิมพ์มังงะได้รับการยกเว้นภาษีมูลค่าเพิ่มตาม ม.81(1)(ฉ) แห่งประมวลรัษฎากร
               </p>
               <p className="text-[10px] text-zinc-400">
-                เอกสารนี้สร้างขึ้นโดยระบบอัตโนมัติของ Manga Collectibles Store
+                เอกสารนี้สร้างขึ้นโดยระบบอัตโนมัติของ ChanSasom Store
               </p>
             </div>
 

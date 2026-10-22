@@ -15,12 +15,14 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Flame,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useWishlist } from "../contexts/WishlistContext";
 import { useCompare } from "../contexts/CompareContext";
 import { joinMockWaitlist } from "../mocks/storage.mock";
 import { canShop } from "../utils/permissions";
+import { getProductEffectiveBestSellerRank } from "../services/best-seller-settings.service";
 
 export interface FigureProduct {
   id: string;
@@ -228,6 +230,10 @@ export default function FigureDetailCard({
     }
   }, [depositIsAvailable, paymentOption]);
 
+  const bestSellerRankInfo = useMemo(() => {
+    return getProductEffectiveBestSellerRank(product.id, product.category);
+  }, [product.id, product.category]);
+
   function decreaseQuantity() {
     setQuantity((currentQuantity) => Math.max(1, currentQuantity - 1));
   }
@@ -408,6 +414,13 @@ export default function FigureDetailCard({
                 กล่องคมกริบ
               </span>
             ) : null}
+            {bestSellerRankInfo && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300 shadow-2xs">
+                <Flame size={13} className="text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                <span>อันดับ #{bestSellerRankInfo.rank} ขายดี</span>
+                <span className="hidden sm:inline text-amber-700/80 dark:text-amber-400/80">· {bestSellerRankInfo.salesText}</span>
+              </span>
+            )}
           </div>
 
           <div className="flex items-start justify-between gap-4">

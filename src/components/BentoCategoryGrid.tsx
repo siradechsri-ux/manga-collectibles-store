@@ -14,8 +14,11 @@ import { useState } from "react";
 import { STORE_COLLECTIONS } from "../lib/store-collections";
 
 export default function BentoCategoryGrid() {
-  const [mangaCollection, lnCollection, figureCollection, goodsCollection, accCollection] =
-    STORE_COLLECTIONS;
+  const mangaCollection = STORE_COLLECTIONS.find((c) => c.slug === 'manga')!;
+  const lnCollection = STORE_COLLECTIONS.find((c) => c.slug === 'light-novel')!;
+  const figureCollection = STORE_COLLECTIONS.find((c) => c.slug === 'figures')!;
+  const goodsCollection = STORE_COLLECTIONS.find((c) => c.slug === 'goods')!;
+  const accCollection = STORE_COLLECTIONS.find((c) => c.slug === 'accessories')!;
 
   return (
     <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">

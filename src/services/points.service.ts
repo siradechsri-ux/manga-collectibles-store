@@ -10,6 +10,7 @@ export type PointsTransactionType =
   | "EARN_ORDER"
   | "EARN_REVIEW"
   | "REDEEM_REWARD"
+  | "REDEEM_DISCOUNT"
   | "DEV_BONUS"
   | "WELCOME_BONUS";
 
@@ -284,12 +285,29 @@ function notifyPointsChanged(points: number): void {
 }
 
 /**
+ * อัตราแลกแต้มเป็นเงินสดส่วนลด (Points to Baht conversion rate)
+ * 10 แต้ม = 1 บาท (หรือ 1 แต้ม = 0.10 บาท)
+ */
+export const POINTS_TO_BAHT_RATE = 10;
+
+export function calculatePointsDiscount(points: number): number {
+  if (!Number.isFinite(points) || points <= 0) return 0;
+  return Math.floor(points / POINTS_TO_BAHT_RATE);
+}
+
+export function calculatePointsNeededForDiscount(baht: number): number {
+  if (!Number.isFinite(baht) || baht <= 0) return 0;
+  return Math.ceil(baht * POINTS_TO_BAHT_RATE);
+}
+
+/**
  * หักแต้มสะสมพร้อมบันทึกประวัติ
  */
 export function deductPoints(
   amount: number,
   description = "ใช้แต้มแลกของรางวัลพรีเมียม",
   referenceId?: string,
+  type: PointsTransactionType = "REDEEM_REWARD",
 ): boolean {
   if (typeof window === "undefined") return false;
   if (!Number.isSafeInteger(amount) || amount <= 0) return false;
@@ -304,7 +322,7 @@ export function deductPoints(
     window.localStorage.setItem(MOCK_POINTS_STORAGE_KEY, String(next));
     notifyPointsChanged(next);
     recordLedgerEntry(
-      "REDEEM_REWARD",
+      type,
       -amount,
       next,
       description,
@@ -327,7 +345,21 @@ export function redeemReward(
   const desc = rewardTitle
     ? `แลกรับของรางวัล: ${rewardTitle}`
     : `แลกรับของรางวัลพรีเมียม #${rewardId}`;
-  return deductPoints(cost, desc, String(rewardId));
+  return deductPoints(cost, desc, String(rewardId), "REDEEM_REWARD");
+}
+
+/**
+ * ใช้แต้มสะสมแลกส่วนลดคำสั่งซื้อ
+ */
+export function redeemPointsForDiscount(
+  points: number,
+  orderNumber?: string,
+): boolean {
+  const discountBaht = calculatePointsDiscount(points);
+  const desc = orderNumber
+    ? `ใช้แต้มแลกส่วนลดคำสั่งซื้อ #${orderNumber} (-฿${discountBaht})`
+    : `ใช้แต้มแลกส่วนลดคำสั่งซื้อ (-฿${discountBaht})`;
+  return deductPoints(points, desc, orderNumber, "REDEEM_DISCOUNT");
 }
 
 /**

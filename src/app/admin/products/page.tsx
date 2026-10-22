@@ -13,6 +13,7 @@ import {
   Edit3,
   Eye,
   EyeOff,
+  Flame,
   Package,
   Search,
   ShieldCheck,
@@ -35,12 +36,19 @@ import {
 } from "../../../mocks/admin-products.mock";
 import { resetMockCommerceData } from "../../../mocks/storage.mock";
 import { canManageInventory, canViewStock } from "../../../utils/permissions";
+import {
+  getBestSellerSettings,
+  saveBestSellerSettings,
+  subscribeBestSellerSettings,
+  type BestSellerSettings,
+  type PinnedBestSeller,
+} from "../../../services/best-seller-settings.service";
 
 function productImage(product: AdminProduct): string | null {
   if (product.type === "MANGA" || product.type === "LIGHT_NOVEL") {
-    return product.coverImage || null;
+    return product.coverImage || product.coverUrl || product.images?.[0] || null;
   }
-  return product.imageUrl || null;
+  return product.imageUrl || product.images?.[0] || null;
 }
 
 function getPaginationRange(current: number, total: number): (number | "dots")[] {
@@ -169,6 +177,48 @@ export default function AdminProductsPage() {
   const [category, setCategory] = useState<ProductCategoryFilter>("ALL");
   const [status, setStatus] = useState<ProductStatusFilter>("ALL");
   const [visibility, setVisibility] = useState<VisibilityFilter>("ALL");
+  const [bestSellerSettings, setBestSellerSettings] = useState<BestSellerSettings>(getBestSellerSettings);
+
+  useEffect(() => {
+    return subscribeBestSellerSettings((updated) => {
+      setBestSellerSettings(updated);
+    });
+  }, []);
+
+  const handleToggleBestSeller = (product: AdminProduct) => {
+    const cleanId =
+      product.type === "MANGA" || product.type === "LIGHT_NOVEL"
+        ? (product.seriesId || product.id)
+        : product.id;
+    const isPinned = bestSellerSettings.pinnedBestSellers.some(
+      (p) => p.id === cleanId || p.id === product.id
+    );
+    let nextPinned: PinnedBestSeller[];
+    if (isPinned) {
+      nextPinned = bestSellerSettings.pinnedBestSellers.filter(
+        (p) => p.id !== cleanId && p.id !== product.id
+      );
+    } else {
+      const nextRank = bestSellerSettings.pinnedBestSellers.length + 1;
+      nextPinned = [
+        ...bestSellerSettings.pinnedBestSellers,
+        {
+          id: cleanId,
+          type:
+            product.type === "MANGA" || product.type === "LIGHT_NOVEL"
+              ? "MANGA"
+              : "COLLECTIBLE",
+          rank: nextRank,
+          salesTextOverride:
+            product.type === "MANGA"
+              ? "ยอดขาย 10,000+ เล่ม"
+              : "ยอดสั่งจอง 500+ กล่อง",
+        },
+      ];
+    }
+    const updated = saveBestSellerSettings({ pinnedBestSellers: nextPinned });
+    setBestSellerSettings(updated);
+  };
   const [error, setError] = useState<string | null>(null);
   const [stockTarget, setStockTarget] = useState<AdminProduct | null>(null);
   const [stockDirection, setStockDirection] = useState<"ADD" | "REMOVE">("ADD");
@@ -424,6 +474,7 @@ export default function AdminProductsPage() {
                   <th className="px-4 py-3 text-right">ราคา</th>
                   <th className="px-4 py-3 text-right">สต็อกคงเหลือ</th>
                   <th className="px-4 py-3">สถานะ</th>
+                  <th className="px-4 py-3 text-center">ขายดี</th>
                   <th className="px-4 py-3">การมองเห็น</th>
                   {isAdmin ? <th className="px-4 py-3 text-right">จัดการ</th> : null}
                 </tr>
@@ -480,6 +531,25 @@ export default function AdminProductsPage() {
                         {productStock(product) === 0 ? <span className="ml-2 rounded-full bg-red-100 px-2 py-1 text-[10px] font-bold text-red-800 dark:bg-red-950 dark:text-red-200">สินค้าหมด</span> : productStock(product) < 5 ? <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-[10px] font-bold text-orange-800 dark:bg-orange-950 dark:text-orange-200">สต็อกต่ำ</span> : null}
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={state} /></td>
+                      <td className="px-4 py-3 text-center">
+                        {(() => {
+                          const cleanId =
+                            product.type === "MANGA" || product.type === "LIGHT_NOVEL"
+                              ? (product.seriesId || product.id)
+                              : product.id;
+                          const pinnedMatch = bestSellerSettings.pinnedBestSellers.find(
+                            (p) => p.id === cleanId || p.id === product.id
+                          );
+                          return pinnedMatch ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
+                              <Flame size={10} aria-hidden="true" />
+                              #{pinnedMatch.rank}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-zinc-400">-</span>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3">
                         {product.isHidden ? (
                           <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
@@ -514,6 +584,30 @@ export default function AdminProductsPage() {
                             >
                               {product.isHidden ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                             </button>
+                            {(() => {
+                              const cleanId =
+                                product.type === "MANGA" || product.type === "LIGHT_NOVEL"
+                                  ? (product.seriesId || product.id)
+                                  : product.id;
+                              const pinnedMatch = bestSellerSettings.pinnedBestSellers.find(
+                                (p) => p.id === cleanId || p.id === product.id
+                              );
+                              return (
+                                <button
+                                  type="button"
+                                  aria-label={pinnedMatch ? `ปลดปักหมุดขายดี ${productName(product)}` : `ปักหมุดขายดี ${productName(product)}`}
+                                  title={pinnedMatch ? `ปลดปักหมุดขายดี (ปัจจุบันอันดับ #${pinnedMatch.rank})` : "ปักหมุดเป็นสินค้าขายดี"}
+                                  onClick={() => handleToggleBestSeller(product)}
+                                  className={`rounded-lg p-2 transition ${
+                                    pinnedMatch
+                                      ? "bg-amber-100 text-amber-900 hover:bg-amber-200 dark:bg-amber-950/60 dark:text-amber-300"
+                                      : "text-zinc-400 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-zinc-800"
+                                  }`}
+                                >
+                                  <Flame size={16} aria-hidden="true" />
+                                </button>
+                              );
+                            })()}
                             <Link href={editUrl} aria-label={`แก้ไข ${productName(product)}`} title="แก้ไขสินค้า" className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 hover:text-orange-700 dark:text-zinc-300 dark:hover:bg-zinc-800"><Edit3 size={16} /></Link>
                             <button type="button" aria-label={`ปรับสต็อก ${productName(product)}`} title="ปรับสต็อก" onClick={() => { setStockTarget(product); setStockDirection("ADD"); setStockQuantity("1"); }} className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 hover:text-blue-700 dark:text-zinc-300 dark:hover:bg-zinc-800"><Package size={16} /></button>
                             <button type="button" aria-label={`ลบ ${productName(product)}`} title="ลบสินค้า" onClick={() => setDeleteTarget(product)} className="rounded-lg p-2 text-zinc-600 hover:bg-red-50 hover:text-red-700 dark:text-zinc-300 dark:hover:bg-red-950/40 dark:hover:text-red-300"><Trash2 size={16} /></button>
@@ -524,7 +618,7 @@ export default function AdminProductsPage() {
                   );
                 })}
                 {paginatedProducts.length === 0 ? (
-                  <tr><td colSpan={isAdmin ? 9 : 8} className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">ไม่พบสินค้าที่ตรงกับเงื่อนไข</td></tr>
+                  <tr><td colSpan={isAdmin ? 10 : 9} className="px-4 py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">ไม่พบสินค้าที่ตรงกับเงื่อนไข</td></tr>
                 ) : null}
               </tbody>
             </table>

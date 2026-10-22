@@ -1,5 +1,7 @@
 "use client";
 
+import ChanSasomLogo from "../brand/ChanSasomLogo";
+
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -74,12 +76,9 @@ export default function RegisterPage() {
     <main className="flex min-h-screen items-center justify-center bg-[#f7f7f5] px-4 py-10">
       <section className="w-full max-w-lg rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:p-9">
         <div className="mb-7 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100 text-orange-700">
-            <BookOpen size={27} aria-hidden="true" />
+          <div className="flex justify-center mb-2">
+            <ChanSasomLogo size="lg" showTagline={false} />
           </div>
-          <p className="mt-4 text-sm font-semibold tracking-wide text-orange-700">
-            MANGA & COLLECTIBLES
-          </p>
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-950">
             สมัครสมาชิก
           </h1>

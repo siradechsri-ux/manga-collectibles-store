@@ -138,6 +138,15 @@ export function saveRewardItem(item: RewardItem): void {
   }
 }
 
+export function deleteRewardItem(id: string): void {
+  const current = listRewards();
+  const updated = current.filter((r) => r.id !== id);
+  if (typeof window !== "undefined") {
+    localStorage.setItem(REWARDS_STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new Event(MOCK_REWARDS_UPDATED_EVENT));
+  }
+}
+
 export function resetRewardsCatalog(): RewardItem[] {
   if (typeof window !== "undefined") {
     localStorage.setItem(REWARDS_STORAGE_KEY, JSON.stringify(MOCK_REWARDS));

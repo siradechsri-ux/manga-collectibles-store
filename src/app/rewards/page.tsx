@@ -51,6 +51,7 @@ import {
 import {
   getRewardNumericId,
   listRewards,
+  saveRewardItem,
   type RewardItem,
 } from "../../mocks/rewards.mock";
 import { canShop, getRoleHomeUrl } from "../../utils/permissions";
@@ -226,11 +227,13 @@ export default function RewardsPage() {
         pointsSpent: reward.pointsRequired,
       });
 
-      // Update local stock display
+      // Update local and persistent stock
+      const newStock = Math.max(0, reward.stock - 1);
+      saveRewardItem({ ...reward, stock: newStock });
       setRewardsList((current) =>
         current.map((item) =>
           item.id === reward.id
-            ? { ...item, stock: Math.max(0, item.stock - 1) }
+            ? { ...item, stock: newStock }
             : item,
         ),
       );

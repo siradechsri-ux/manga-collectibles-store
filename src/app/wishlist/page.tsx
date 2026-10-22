@@ -69,39 +69,49 @@ export default function WishlistPage() {
   });
 
   const handleMoveToCart = (item: WishlistItem) => {
+    const rawNum = Number(item.id);
+    const safeNumericId = Number.isSafeInteger(rawNum) && rawNum > 0 ? rawNum : 1001;
+    const img = item.imageUrl || null;
+
     if (item.itemType === "MANGA") {
       addItem({
         kind: "MANGA",
-        id: Number(item.id),
+        id: safeNumericId,
         title: item.title,
         volume: 1,
         price: item.price,
-        imageUrl: item.imageUrl,
+        image: img,
+        coverImage: img,
+        imageUrl: img,
         isPreorder: Boolean(item.isPreorder),
         quantity: 1,
       });
     } else if (item.itemType === "LIGHT_NOVEL") {
       addItem({
         kind: "LIGHT_NOVEL",
-        id: Number(item.id),
+        id: safeNumericId,
         title: item.title,
         volume: 1,
         price: item.price,
-        imageUrl: item.imageUrl,
+        image: img,
+        coverImage: img,
+        imageUrl: img,
         isPreorder: Boolean(item.isPreorder),
         quantity: 1,
       });
     } else if (item.itemType === "PLAMO") {
       addItem({
         kind: "PLAMO",
-        id: Number(item.id),
+        id: safeNumericId,
         name: item.title,
         fullPrice: item.price,
         depositAmount: Math.round(item.price * 0.3),
         selectedPaymentType: "FULL",
         quantity: 1,
         boxDimensions: { widthCm: 25, lengthCm: 20, heightCm: 10 },
-        imageUrl: item.imageUrl,
+        image: img,
+        coverImage: img,
+        imageUrl: img,
       });
     } else if (item.itemType === "GOODS") {
       const parsedId = Number.isFinite(Number(item.id))
@@ -114,32 +124,36 @@ export default function WishlistPage() {
         name: item.title,
         fullPrice: item.price,
         quantity: 1,
-        image: item.imageUrl,
-        coverImage: item.imageUrl,
-        imageUrl: item.imageUrl,
+        image: img,
+        coverImage: img,
+        imageUrl: img,
         ...(isReward ? { isReward: true, pointsSpent: 0, subcategory: "REWARD" } : {}),
       });
     } else if (item.itemType === "ACCESSORY") {
       addItem({
         kind: "ACCESSORY",
-        id: Number(item.id),
+        id: safeNumericId,
         name: item.title,
         fullPrice: item.price,
         quantity: 1,
-        imageUrl: item.imageUrl,
+        image: img,
+        coverImage: img,
+        imageUrl: img,
       });
     } else {
       // Default Figure
       addItem({
         kind: "FIGURE",
-        id: Number(item.id),
+        id: safeNumericId,
         name: item.title,
         fullPrice: item.price,
         depositAmount: Math.round(item.price * 0.3),
         selectedPaymentType: "FULL",
         quantity: 1,
         boxDimensions: { widthCm: 20, lengthCm: 18, heightCm: 25 },
-        imageUrl: item.imageUrl,
+        image: img,
+        coverImage: img,
+        imageUrl: img,
       });
     }
 

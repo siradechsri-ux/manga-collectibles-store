@@ -38,6 +38,7 @@ import {
 } from "../../services/kuji.service";
 import { getUserPoints, subscribeUserPoints } from "../../services/points.service";
 import CartDrawer from "../../components/CartDrawer";
+import KujiTicketRevealModal from "../../components/KujiTicketRevealModal";
 import PointBadge from "../../components/PointBadge";
 import { canShop } from "../../utils/permissions";
 
@@ -113,18 +114,14 @@ export default function KujiPage() {
       return;
     }
 
-    setIsDrawing(true);
-    setTimeout(() => {
-      const res = drawKujiTicket();
-      setIsDrawing(false);
-      if (res.success && res.result) {
-        setCurrentWinResult(res.result);
-        setRemainingTickets(getRemainingKujiTickets());
-        setHistory(getKujiHistory());
-      } else {
-        setErrorMessage(res.message || "เกิดข้อผิดพลาดในการเปิดตั๋ว");
-      }
-    }, 1200);
+    const res = drawKujiTicket();
+    if (res.success && res.result) {
+      setCurrentWinResult(res.result);
+      setRemainingTickets(getRemainingKujiTickets());
+      setHistory(getKujiHistory());
+    } else {
+      setErrorMessage(res.message || "เกิดข้อผิดพลาดในการเปิดตั๋ว");
+    }
   };
 
   const handleClaimPrize = (prize: KujiPrize) => {
@@ -445,83 +442,22 @@ export default function KujiPage() {
         </div>
       </main>
 
-      {/* Winning Reveal Modal */}
+      {/* Animated Japanese Kuji Ticket Reveal Modal */}
       {currentWinResult && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200"
-        >
-          <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-amber-300/40 bg-white p-6 shadow-2xl dark:border-amber-500/30 dark:bg-zinc-900 text-center animate-in zoom-in-95 duration-300">
-            <button
-              type="button"
-              onClick={() => setCurrentWinResult(null)}
-              className="absolute right-4 top-4 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-              aria-label="ปิด"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="mx-auto inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800 dark:bg-amber-950 dark:text-amber-300 mb-3">
-              <Sparkles size={14} />
-              <span>ยินดีด้วย! คุณได้รับรางวัล</span>
-            </div>
-
-            <div className="my-3">
-              <span
-                className={`inline-flex h-16 w-16 items-center justify-center rounded-2xl text-2xl font-black ${gradeBadgeColor(
-                  currentWinResult.prize.grade,
-                )}`}
-              >
-                {currentWinResult.prize.grade}
-              </span>
-            </div>
-
-            <div className="mx-auto my-3 h-44 w-44 overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-inner">
-              <img
-                src={currentWinResult.prize.imageUrl}
-                alt={currentWinResult.prize.title}
-                className="h-full w-full object-cover"
-              />
-            </div>
-
-            <h3 className="text-base font-black text-zinc-900 dark:text-zinc-50 px-4">
-              {currentWinResult.prize.title}
-            </h3>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              {currentWinResult.prize.description}
-            </p>
-
-            <div className="mt-6 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => handleClaimPrize(currentWinResult.prize)}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-xs transition hover:bg-blue-700"
-              >
-                {currentWinResult.prize.isDiscountCode ? (
-                  <>
-                    <Copy size={14} />
-                    <span>
-                      {copiedCode ? "คัดลอกโค้ดสำเร็จ!" : "คัดลอกโค้ดส่วนลด KUJI50"}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag size={14} />
-                    <span>เพิ่มของรางวัลลงตะกร้าสินค้า (฿0)</span>
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentWinResult(null)}
-                className="rounded-xl border border-zinc-200 py-2.5 text-xs font-bold text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>
+        <KujiTicketRevealModal
+          result={currentWinResult}
+          onClose={() => setCurrentWinResult(null)}
+          onClaim={handleClaimPrize}
+          onDrawAgain={() => {
+            setCurrentWinResult(null);
+            setTimeout(() => {
+              handleDraw();
+            }, 100);
+          }}
+          canDrawAgain={userCanShop && points >= config.pointsPerDraw && remainingTickets > 0}
+          pointsPerDraw={config.pointsPerDraw}
+          userPoints={points}
+        />
       )}
 
       {/* Cart Drawer */}

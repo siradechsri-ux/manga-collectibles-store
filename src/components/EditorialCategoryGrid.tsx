@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { STORE_COLLECTIONS, StoreCollection } from "../lib/store-collections";
 
+
 const editorialThemes = {
   manga: {
     accent: "text-orange-400",

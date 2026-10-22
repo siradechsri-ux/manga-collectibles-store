@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, BookOpen, Heart, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, BookOpen, Flame, Heart, PackageSearch, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -15,6 +15,7 @@ import { CatalogMangaSeries } from "../../../lib/catalog-client";
 import { ProductService } from "../../../services/product.service";
 import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../../../mocks/admin-products.mock";
 import { getSafeCollectionReturnPath } from "../../../lib/collection-return";
+import { getProductEffectiveBestSellerRank } from "../../../services/best-seller-settings.service";
 import ProductReviews from "../../../components/ProductReviews";
 import ProductBundleDeal from "../../../components/ProductBundleDeal";
 
@@ -33,6 +34,14 @@ export default function MangaSeriesPage() {
   const [cartNotice, setCartNotice] = useState<string | null>(null);
   const [returnPath, setReturnPath] = useState("/");
 
+  const bestSellerInfo = series
+    ? getProductEffectiveBestSellerRank(series.id, isNovel ? "LIGHT_NOVEL" : "MANGA")
+    : null;
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [params.id]);
+
   useEffect(() => {
     setReturnPath(
       getSafeCollectionReturnPath(
@@ -45,18 +54,19 @@ export default function MangaSeriesPage() {
     setLoading(true);
     setError(null);
     try {
-      const catalog = await ProductService.getProducts();
-      const selectedSeries =
-        catalog.mangaSeries.find((item) => item.id === seriesId) ??
-        catalog.lightNovelSeries?.find((item) => item.id === seriesId);
+      const selectedSeries = await ProductService.getMangaSeriesById(seriesId);
       if (!selectedSeries) {
+        // Cross-category check: was this a figure or collectible?
+        const figure = await ProductService.getFigureById(seriesId);
+        if (figure) {
+          router.replace(`/figures/${encodeURIComponent(figure.slug || figure.id)}`);
+          return;
+        }
         setSeries(null);
-        setError("ไม่พบข้อมูลหนังสือเรื่องนี้");
+        setError("ไม่พบข้อมูลสินค้าที่ระบุ");
         return;
       }
-      const isLn =
-        selectedSeries.category === "LIGHT_NOVEL" ||
-        Boolean(catalog.lightNovelSeries?.some((item) => item.id === seriesId));
+      const isLn = selectedSeries.category === "LIGHT_NOVEL";
       setIsNovel(isLn);
       setSeries(selectedSeries);
     } catch (loadError) {
@@ -68,7 +78,7 @@ export default function MangaSeriesPage() {
     } finally {
       setLoading(false);
     }
-  }, [seriesId]);
+  }, [seriesId, router]);
 
   useEffect(() => {
     void loadSeries();
@@ -187,17 +197,25 @@ export default function MangaSeriesPage() {
           <div className="mt-8 h-52 animate-pulse rounded-3xl bg-white" role="status">
             <span className="sr-only">กำลังโหลดข้อมูลหนังสือ</span>
           </div>
-        ) : error ? (
-          <div className="mt-8 rounded-2xl border border-amber-200 bg-white p-8 text-center">
-            <AlertCircle className="mx-auto text-amber-600" size={34} aria-hidden="true" />
-            <h1 className="mt-3 text-lg font-bold text-slate-900">{error}</h1>
-            <button
-              type="button"
-              onClick={() => void loadSeries()}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white"
-            >
-              <RefreshCw size={15} aria-hidden="true" /> โหลดอีกครั้ง
-            </button>
+        ) : error || !series ? (
+          <div className="mt-8 flex min-h-[500px] flex-col items-center justify-center rounded-3xl border border-zinc-200 bg-white p-8 text-center shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-zinc-100 text-zinc-500 shadow-inner dark:bg-zinc-800 dark:text-zinc-400">
+              <PackageSearch size={44} aria-hidden="true" />
+            </div>
+            <h1 className="mt-5 text-xl font-black text-zinc-900 dark:text-zinc-100 sm:text-2xl">
+              ไม่พบข้อมูลสินค้าที่ระบุ
+            </h1>
+            <p className="mt-2 max-w-md text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+              ขออภัย ไม่พบหนังสือหรือมังงะที่คุณกำลังค้นหา รายการนี้อาจถูกย้าย สิ้นสุดการจำหน่าย หรือระบุรหัสสินค้าในลิงก์ไม่ถูกต้อง
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-orange-600 px-6 text-sm font-bold text-white shadow-xs transition hover:bg-orange-700 hover:shadow-md"
+              >
+                กลับสู่หน้าร้านค้า
+              </Link>
+            </div>
           </div>
         ) : series ? (
           <>
@@ -208,6 +226,13 @@ export default function MangaSeriesPage() {
                     <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-violet-100">
                       <BookOpen size={14} aria-hidden="true" /> {isNovel ? "ไลท์โนเวล" : "มังงะ"} · {series.publisher}
                     </span>
+                    {bestSellerInfo && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/50 bg-amber-500/25 px-3.5 py-1.5 text-xs font-black text-amber-200 backdrop-blur-xs shadow-xs">
+                        <Flame size={13} className="text-amber-400" aria-hidden="true" />
+                        <span>อันดับ #{bestSellerInfo.rank} ขายดี</span>
+                        <span className="hidden sm:inline text-amber-300/80">· {bestSellerInfo.salesText}</span>
+                      </span>
+                    )}
                     {userCanShop ? (
                       <button
                         type="button"

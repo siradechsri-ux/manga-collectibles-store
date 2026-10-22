@@ -20,7 +20,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "FIGURE",
     price: 1850,
     image: "/images/products/figure-2001.jpg",
-    href: "/collections/figures",
+    href: "/figures/nendoroid-gojo-satoru",
     glowColor: "rgba(56, 189, 248, 0.45)", // Sky Blue Glow
   },
   {
@@ -29,7 +29,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "MANGA",
     price: 115,
     image: "/images/products/jjk-vol-01.jpg",
-    href: "/collections/manga",
+    href: "/manga/jujutsu-kaisen",
     glowColor: "rgba(249, 115, 22, 0.45)", // Orange Glow
   },
   {
@@ -38,7 +38,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "GUNPLA",
     price: 2450,
     image: "/images/products/plamo-6001.jpg",
-    href: "/collections/figures",
+    href: "/figures/rg-hi-nu-gundam",
     glowColor: "rgba(99, 102, 241, 0.45)", // Indigo Glow
   },
   {
@@ -47,7 +47,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "MANGA",
     price: 125,
     image: "/images/products/frieren-vol-01.jpg",
-    href: "/collections/manga",
+    href: "/manga/frieren",
     glowColor: "rgba(168, 85, 247, 0.45)", // Purple Glow
   },
   {
@@ -56,7 +56,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "FIGURE",
     price: 1890,
     image: "/images/products/figure-2002.jpg",
-    href: "/collections/figures",
+    href: "/figures/pop-up-parade-sukuna",
     glowColor: "rgba(239, 68, 68, 0.45)", // Red Glow
   },
   {
@@ -65,7 +65,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "LIGHT NOVEL",
     price: 290,
     image: "/images/products/mushoku-vol-01.jpg",
-    href: "/collections/light-novel",
+    href: "/manga/mushoku-tensei-novel",
     glowColor: "rgba(14, 165, 233, 0.45)", // Sky Glow
   },
   {
@@ -74,7 +74,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "MANGA",
     price: 95,
     image: "/images/products/spy-family-vol-01.jpg",
-    href: "/collections/manga",
+    href: "/manga/spy-x-family",
     glowColor: "rgba(16, 185, 129, 0.45)", // Emerald Glow
   },
   {
@@ -83,7 +83,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "MANGA",
     price: 115,
     image: "/images/products/chainsaw-vol-01.jpg",
-    href: "/collections/manga",
+    href: "/manga/chainsaw-man",
     glowColor: "rgba(244, 63, 94, 0.45)", // Rose Glow
   },
   {
@@ -92,7 +92,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "OFFICIAL GOODS",
     price: 490,
     image: "/images/products/goods-7001.jpg",
-    href: "/collections/goods",
+    href: "/figures/goods-7001",
     glowColor: "rgba(234, 179, 8, 0.45)", // Amber Glow
   },
   {
@@ -101,7 +101,7 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
     categoryLabel: "LIGHT NOVEL",
     price: 280,
     image: "/images/products/rezero-vol-01.jpg",
-    href: "/collections/light-novel",
+    href: "/manga/rezero-novel",
     glowColor: "rgba(217, 70, 239, 0.45)", // Fuchsia Glow
   },
 ];

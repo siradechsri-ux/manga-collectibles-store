@@ -34,6 +34,10 @@ const mangaSeriesSchema = z
     images: z.array(z.string()).optional(),
     taxRate: z.number().finite().nonnegative().optional(),
     volumes: z.array(volumeSchema),
+    genres: z.array(z.string()).optional(),
+    demographic: z.string().optional(),
+    bestSellerRank: z.number().optional(),
+    salesText: z.string().optional(),
   })
   .strict();
 
@@ -70,6 +74,8 @@ const figureSchema = z
     category: z.enum(["FIGURE", "PLAMO", "GOODS", "ACCESSORY"]).optional(),
     subcategory: z.string().optional(),
     grade: z.string().optional(),
+    bestSellerRank: z.number().optional(),
+    salesText: z.string().optional(),
   })
   .strict();
 

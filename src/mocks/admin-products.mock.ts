@@ -254,6 +254,19 @@ function toIsoOrEmpty(value: string): string {
 }
 
 function numericEntityId(slug: string, prefixSeed: number = 0): string {
+  // Check whether the slug corresponds to a known static collectible in the mock catalog
+  const raw = getMockCatalog();
+  const knownItem = [
+    ...raw.figures,
+    ...raw.plamo,
+    ...raw.goods,
+    ...raw.accessories,
+  ].find((item) => item.slug === slug);
+
+  if (knownItem) {
+    return String(knownItem.id);
+  }
+
   let hash = 2_166_136_261 ^ prefixSeed;
   for (const character of slug) {
     hash = Math.imul(hash ^ character.charCodeAt(0), 16_777_619);
@@ -293,6 +306,8 @@ function createInitialProducts(): AdminProduct[] {
             ? 450
             : 250,
         images: volume.coverUrl ? [volume.coverUrl] : (volume.images ?? []),
+        coverImage: volume.coverUrl ?? volume.images?.[0] ?? "",
+        coverUrl: volume.coverUrl ?? volume.images?.[0] ?? "",
         isHidden: false,
         publishDate: "",
       });
@@ -324,6 +339,8 @@ function createInitialProducts(): AdminProduct[] {
         expectedShippingDate: volume.expectedShippingDate ?? "",
         weightGrams: volume.variantLabel?.includes("Special") ? 420 : 280,
         images: volume.coverUrl ? [volume.coverUrl] : (volume.images ?? []),
+        coverImage: volume.coverUrl ?? volume.images?.[0] ?? "",
+        coverUrl: volume.coverUrl ?? volume.images?.[0] ?? "",
         isHidden: false,
         publishDate: "",
       });
@@ -353,6 +370,8 @@ function createInitialProducts(): AdminProduct[] {
       heightMm: figure.heightMm,
       janCode: figure.janCode,
       images: [...figure.images],
+      imageUrl: figure.images[0] ?? "",
+      coverImage: figure.images[0] ?? "",
       isHidden: false,
       publishDate: "",
     });
@@ -379,6 +398,8 @@ function createInitialProducts(): AdminProduct[] {
       weightGrams: item.scale.includes("1/100") ? 850 : 450,
       janCode: item.janCode,
       images: [...item.images],
+      imageUrl: item.images[0] ?? "",
+      coverImage: item.images[0] ?? "",
       isHidden: false,
       publishDate: "",
     });
@@ -399,6 +420,8 @@ function createInitialProducts(): AdminProduct[] {
       status: item.stockOrQuotaRemaining > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
       weightGrams: item.subcategory === "BADGE" ? 45 : 100,
       images: [...item.images],
+      imageUrl: item.images[0] ?? "",
+      coverImage: item.images[0] ?? "",
       isHidden: false,
       publishDate: "",
     });

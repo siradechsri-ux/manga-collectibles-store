@@ -263,7 +263,7 @@ function createEmailHtml(title: string, body: string): string {
   <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
   <body style="margin:0;background:#f1f5f9;font-family:Arial,'Noto Sans Thai',sans-serif;color:#0f172a">
     <div style="max-width:640px;margin:24px auto;padding:24px;background:#ffffff;border-radius:16px">
-      <p style="margin:0 0 8px;color:#ea580c;font-weight:700">Manga & Collectibles</p>
+      <p style="margin:0 0 8px;color:#ea580c;font-weight:700">ChanSasom</p>
       <h1 style="font-size:22px;line-height:1.4;margin:0 0 20px">${escapeHtml(title)}</h1>
       ${body}
       <p style="margin:28px 0 0;color:#64748b;font-size:13px">อีเมลฉบับนี้ส่งโดยอัตโนมัติ กรุณาอย่าตอบกลับ</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, Bell, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, Bell, PackageSearch, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -27,6 +27,10 @@ export default function FigureProductPage() {
   const [returnPath, setReturnPath] = useState("/");
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [params.id]);
+
+  useEffect(() => {
     setReturnPath(
       getSafeCollectionReturnPath(
         new URLSearchParams(window.location.search).get("returnTo"),
@@ -40,8 +44,14 @@ export default function FigureProductPage() {
     try {
       const selectedFigure = await ProductService.getFigureById(slug);
       if (!selectedFigure) {
+        // Cross-category check: was this a manga series slug/ID?
+        const manga = await ProductService.getMangaSeriesById(slug);
+        if (manga) {
+          router.replace(`/manga/${encodeURIComponent(manga.id)}`);
+          return;
+        }
         setFigure(null);
-        setError("ไม่พบข้อมูลสินค้าชิ้นนี้");
+        setError("ไม่พบข้อมูลสินค้าที่ระบุ");
         return;
       }
       setFigure(selectedFigure);
@@ -54,7 +64,7 @@ export default function FigureProductPage() {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, router]);
 
   useEffect(() => {
     void loadFigure();
@@ -179,17 +189,25 @@ export default function FigureProductPage() {
             </div>
             <div className="h-[34rem] animate-pulse rounded-3xl bg-white" />
           </div>
-        ) : error ? (
-          <div className="mt-8 rounded-2xl border border-amber-200 bg-white p-8 text-center">
-            <AlertCircle className="mx-auto text-amber-600" size={34} aria-hidden="true" />
-            <h1 className="mt-3 text-lg font-bold text-slate-900">{error}</h1>
-            <button
-              type="button"
-              onClick={() => void loadFigure()}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white"
-            >
-              <RefreshCw size={15} aria-hidden="true" /> โหลดอีกครั้ง
-            </button>
+        ) : error || !figure ? (
+          <div className="mt-8 flex min-h-[500px] flex-col items-center justify-center rounded-3xl border border-zinc-200 bg-white p-8 text-center shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-zinc-100 text-zinc-500 shadow-inner dark:bg-zinc-800 dark:text-zinc-400">
+              <PackageSearch size={44} aria-hidden="true" />
+            </div>
+            <h1 className="mt-5 text-xl font-black text-zinc-900 dark:text-zinc-100 sm:text-2xl">
+              ไม่พบข้อมูลสินค้าที่ระบุ
+            </h1>
+            <p className="mt-2 max-w-md text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
+              ขออภัย ไม่พบสินค้าหรือของสะสมที่คุณกำลังค้นหา รายการนี้อาจถูกย้าย สิ้นสุดระยะเวลาจอง หรือระบุรหัสสินค้าในลิงก์ไม่ถูกต้อง
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-orange-600 px-6 text-sm font-bold text-white shadow-xs transition hover:bg-orange-700 hover:shadow-md"
+              >
+                กลับสู่หน้าร้านค้า
+              </Link>
+            </div>
           </div>
         ) : figure ? (
           <>

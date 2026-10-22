@@ -246,6 +246,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     isOrderDetailPage &&
     user.role !== "CUSTOMER" &&
     user.role !== "STAFF" &&
+    user.role !== "FINANCE" &&
     user.role !== "ADMIN"
   ) {
     return forbiddenRedirect(request);
