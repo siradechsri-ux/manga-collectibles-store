@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BookMarked,
   BookOpen,
+  Boxes,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
@@ -43,6 +44,12 @@ const editorialThemes = {
     badge: "bg-amber-500/20 text-amber-300 border-amber-500/30",
     borderHover: "hover:border-amber-500/80 hover:shadow-amber-500/15",
     icon: ShieldCheck,
+  },
+  gunpla: {
+    accent: "text-indigo-400",
+    badge: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+    borderHover: "hover:border-indigo-500/80 hover:shadow-indigo-500/15",
+    icon: Boxes,
   },
 } as const;
 

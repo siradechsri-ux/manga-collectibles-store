@@ -68,28 +68,28 @@
 ระบบกำหนดบทบาทผู้ใช้งาน (User Roles) ออกเป็น 4 ระดับ เพื่อจำกัดสิทธิ์ตามหลัก Least Privilege:
 
 ```mermaid
-graph TD
-    User([ผู้ใช้งานทั้งหมด]) --> Customer[CUSTOMER: ลูกค้าทั่วไป]
-    User --> Staff[STAFF: เจ้าหน้าที่คลังสินค้า]
-    User --> Finance[FINANCE: เจ้าหน้าที่ฝ่ายการเงิน]
-    User --> Admin[ADMIN: ผู้ดูแลระบบสูงสุด]
+flowchart TD
+    User(["ผู้ใช้งานทั้งหมด"]) --> Customer["CUSTOMER: ลูกค้าทั่วไป"]
+    User --> Staff["STAFF: เจ้าหน้าที่คลังสินค้า"]
+    User --> Finance["FINANCE: เจ้าหน้าที่ฝ่ายการเงิน"]
+    User --> Admin["ADMIN: ผู้ดูแลระบบสูงสุด"]
 
-    Customer --> C1[เลือกดูสินค้า สั่งซื้อ จองพรีออเดอร์]
-    Customer --> C2[แนบสลิปชำระเงิน / ชำระค่างวดที่เหลือ]
-    Customer --> C3[ขอรับสิทธิ์ Waitlist และเล่น Ichiban Kuji]
-    Customer --> C4[ดาวน์โหลดใบกำกับภาษี e-Tax]
+    Customer --> C1["เลือกดูสินค้า สั่งซื้อ จองพรีออเดอร์"]
+    Customer --> C2["แนบสลิปชำระเงิน / ชำระค่างวดที่เหลือ"]
+    Customer --> C3["ขอรับสิทธิ์ Waitlist และเล่น Ichiban Kuji"]
+    Customer --> C4["ดาวน์โหลดใบกำกับภาษี e-Tax"]
 
-    Staff --> S1[ตรวจสอบคำสั่งซื้อที่พร้อมแพ็ค Ready to Pack]
-    Staff --> S2[อัปเดตสถานะฟิกเกอร์เข้าคลัง Arrived in Warehouse]
-    Staff --> S3[บันทึกเลขพัสดุ Flash / ไปรษณีย์ไทย]
+    Staff --> S1["ตรวจสอบคำสั่งซื้อที่พร้อมแพ็ค Ready to Pack"]
+    Staff --> S2["อัปเดตสถานะฟิกเกอร์เข้าคลัง Arrived in Warehouse"]
+    Staff --> S3["บันทึกเลขพัสดุ Flash / ไปรษณีย์ไทย"]
 
-    Finance --> F1[ตรวจสอบสลิปที่ระบบตรวจไม่ผ่าน Manual Review]
-    Finance --> F2[ตรวจสอบรายงานภาษีขาย VAT 7% และยกเว้น VAT]
-    Finance --> F3[อนุมัติหรือยกเลิกใบกำกับภาษี e-Tax Invoice]
+    Finance --> F1["ตรวจสอบสลิปที่ระบบตรวจไม่ผ่าน Manual Review"]
+    Finance --> F2["ตรวจสอบรายงานภาษีขาย VAT 7% และยกเว้น VAT"]
+    Finance --> F3["อนุมัติหรือยกเลิกใบกำกับภาษี e-Tax Invoice"]
 
-    Admin --> A1[จัดการแคตตาล็อก มังงะ ฟิกเกอร์ ซีรีส์ ผู้ผลิต]
-    Admin --> A2[ตั้งค่าตู้สลาก Ichiban Kuji และรางวัล Last One]
-    Admin --> A3[จัดการอัตราค่าส่ง สิทธิ์ผู้ใช้ และตั้งค่าระบบ]
+    Admin --> A1["จัดการแคตตาล็อก มังงะ ฟิกเกอร์ ซีรีส์ ผู้ผลิต"]
+    Admin --> A2["ตั้งค่าตู้สลาก Ichiban Kuji และรางวัล Last One"]
+    Admin --> A3["จัดการอัตราค่าส่ง สิทธิ์ผู้ใช้ และตั้งค่าระบบ"]
 ```
 
 ### ตารางเมทริกซ์สิทธิ์การใช้งาน (RBAC Permission Matrix)
@@ -194,55 +194,55 @@ graph TD
 ระบบถูกออกแบบด้วยสถาปัตยกรรมแบบ **Modern Full-Stack Decoupled Architecture** ผสมผสานระหว่าง Frontend Client-Side Rendering/Server Component และ Backend API Services พร้อมระบบ Worker ในการประมวลผลงานเบื้องหลัง
 
 ```mermaid
-graph TB
-    subgraph ClientLayer["🖥️ Client Presentation Layer"]
-        WebUser["🌐 Customer Browser<br/>(Desktop / Mobile)"]
-        BackofficeUser["💼 Staff / Finance / Admin<br/>(Backoffice UI)"]
+flowchart TB
+    subgraph ClientLayer["Client Presentation Layer"]
+        WebUser["Customer Browser (Desktop / Mobile)"]
+        BackofficeUser["Staff / Finance / Admin (Backoffice UI)"]
     end
 
-    subgraph FrontendApp["⚡ Next.js 16 Web Application (Port 3000)"]
-        NextRouter["App Router & Middleware<br/>(i18n / Session Guard)"]
-        ReactUI["React 19 Components<br/>(Tailwind CSS & Lucide)"]
-        ClientContext["Context Providers<br/>(Auth / Cart / Theme)"]
+    subgraph FrontendApp["Next.js 16 Web Application (Port 3000)"]
+        NextRouter["App Router & Middleware (i18n / Session Guard)"]
+        ReactUI["React 19 Components (Tailwind CSS & Lucide)"]
+        ClientContext["Context Providers (Auth / Cart / Theme)"]
     end
 
-    subgraph BackendAPI["🚀 Express API Application (Port 4000)"]
-        ExpressApp["Express Server & Middlewares<br/>(CORS / CookieParser / AuthToken)"]
+    subgraph BackendAPI["Express API Application (Port 4000)"]
+        ExpressApp["Express Server & Middlewares (CORS / CookieParser / AuthToken)"]
         
         subgraph Controllers["API Controllers & Services"]
-            AuthCtrl["Auth Service<br/>(JWT / bcrypt)"]
-            CatalogCtrl["Catalog Service<br/>(Manga & Figure Query)"]
-            CheckoutCtrl["Unified Checkout Service<br/>(Mixed Cart Engine)"]
-            SlipCtrl["Slip Verification Service<br/>(SHA-256 Anti-Fraud)"]
-            BalanceCtrl["Balance Settlement Service<br/>(7-Day Grace Period)"]
-            WaitlistCtrl["Waitlist Service & Worker<br/>(Auto Re-allocation)"]
-            TaxCtrl["Tax Invoice Service<br/>(PDFKit / Mod 11 Check)"]
-            KujiCtrl["Ichiban Kuji Service<br/>(Live Ticket State)"]
+            AuthCtrl["Auth Service (JWT / bcrypt)"]
+            CatalogCtrl["Catalog Service (Manga & Figure Query)"]
+            CheckoutCtrl["Unified Checkout Service (Mixed Cart Engine)"]
+            SlipCtrl["Slip Verification Service (SHA-256 Anti-Fraud)"]
+            BalanceCtrl["Balance Settlement Service (7-Day Grace Period)"]
+            WaitlistCtrl["Waitlist Service & Worker (Auto Re-allocation)"]
+            TaxCtrl["Tax Invoice Service (PDFKit / Mod 11 Check)"]
+            KujiCtrl["Ichiban Kuji Service (Live Ticket State)"]
         end
     end
 
-    subgraph WorkerLayer["⏱️ Background Workers & Cron Jobs"]
-        ForfeitureCron["Balance Forfeiture Cron<br/>(Runs Daily at 00:00)"]
-        WaitlistWorker["Waitlist Expiration Worker<br/>(Runs Every 10 Mins)"]
+    subgraph WorkerLayer["Background Workers & Cron Jobs"]
+        ForfeitureCron["Balance Forfeiture Cron (Runs Daily at 00:00)"]
+        WaitlistWorker["Waitlist Expiration Worker (Runs Every 10 Mins)"]
     end
 
-    subgraph PersistenceLayer["💾 Data Persistence Layer"]
-        PostgresDB[("🐘 PostgreSQL 16<br/>Relational Database")]
-        RedisStore[("⚡ Redis 7<br/>Session & Caching")]
-        FileStorage[("📁 Local / S3 Storage<br/>(PDF Tax Invoices & Uploads)")]
+    subgraph PersistenceLayer["Data Persistence Layer"]
+        PostgresDB[("PostgreSQL 16 Relational Database")]
+        RedisStore[("Redis 7 Session & Caching")]
+        FileStorage[("Local / S3 Storage (PDF Tax Invoices & Uploads)")]
     end
 
-    subgraph ExternalServices["🌍 External Services & APIs"]
-        SlipProvider["🏦 Slip Verification Provider<br/>(OpenSlipVerify / Bank API)"]
-        LineNotify["💬 LINE Messaging API<br/>(Push Message Notifications)"]
-        ResendMail["📧 Resend Email Service<br/>(Order Confirm & e-Tax PDF)"]
+    subgraph ExternalServices["External Services & APIs"]
+        SlipProvider["Slip Verification Provider (OpenSlipVerify / Bank API)"]
+        LineNotify["LINE Messaging API (Push Message Notifications)"]
+        ResendMail["Resend Email Service (Order Confirm & e-Tax PDF)"]
     end
 
     WebUser --> NextRouter
     BackofficeUser --> NextRouter
     NextRouter --> ReactUI
     ReactUI --> ClientContext
-    ClientContext -->|REST API Calls /api/*| ExpressApp
+    ClientContext -->|"REST API Calls: /api/*"| ExpressApp
 
     ExpressApp --> Controllers
     Controllers --> PostgresDB
@@ -323,12 +323,12 @@ erDiagram
 
     users {
         int id PK
-        varchar email UK
+        varchar email "UK"
         varchar password_hash
         varchar full_name
         varchar phone_number
         enum role
-        varchar line_user_id UK
+        varchar line_user_id "UK"
     }
 
     user_addresses {
@@ -346,7 +346,7 @@ erDiagram
 
     products {
         bigint id PK
-        varchar slug UK
+        varchar slug "UK"
         varchar name
         varchar product_type
         int volume_number
@@ -358,7 +358,7 @@ erDiagram
         bigint id PK
         bigint product_id FK
         varchar option_name
-        varchar sku UK
+        varchar sku "UK"
         numeric price
         int stock_quantity
         numeric weight_grams
@@ -366,7 +366,7 @@ erDiagram
     }
 
     figures_metadata {
-        bigint product_id PK,FK
+        bigint product_id PK "FK"
         bigint manufacturer_id FK
         bigint character_id FK
         varchar scale
@@ -379,7 +379,7 @@ erDiagram
     }
 
     preorders {
-        bigint product_variant_id PK,FK
+        bigint product_variant_id PK "FK"
         timestamptz start_date
         timestamptz end_date
         bigint quota_limit
@@ -392,7 +392,7 @@ erDiagram
     orders {
         bigint id PK
         int user_id FK
-        varchar order_number UK
+        varchar order_number "UK"
         numeric total_amount
         numeric immediate_amount
         numeric remaining_balance_amount
@@ -418,7 +418,7 @@ erDiagram
     shipments {
         bigint id PK
         bigint order_id FK
-        varchar shipment_number UK
+        varchar shipment_number "UK"
         varchar shipping_stage
         enum carrier
         varchar tracking_number
@@ -431,8 +431,8 @@ erDiagram
         bigint id PK
         bigint order_id FK
         varchar payment_stage
-        varchar transaction_ref UK
-        char slip_hash UK
+        varchar transaction_ref "UK"
+        char slip_hash "UK"
         numeric transfer_amount
         timestamptz transferred_at
     }
@@ -449,9 +449,9 @@ erDiagram
 
     tax_invoices {
         bigint id PK
-        bigint order_id UK,FK
+        bigint order_id FK "UK"
         int user_id FK
-        varchar invoice_number UK
+        varchar invoice_number "UK"
         enum entity_type
         char tax_id
         varchar company_or_name
@@ -845,7 +845,7 @@ sequenceDiagram
     participant WaitlistWorker as Waitlist Worker
     participant DB as ฐานข้อมูล (PostgreSQL)
     participant Notification as LINE / Email Service
-    actor WaitlistUser as ลูกค้าคิวสำรอง (Waitlist Queue #1)
+    actor WaitlistUser as ลูกค้าคิวสำรอง (Waitlist Queue No.1)
 
     Cron->>DB: ค้นหาคำสั่งซื้อที่ AWAITING_BALANCE_PAYMENT และ NOW() > balance_due_date
     DB-->>Cron: รายการคำสั่งซื้อที่หมดเวลาชำระเงิน
@@ -876,24 +876,24 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Start([เริ่มการออกใบกำกับภาษี]) --> ReadOrder[อ่านข้อมูลคำสั่งซื้อและรายการสินค้า]
-    ReadOrder --> SplitItems{แยกหมวดหมู่สินค้า}
-    
-    SplitItems -->|หนังสือ / มังงะ / ไลท์โนเวล| NonVat[จัดเข้าหมวดหมู่: ได้รับการยกเว้นภาษีมูลค่าเพิ่ม<br/>Non-VAT Amount / VAT Exempt]
-    SplitItems -->|ฟิกเกอร์ / ของเล่น / ค่าจัดส่งพัสดุ| Vat7[จัดเข้าหมวดหมู่: คิดภาษีมูลค่าเพิ่ม 7%<br/>Vatable Amount]
-    
-    NonVat --> SumTotal[รวมยอดแยกหมวดหมู่]
-    Vat7 --> CalcVat[คำนวณภาษีแยก: VAT = Vatable Amount x 7 / 107]
+    Start(["เริ่มการออกใบกำกับภาษี"]) --> ReadOrder["อ่านข้อมูลคำสั่งซื้อและรายการสินค้า"]
+    ReadOrder --> SplitItems{"แยกหมวดหมู่สินค้า"}
+
+    SplitItems -->|"หนังสือ / มังงะ / ไลท์โนเวล"| NonVat["จัดเข้าหมวดหมู่: ยกเว้นภาษีมูลค่าเพิ่ม (Non-VAT / VAT Exempt)"]
+    SplitItems -->|"ฟิกเกอร์ / ของเล่น / ค่าจัดส่ง"| Vat7["จัดเข้าหมวดหมู่: คิดภาษีมูลค่าเพิ่ม 7% (Vatable Amount)"]
+
+    NonVat --> SumTotal["รวมยอดแยกหมวดหมู่"]
+    Vat7 --> CalcVat["คำนวณภาษีแยก: VAT = Vatable Amount x 7 / 107"]
     CalcVat --> SumTotal
-    
-    SumTotal --> CheckTaxId{ตรวจสอบ Tax ID 13 หลัก}
-    CheckTaxId -->|ไม่ผ่าน Mod 11| Reject[ส่งข้อผิดพลาด: เลขประจำตัวผู้เสียภาษีไม่ถูกต้อง]
-    CheckTaxId -->|ผ่าน| GenNumber[ออกเลขที่ใบกำกับภาษีจาก Sequence ประจำเดือน<br/>เช่น INV-202610-0042]
-    
-    GenNumber --> GenPDF[สร้างไฟล์ PDF ด้วย PDFKit<br/>ฟอนต์สารบรรณ Sarabun + แปลงตัวเลขเป็นข้อความบาทไทย]
-    GenPDF --> SaveStorage[บันทึกไฟล์ลงคลังเอกสารและอัปเดตตาราง tax_invoices]
-    SaveStorage --> SendMail[ส่งอีเมลพร้อมแนบ PDF ไปยังลูกค้าโดยอัตโนมัติ]
-    SendMail --> Finish([เสร็จสิ้นกระบวนการ])
+
+    SumTotal --> CheckTaxId{"ตรวจสอบ Tax ID 13 หลัก"}
+    CheckTaxId -->|"ไม่ผ่าน Mod 11"| Reject["ส่งข้อผิดพลาด: เลขประจำตัวผู้เสียภาษีไม่ถูกต้อง"]
+    CheckTaxId -->|"ผ่าน"| GenNumber["ออกเลขที่ใบกำกับภาษีจาก Sequence (เช่น INV-202610-0042)"]
+
+    GenNumber --> GenPDF["สร้างไฟล์ PDF ด้วย PDFKit (ฟอนต์สารบรรณ + แปลงตัวเลขเป็นบาทไทย)"]
+    GenPDF --> SaveStorage["บันทึกไฟล์และอัปเดตตาราง tax_invoices"]
+    SaveStorage --> SendMail["ส่งอีเมลพร้อมแนบ PDF ไปยังลูกค้าโดยอัตโนมัติ"]
+    SendMail --> Finish(["เสร็จสิ้นกระบวนการ"])
 ```
 
 ---
@@ -915,7 +915,6 @@ sequenceDiagram
     Customer->>UI: กดปุ่มจับสลาก (เช่น ซื้อ 5 ใบ หรือ ดึงสลากที่เหลือทั้งหมด)
     UI->>KujiService: POST /api/kuji/draw (count: 5)
     
-    rect rgb(255, 245, 240)
     Note over KujiService,DB: การคำนวณสุ่มผลรางวัลแบบ Real-Time Atomicity
     KujiService->>DB: ตรวจสอบจำนวนตั๋วคงเหลือ >= จำนวนที่ดึง
     KujiService->>KujiService: สุ่มผลรางวัลตามสัดส่วนรางวัลที่ยังคงอยู่ในตู้
@@ -923,7 +922,6 @@ sequenceDiagram
     
     opt เมื่อตั๋วถูกดึงจนหมดตู้ (remainingTickets == 0)
         KujiService->>KujiService: มอบรางวัลพิเศษ 'Last One Prize' ให้กับตั๋วใบสุดท้ายโดยอัตโนมัติ!
-    end
     end
 
     KujiService-->>UI: ส่งผลการสลาก (รายการรางวัลที่ได้ + ธงระบุ Last One Prize)
@@ -1002,23 +1000,23 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    OrderCreated[คำสั่งซื้อ Mixed Cart ชำระงวดแรกสำเร็จ<br/>Shipping Policy = SPLIT] --> SplitInit{แยกสายงานพัสดุ}
-    
-    SplitInit -->|งวดแรก: มังงะพร้อมส่ง| Ship1[สร้างพัสดุรอบที่ 1: shipments.shipping_stage = INITIAL]
-    Ship1 --> Pack1[คลังแพ็คสินค้ามังงะ]
-    Pack1 --> Track1[ออกเลข Tracking รอบแรก เช่น Flash TH0123]
-    Track1 --> Delivered1[จัดส่งถึงลูกค้า: Shipment #1 DELIVERED<br/>สถานะคำสั่งซื้อยังคงเป็น processing]
-    
-    SplitInit -->|งวดที่สอง: ฟิกเกอร์พรีออเดอร์| WaitArrive[รอฟิกเกอร์ผลิตเสร็จและเข้าคลังไทย 6-9 เดือน]
-    WaitArrive --> Arrived[ฟิกเกอร์เข้าคลัง -> ลูกค้าชำระ Balance ใน 7 วัน]
-    Arrived --> Ship2[สร้างพัสดุรอบที่ 2: shipments.shipping_stage = BALANCE]
-    Ship2 --> Pack2[คลังแพ็คฟิกเกอร์ พร้อมห่อบับเบิ้ลกันกระแทกหนาพิเศษ]
-    Pack2 --> Track2[ออกเลข Tracking รอบสอง เช่น ไปรษณีย์ไทย EMS]
-    Track2 --> Delivered2[จัดส่งถึงลูกค้า: Shipment #2 DELIVERED]
-    
-    Delivered1 -.-> CheckAll{พัสดุทุกรอบส่งถึงครบถ้วน?}
+    OrderCreated["คำสั่งซื้อ Mixed Cart ชำระงวดแรกสำเร็จ (Shipping Policy: SPLIT)"] --> SplitInit{"แยกสายงานพัสดุ"}
+
+    SplitInit -->|"งวดแรก: มังงะพร้อมส่ง"| Ship1["สร้างพัสดุรอบที่ 1 (shipments.shipping_stage: INITIAL)"]
+    Ship1 --> Pack1["คลังแพ็คสินค้ามังงะ"]
+    Pack1 --> Track1["ออกเลข Tracking รอบแรก เช่น Flash TH0123"]
+    Track1 --> Delivered1["จัดส่งถึงลูกค้า: พัสดุรอบที่ 1 DELIVERED (สถานะคำสั่งซื้อ: processing)"]
+
+    SplitInit -->|"งวดที่สอง: ฟิกเกอร์พรีออเดอร์"| WaitArrive["รอฟิกเกอร์ผลิตเสร็จและเข้าคลังไทย 6-9 เดือน"]
+    WaitArrive --> Arrived["ฟิกเกอร์เข้าคลัง: ลูกค้าชำระ Balance ใน 7 วัน"]
+    Arrived --> Ship2["สร้างพัสดุรอบที่ 2 (shipments.shipping_stage: BALANCE)"]
+    Ship2 --> Pack2["คลังแพ็คฟิกเกอร์ พร้อมห่อบับเบิ้ลกันกระแทก"]
+    Pack2 --> Track2["ออกเลข Tracking รอบสอง เช่น ไปรษณีย์ไทย EMS"]
+    Track2 --> Delivered2["จัดส่งถึงลูกค้า: พัสดุรอบที่ 2 DELIVERED"]
+
+    Delivered1 -.-> CheckAll{"พัสดุทุกรอบส่งถึงครบถ้วน?"}
     Delivered2 --> CheckAll
-    CheckAll -->|ครบทุกชิ้น| OrderComplete[ปรับสถานะคำสั่งซื้อเป็น completed ปิดบิลสมบูรณ์]
+    CheckAll -->|"ครบทุกชิ้น"| OrderComplete["ปรับสถานะคำสั่งซื้อเป็น completed ปิดบิลสมบูรณ์"]
 ```
 
 ---
@@ -1175,20 +1173,20 @@ EMAIL_FROM=orders@mangacollectibles.com
 
 ```mermaid
 flowchart LR
-    subgraph DailyCron["🕛 Daily Cron (00:00 น.)"]
-        Forfeit["ริบเงินมัดจำออเดอร์ค้างชำระเกิน 7 วัน<br/>(DEPOSIT_FORFEITED)"]
+    subgraph DailyCron["Daily Cron (00:00 น.)"]
+        Forfeit["ริบเงินมัดจำออเดอร์ค้างชำระเกิน 7 วัน (DEPOSIT_FORFEITED)"]
         ReleaseQuota["ปล่อยโควตาสินค้าคืนระบบ"]
         Forfeit --> ReleaseQuota
     end
 
-    subgraph PeriodicWorker["⏱️ Worker ทุก 10 นาที"]
-        CheckWaitlist["ตรวจสอบ Waitlist สถานะ OFFERED<br/>ที่หมดเวลา 48 ชม."]
+    subgraph PeriodicWorker["Worker ทุก 10 นาที"]
+        CheckWaitlist["ตรวจสอบ Waitlist สถานะ OFFERED ที่หมดเวลา 48 ชม."]
         ExpireOffer["ปรับสถานะเป็น EXPIRED"]
         NextQueue["ส่งต่อ Offer ให้คิวสำรองลำดับถัดไป"]
         CheckWaitlist --> ExpireOffer --> NextQueue
     end
 
-    ReleaseQuota -.กระตุ้นคิว.-> CheckWaitlist
+    ReleaseQuota -.->|"กระตุ้นคิว"| CheckWaitlist
 ```
 
 1. **Daily Balance Forfeiture Cron (`0 0 * * *` - ทำงานทุกเที่ยงคืน):**

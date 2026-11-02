@@ -17,6 +17,7 @@ export default function BentoCategoryGrid() {
   const mangaCollection = STORE_COLLECTIONS.find((c) => c.slug === 'manga')!;
   const lnCollection = STORE_COLLECTIONS.find((c) => c.slug === 'light-novel')!;
   const figureCollection = STORE_COLLECTIONS.find((c) => c.slug === 'figures')!;
+  const gunplaCollection = STORE_COLLECTIONS.find((c) => c.slug === 'gunpla')!;
   const goodsCollection = STORE_COLLECTIONS.find((c) => c.slug === 'goods')!;
   const accCollection = STORE_COLLECTIONS.find((c) => c.slug === 'accessories')!;
 
@@ -234,7 +235,69 @@ export default function BentoCategoryGrid() {
         </div>
       </Link>
 
-      {/* ===================== [4. GOODS: Bento Card (lg:col-span-1)] ===================== */}
+      {/* ===================== [4. GUNPLA: Bento Card (lg:col-span-1)] ===================== */}
+      <Link
+        href={`/collections/${gunplaCollection.slug}`}
+        className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-zinc-200 bg-gradient-to-br from-white via-indigo-50/20 to-blue-50/30 p-6 shadow-xs transition duration-300 hover:-translate-y-1.5 hover:border-indigo-400 hover:shadow-xl dark:border-zinc-800 dark:bg-gradient-to-br dark:from-zinc-900 dark:via-zinc-900 dark:to-indigo-950/20 dark:hover:border-indigo-500 lg:col-span-1"
+      >
+        <div>
+          {/* Badges */}
+          <div className="flex items-center justify-between">
+            <span className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-800 shadow-2xs dark:border-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300">
+              {gunplaCollection.featureBadge}
+            </span>
+            <span className="rounded-lg border border-blue-200/90 bg-blue-100/80 px-2 py-0.5 text-[11px] font-bold text-blue-800 shadow-2xs dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
+              {gunplaCollection.itemCountText}
+            </span>
+          </div>
+
+          <div className="mt-3 flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+            <Boxes size={14} aria-hidden="true" />
+            <span>{gunplaCollection.subtitle}</span>
+          </div>
+
+          <h3 className="mt-1 text-xl font-black text-zinc-900 transition group-hover:text-indigo-600 dark:text-zinc-100 dark:group-hover:text-indigo-400">
+            {gunplaCollection.title}
+          </h3>
+
+          <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+            {gunplaCollection.description}
+          </p>
+
+          {/* Visual: Plamo preview */}
+          <div className="my-4 flex h-48 items-center justify-center overflow-hidden">
+            <img
+              src={`/images/products/${gunplaCollection.previewImages[0]}`}
+              alt="Gunpla model"
+              className="h-44 w-auto object-contain drop-shadow-xl transition-all duration-500 group-hover:scale-110"
+            />
+          </div>
+
+          {/* Tags */}
+          <div className="flex flex-wrap gap-1.5">
+            {gunplaCollection.tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer Link */}
+        <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3 text-xs font-bold text-indigo-600 transition dark:border-zinc-800 dark:text-indigo-400">
+          <span>เลือกดูกันพลาทั้งหมด</span>
+          <ArrowRight
+            size={14}
+            className="transform transition duration-300 group-hover:translate-x-1.5"
+            aria-hidden="true"
+          />
+        </div>
+      </Link>
+
+      {/* ===================== [5. GOODS: Bento Card (lg:col-span-1)] ===================== */}
       <Link
         href={`/collections/${goodsCollection.slug}`}
         className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-zinc-200 bg-gradient-to-br from-white via-rose-50/20 to-pink-50/30 p-6 shadow-xs transition duration-300 hover:-translate-y-1.5 hover:border-rose-400 hover:shadow-xl dark:border-zinc-800 dark:bg-gradient-to-br dark:from-zinc-900 dark:via-zinc-900 dark:to-rose-950/20 dark:hover:border-rose-500 lg:col-span-1"
@@ -296,7 +359,7 @@ export default function BentoCategoryGrid() {
         </div>
       </Link>
 
-      {/* ===================== [5. ACCESSORIES: Bento Card (lg:col-span-1)] ===================== */}
+      {/* ===================== [6. ACCESSORIES: Bento Card (lg:col-span-1)] ===================== */}
       <Link
         href={`/collections/${accCollection.slug}`}
         className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-zinc-200 bg-gradient-to-br from-white via-amber-50/20 to-orange-50/30 p-6 shadow-xs transition duration-300 hover:-translate-y-1.5 hover:border-amber-400 hover:shadow-xl dark:border-zinc-800 dark:bg-gradient-to-br dark:from-zinc-900 dark:via-zinc-900 dark:to-amber-950/20 dark:hover:border-amber-500 lg:col-span-1"

@@ -1181,9 +1181,9 @@ export default function Navbar() {
 
                   {/* Plamo */}
                   <Link
-                    href="/collections/plamo"
+                    href="/collections/gunpla"
                     className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
-                      pathname === "/collections/plamo"
+                      pathname === "/collections/gunpla" || pathname === "/collections/plamo"
                         ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
                         : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
                     }`}
@@ -1294,7 +1294,7 @@ export default function Navbar() {
                                 <span className="text-[10px] font-bold text-zinc-400">Figures</span>
                               </Link>
                               <Link
-                                href="/collections/plamo"
+                                href="/collections/gunpla"
                                 onClick={() => setCategoryDropdownOpen(false)}
                                 className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-zinc-700 hover:bg-blue-50 hover:text-blue-700 dark:text-zinc-200 dark:hover:bg-blue-950/40 dark:hover:text-blue-300 font-semibold transition"
                               >

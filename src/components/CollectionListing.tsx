@@ -283,7 +283,9 @@ export default function CollectionListing({
     if (!catalog) return [];
     switch (collection.slug) {
       case "figures":
-        return [...catalog.figures, ...catalog.plamo];
+        return catalog.figures;
+      case "gunpla":
+        return catalog.plamo;
       case "goods":
         return catalog.goods;
       case "accessories":

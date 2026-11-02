@@ -16,7 +16,13 @@ export default async function CollectionCategoryPage({
     redirect("/collections/manga?filter=best-seller");
   }
 
-  const collection = STORE_COLLECTIONS.find((item) => item.slug === slug);
+  if (slug === "plamo") {
+    redirect("/collections/gunpla");
+  }
+
+  const collection = STORE_COLLECTIONS.find(
+    (item) => item.slug === slug || (slug === "plamo" && item.slug === "gunpla")
+  );
 
   if (!collection) notFound();
 
