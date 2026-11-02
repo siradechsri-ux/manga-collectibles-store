@@ -6,7 +6,7 @@
 ### ข้อมูลเอกสาร (Document Metadata)
 * **ชื่อโครงการ:** Manga & Collectibles Store Platform
 * **รหัสโครงการ:** MCS-SA-2026-V1
-* **เวอร์ชันเอกสาร:** Version 1.0 (สมบูรณ์)
+* **เวอร์ชันเอกสาร:** Version 1.1 (Comprehensive Enterprise & QA Baseline)
 * **สถานะ:** เอกสารผ่านการวิเคราะห์และตรวจสอบทางเทคนิค (Approved / Architecture Baseline)
 * **กลุ่มเป้าหมายผู้อ่าน:** System Analyst, Software Engineer, Database Administrator, Product Owner, QA Engineer
 
@@ -27,9 +27,14 @@
    - 6.4 Figure Waitlist Queue & Auto-Allocation
    - 6.5 e-Tax Invoice & Mixed VAT Calculation (RD Compliance)
    - 6.6 Ichiban Kuji Online Lottery Box & Last One Prize
+   - 6.7 Preorder Manufacturer Cancellation & Full Refund Flow
+   - 6.8 Product Defect Claims & RMA Flow
+   - 6.9 Split Shipment & Multi-Parcel Tracking Lifecycle
 7. [ข้อกำหนดส่วนต่อประสานโปรแกรมประยุกต์ (API Specification & Contracts)](#7-ข้อกำหนดส่วนต่อประสานโปรแกรมประยุกต์-api-specification--contracts)
 8. [ความมั่นคงปลอดภัยและการจัดการข้อผิดพลาด (Security & Error Handling)](#8-ความมั่นคงปลอดภัยและการจัดการข้อผิดพลาด-security--error-handling)
 9. [การติดตั้ง สภาพแวดล้อม และงานเบื้องหลัง (Deployment & Scheduled Tasks)](#9-การติดตั้ง-สภาพแวดล้อม-และงานเบื้องหลัง-deployment--scheduled-tasks)
+10. [เมทริกซ์กรณีทดสอบและเกณฑ์การยอมรับ (Test Scenarios & Acceptance Criteria Matrix)](#10-เมทริกซ์กรณีทดสอบและเกณฑ์การยอมรับ-test-scenarios--acceptance-criteria-matrix)
+11. [สรุปผลการวิเคราะห์และข้อเสนอแนะ (Conclusion & Next Steps)](#11-สรุปผลการวิเคราะห์และข้อเสนอแนะ-conclusion--next-steps)
 
 ---
 
@@ -155,6 +160,21 @@ graph TD
 * **FR-8.1:** ระบบสมาชิกคำนวณระดับตามยอดสะสมแต้ม (Member, Silver, Gold, Platinum) และให้สิทธิประโยชน์ส่วนลดแตกต่างกัน
 * **FR-8.2:** ระบบตู้สลากออนไลน์ Ichiban Kuji จำลองการจับฉลากแบบเรียลไทม์ ตรวจสอบสิทธิ์และจำนวนคงเหลือในตู้ (Box Stock) พร้อมกลไกมอบรางวัลพิเศษ **Last One Prize** สำหรับผู้ที่ดึงตั๋วใบสุดท้ายในกล่อง
 
+#### หมวดที่ 9: การจัดการที่อยู่และข้อมูลการจัดส่ง (Address & Delivery Management)
+* **FR-9.1:** ระบบต้องมีสมุดที่อยู่ (`user_addresses`) ให้ลูกค้าบันทึกที่อยู่จัดส่งได้หลายแห่ง โดยกำหนดที่อยู่หลัก (Default Shipping Address) ได้
+* **FR-9.2:** ในกรณีคำสั่งซื้อพรีออเดอร์ ลูกค้าสามารถแก้ไขที่อยู่จัดส่งในคำสั่งซื้อได้ตลอดช่วงเวลารอสินค้าเข้าคลัง จนถึงขั้นตอนการชำระค่างวดคงเหลือ (`AWAITING_BALANCE_PAYMENT`)
+* **FR-9.3:** กรณีเลือกนโยบายแยกจัดส่ง (`SPLIT`) ระบบต้องสร้างรายการพัสดุ (`shipments`) แยกออกเป็นรอบสินค้าพร้อมส่ง และรอบฟิกเกอร์พรีออเดอร์ โดยแต่ละพัสดุมีเลข Tracking Number และสถานะการจัดส่งแยกกันเป็นอิสระ
+
+#### หมวดที่ 10: การยกเลิกและคืนเงินกรณีผู้ผลิตเลื่อน/ยกเลิก (Manufacturer Cancellation & Refunds)
+* **FR-10.1:** กรณีค่ายผู้ผลิตประกาศยกเลิกการผลิตฟิกเกอร์ (Cancelled by Manufacturer) ผู้ดูแลระบบสามารถปรับสถานะสินค้าเป็น `CANCELLED_BY_MANUFACTURER`
+* **FR-10.2:** เมื่อสินค้าถูกยกเลิกการผลิต ระบบต้องสร้างรายการขอคืนเงินมัดจำเต็มจำนวน 100% (`FULL_REFUND`) ให้ลูกค้าทุกคนที่เคยวางมัดจำไว้ และเปลี่ยนสถานะคำสั่งซื้อเป็น `REFUNDED` หลังการเงินแนบหลักฐานการโอนเงินคืน
+* **FR-10.3:** กรณีผู้ผลิตเลื่อนกำหนดส่งมอบ (Release Delay) แอดมินสามารถบันทึกกำหนดวันเข้าคลังใหม่ (`estimatedReleaseDate`) พร้อมส่งข้อความแจ้งเตือนลูกค้าทาง LINE / Email โดยอัตโนมัติ
+
+#### หมวดที่ 11: การเคลมสินค้าและการส่งคืน (Claims & RMA Management)
+* **FR-11.1:** ลูกค้าสามารถยื่นคำร้องเคลมสินค้าชำรุดเสียหาย (ชิ้นส่วนหัก/หาย, หนังสือหน้าขาด/สลับ) ภายใน 7 วัน นับจากวันที่พัสดุขึ้นสถานะส่งมอบสำเร็จ (`DELIVERED`)
+* **FR-11.2:** คำร้องเคลมต้องระบุประเภทความเสียหาย แนบรูปถ่าย และลิงก์คลิปวิดีโอขณะแกะกล่องพัสดุ (Unboxing Video Requirement)
+* **FR-11.3:** เจ้าหน้าที่สามารถตรวจสอบและอนุมัติการเคลมได้ 3 รูปแบบ: ส่งชิ้นส่วนใหม่ทดแทน (`SPARE_PARTS`), เปลี่ยนสินค้าชิ้นใหม่ (`REPLACEMENT`), หรือคืนเงิน (`REFUND`)
+
 ---
 
 ### 3.2 ความต้องการที่มิใช่เชิงหน้าที่ (Non-Functional Requirements - NFR)
@@ -164,6 +184,8 @@ graph TD
 * **NFR-3 (Performance):** หน้าเว็บแคตตาล็อกสินค้าต้องตอบสนองด้วยเวลาเฉลี่ย (First Contentful Paint) ต่ำกว่า 1.5 วินาที และ API Response Time ของระบบ Checkout ต้องต่ำกว่า 800 ms ที่ระดับ 100 concurrent requests
 * **NFR-4 (Idempotency):** API ยืนยันการชำระเงินและการตัดยอดคงเหลือต้องรองรับ Idempotency Key เพื่อป้องกันการหักเงินซ้ำกรณีที่มีการส่ง Request ซ้ำซ้อนจากเครือข่ายหลุด
 * **NFR-5 (Tax Law Compliance):** รูปแบบใบกำกับภาษีและการคำนวณยอดต้องถูกต้องตามระเบียบกรมสรรพากรแห่งประเทศไทย 100%
+* **NFR-6 (Auditability & Data Retention):** ทุกการดำเนินการสำคัญของเจ้าหน้าที่ (การปรับสต็อก, การอนุมัติสลิปด้วยมือ, การบันทึกสินค้าเข้าคลัง, การคืนเงิน) ต้องถูกบันทึกใน Audit Log พร้อม User ID, Timestamp, IP Address, และข้อมูลก่อน/หลังการแก้ไข (Immutable Audit Trail)
+* **NFR-7 (PDPA & Privacy Protection):** ระบบต้องปฏิบัติตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 โดยจำกัดการเข้าถึงข้อมูลประจำตัวผู้เสียภาษี/บัตรประชาชน 13 หลัก และรูปสลิปโอนเงิน พร้อมรองรับกลไก Data Anonymization กรณีผู้ใช้ขอลบบัญชี
 
 ---
 
@@ -260,8 +282,13 @@ graph TB
 ```mermaid
 erDiagram
     users ||--o{ orders : "places"
+    users ||--o{ user_addresses : "owns"
     users ||--o{ product_waitlists : "joins"
     users ||--o{ tax_invoices : "requests"
+    users ||--o{ points_ledger : "transacts"
+    users ||--o{ order_claims : "raises"
+    users ||--o{ audit_logs : "performed by"
+    users ||--o{ kuji_tickets : "draws"
     
     publishers ||--o{ manga_series : "publishes"
     publishers ||--o{ products : "owns"
@@ -278,8 +305,12 @@ erDiagram
     product_variants ||--o{ product_waitlists : "queued for"
     
     orders ||--|{ order_items : "contains"
+    orders ||--|{ shipments : "fulfills via"
     orders ||--o{ bank_slips : "verified by"
     orders ||--o| tax_invoices : "generates"
+    orders ||--o{ order_claims : "has claims"
+
+    kuji_boxes ||--|{ kuji_tickets : "contains"
 
     shipping_rates {
         bigint id PK
@@ -298,6 +329,19 @@ erDiagram
         varchar phone_number
         enum role
         varchar line_user_id UK
+    }
+
+    user_addresses {
+        bigint id PK
+        int user_id FK
+        varchar recipient_name
+        varchar phone_number
+        varchar address_line
+        varchar subdistrict
+        varchar district
+        varchar province
+        char postal_code
+        boolean is_default
     }
 
     products {
@@ -353,6 +397,7 @@ erDiagram
         numeric immediate_amount
         numeric remaining_balance_amount
         numeric shipping_fee
+        varchar shipping_policy
         varchar order_status
         varchar payment_status
         varchar settlement_status
@@ -368,6 +413,18 @@ erDiagram
         numeric balance_amount
         varchar payment_type
         varchar settlement_status
+    }
+
+    shipments {
+        bigint id PK
+        bigint order_id FK
+        varchar shipment_number UK
+        varchar shipping_stage
+        enum carrier
+        varchar tracking_number
+        varchar status
+        timestamptz shipped_at
+        timestamptz delivered_at
     }
 
     bank_slips {
@@ -402,6 +459,61 @@ erDiagram
         numeric vatable_amount
         numeric vat_amount
         numeric total_amount
+    }
+
+    order_claims {
+        bigint id PK
+        bigint order_id FK
+        int user_id FK
+        varchar claim_type
+        varchar description
+        varchar video_evidence_url
+        varchar status
+        varchar resolution_type
+        numeric refund_amount
+    }
+
+    kuji_boxes {
+        bigint id PK
+        varchar title
+        numeric price_per_draw
+        int points_per_draw
+        int total_tickets
+        int remaining_tickets
+        varchar status
+    }
+
+    kuji_tickets {
+        bigint id PK
+        bigint box_id FK
+        int ticket_number
+        varchar prize_grade
+        varchar prize_name
+        boolean is_last_one
+        int drawn_by_user_id FK
+        timestamptz drawn_at
+    }
+
+    points_ledger {
+        bigint id PK
+        int user_id FK
+        varchar transaction_type
+        int amount
+        int balance_after
+        varchar reference_id
+        timestamptz created_at
+    }
+
+    audit_logs {
+        bigint id PK
+        int performed_by_user_id FK
+        varchar action
+        varchar resource_type
+        varchar resource_id
+        jsonb old_values
+        jsonb new_values
+        varchar ip_address
+        timestamptz created_at
     }
 ```
 
@@ -531,6 +643,94 @@ erDiagram
 | `total_amount` | `NUMERIC(14,2)`| Not Null | ยอดรวมทั้งสิ้นสุทธิ |
 | `pdf_file_url` | `TEXT` | Nullable | URL ดาวน์โหลดไฟล์ PDF |
 | `status` | `ENUM` | Default 'ISSUED' | สถานะ: ISSUED, CANCELLED |
+
+#### 10. ตาราง `shipments` (การจัดส่งพัสดุและการแยกส่ง Split Shipping)
+| ชื่อคอลัมน์ (Field) | ชนิดข้อมูล (Data Type) | ข้อกำหนด (Constraints) | คำอธิบาย (Description) |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | PK, Identity | รหัสรายการพัสดุ |
+| `order_id` | `BIGINT` | FK -> orders.id | รหัสคำสั่งซื้อที่จัดส่ง |
+| `shipment_number` | `VARCHAR(64)` | Unique, Not Null | รหัสอ้างอิงพัสดุ เช่น `SHP-202610-0012-1` |
+| `shipping_stage` | `VARCHAR(16)` | Check in ('INITIAL', 'BALANCE') | รอบจัดส่ง: สินค้าพร้อมส่ง (INITIAL) หรือ ฟิกเกอร์ตามหลัง (BALANCE) |
+| `carrier` | `ENUM` | Not Null | ผู้ให้บริการขนส่ง (`FLASH`, `THAI_POST`) |
+| `tracking_number` | `VARCHAR(100)` | Nullable | หมายเลขติดตามพัสดุ (Tracking Number) |
+| `status` | `VARCHAR(32)` | Default 'PENDING' | PENDING, PACKED, IN_TRANSIT, DELIVERED, RETURNED |
+| `shipped_at` | `TIMESTAMPTZ` | Nullable | วันเวลาที่ส่งพัสดุออกจากคลัง |
+| `delivered_at` | `TIMESTAMPTZ` | Nullable | วันเวลาที่พัสดุถึงมือผู้รับสำเร็จ |
+
+#### 11. ตาราง `user_addresses` (สมุดที่อยู่ผู้ใช้งาน)
+| ชื่อคอลัมน์ (Field) | ชนิดข้อมูล (Data Type) | ข้อกำหนด (Constraints) | คำอธิบาย (Description) |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | PK, Identity | รหัสที่อยู่ |
+| `user_id` | `INTEGER` | FK -> users.id | เจ้าของที่อยู่ |
+| `recipient_name` | `VARCHAR(150)` | Not Null | ชื่อ-นามสกุล ผู้รับพัสดุ |
+| `phone_number` | `VARCHAR(30)` | Not Null | เบอร์โทรศัพท์ผู้รับ |
+| `address_line` | `VARCHAR(300)` | Not Null | ที่อยู่ (บ้านเลขที่ อาคาร ซอย) |
+| `subdistrict` | `VARCHAR(120)` | Not Null | แขวง / ตำบล |
+| `district` | `VARCHAR(120)` | Not Null | เขต / อำเภอ |
+| `province` | `VARCHAR(120)` | Not Null | จังหวัด |
+| `postal_code` | `CHAR(5)` | Not Null, Format ^[0-9]{5}$ | รหัสไปรษณีย์ 5 หลัก |
+| `is_default` | `BOOLEAN` | Default FALSE | ที่อยู่หลักสำหรับจัดส่งเริ่มต้น |
+
+#### 12. ตาราง `order_claims` (การยื่นเรื่องเคลมสินค้าชำรุด/มีตำหนิ RMA)
+| ชื่อคอลัมน์ (Field) | ชนิดข้อมูล (Data Type) | ข้อกำหนด (Constraints) | คำอธิบาย (Description) |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | PK, Identity | รหัสคำร้องเคลม |
+| `order_id` | `BIGINT` | FK -> orders.id | คำสั่งซื้อที่มีปัญหา |
+| `user_id` | `INTEGER` | FK -> users.id | ผู้ยื่นคำร้องเคลม |
+| `claim_type` | `VARCHAR(32)` | Check in ('DEFECT', 'BROKEN', 'WRONG_ITEM', 'PAGE_DEFECT') | ประเภทความเสียหาย |
+| `description` | `TEXT` | Not Null | รายละเอียดความเสียหาย |
+| `video_evidence_url`| `TEXT` | Not Null | URL ลิงก์คลิปวิดีโอขณะแกะกล่องพัสดุ |
+| `photo_urls` | `JSONB` | Nullable | อาเรย์ URL รูปถ่ายจุดที่มีปัญหา |
+| `status` | `VARCHAR(32)` | Default 'SUBMITTED' | SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, COMPLETED |
+| `resolution_type` | `VARCHAR(32)` | Nullable | SPARE_PARTS, REPLACEMENT, REFUND |
+| `refund_amount` | `NUMERIC(12,2)`| Nullable | ยอดเงินคืนกรณีอนุมัติคืนเงิน |
+
+#### 13. ตาราง `kuji_boxes` (ตู้สลากออนไลน์ Ichiban Kuji)
+| ชื่อคอลัมน์ (Field) | ชนิดข้อมูล (Data Type) | ข้อกำหนด (Constraints) | คำอธิบาย (Description) |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | PK, Identity | รหัสตู้สลาก |
+| `title` | `VARCHAR(250)` | Not Null | ชื่อคอลเลกชันตู้สลาก |
+| `price_per_draw` | `NUMERIC(10,2)`| Default 0 | ราคาเงินสดต่อการดึง 1 ใบ |
+| `points_per_draw`| `INTEGER` | Default 50 | แต้มสะสมที่ใช้ต่อการดึง 1 ใบ |
+| `total_tickets` | `INTEGER` | Not Null, Check > 0 | จำนวนสลากทั้งหมดในกล่อง (เช่น 50, 80 ใบ) |
+| `remaining_tickets`| `INTEGER` | Not Null, Check >= 0 | จำนวนสลากที่ยังไม่ถูกดึง |
+| `status` | `VARCHAR(24)` | Default 'OPEN' | OPEN, SOLD_OUT, ARCHIVED |
+
+#### 14. ตาราง `kuji_tickets` (สลากในตู้สลาก Ichiban Kuji)
+| ชื่อคอลัมน์ (Field) | ชนิดข้อมูล (Data Type) | ข้อกำหนด (Constraints) | คำอธิบาย (Description) |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | PK, Identity | รหัสใบสลาก |
+| `box_id` | `BIGINT` | FK -> kuji_boxes.id | ตู้สลากที่สังกัด |
+| `ticket_number` | `INTEGER` | Not Null, Check > 0 | หมายเลขสลากประจำตู้ |
+| `prize_grade` | `VARCHAR(10)` | Not Null | เกรดรางวัล (A, B, C, D, E, LAST_ONE) |
+| `prize_name` | `VARCHAR(250)` | Not Null | ชื่อของรางวัลที่ระบุในสลาก |
+| `is_last_one` | `BOOLEAN` | Default FALSE | สลากใบสุดท้ายที่จะได้รับรางวัล Last One พิเศษ |
+| `drawn_by_user_id`| `INTEGER` | Nullable, FK -> users.id| ผู้ที่จับสลากใบนี้ไปได้ |
+| `drawn_at` | `TIMESTAMPTZ` | Nullable | วันเวลาที่สลากถูกจับ |
+
+#### 15. ตาราง `points_ledger` (สมุดบัญชีแต้มสะสมสมาชิก)
+| ชื่อคอลัมน์ (Field) | ชนิดข้อมูล (Data Type) | ข้อกำหนด (Constraints) | คำอธิบาย (Description) |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | PK, Identity | รหัสรายการแต้ม |
+| `user_id` | `INTEGER` | FK -> users.id | สมาชิกเจ้าของแต้ม |
+| `transaction_type`| `VARCHAR(32)` | Check in ('EARNED', 'REDEEMED', 'EXPIRED', 'BONUS') | ประเภทรายการแต้ม |
+| `amount` | `INTEGER` | Not Null (บวกหรือลบ) | จำนวนแต้มที่มีการเคลื่อนไหว |
+| `balance_after` | `INTEGER` | Not Null, Check >= 0 | แต้มคงเหลือสุทธิหลังทำรายการ |
+| `reference_id` | `VARCHAR(100)` | Nullable | รหัสอ้างอิงออเดอร์หรือตั๋วคูจิที่ใช้แต้ม |
+| `created_at` | `TIMESTAMPTZ` | Default NOW() | วันเวลาที่เกิดรายการ |
+
+#### 16. ตาราง `audit_logs` (บันทึกประวัติการกระทำของเจ้าหน้าที่)
+| ชื่อคอลัมน์ (Field) | ชนิดข้อมูล (Data Type) | ข้อกำหนด (Constraints) | คำอธิบาย (Description) |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | PK, Identity | รหัสประวัติการบันทึก |
+| `performed_by_user_id`| `INTEGER` | FK -> users.id | ผู้กระทำการ (Admin, Staff, Finance) |
+| `action` | `VARCHAR(64)` | Not Null | กิจกรรม (e.g. FIGURE_ARRIVED, MANUAL_SLIP_APPROVE) |
+| `resource_type` | `VARCHAR(64)` | Not Null | เอนทิตีที่ถูกแก้ไข (e.g. orders, figures, products) |
+| `resource_id` | `VARCHAR(64)` | Not Null | รหัสอ้างอิงของ Resource นั้น |
+| `old_values` | `JSONB` | Nullable | ค่าข้อมูลเดิมก่อนการเปลี่ยนแปลง |
+| `new_values` | `JSONB` | Nullable | ค่าข้อมูลใหม่หลังการเปลี่ยนแปลง |
+| `ip_address` | `VARCHAR(45)` | Nullable | IP Address ของผู้เรียกใช้งาน |
+| `created_at` | `TIMESTAMPTZ` | Default NOW() | วันเวลาที่เกิดกิจกรรม |
 
 ---
 
@@ -732,6 +932,97 @@ sequenceDiagram
 
 ---
 
+### 6.7 โฟลว์การยกเลิกและคืนเงินมัดจำกรณีผู้ผลิตยกเลิก (Manufacturer Cancellation & Refund Flow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as ผู้ดูแลระบบ (Admin)
+    participant API as Preorder Service (Express)
+    participant DB as ฐานข้อมูล (PostgreSQL)
+    participant Notify as LINE / Email Service
+    actor Finance as ฝ่ายการเงิน (Finance)
+    actor Customer as ลูกค้าผู้สั่งจอง (Customer)
+
+    Admin->>API: POST /api/admin/preorders/cancel-batch (variantId, reason)
+    API->>DB: BEGIN TRANSACTION
+    API->>DB: UPDATE preorders SET release_status = 'Cancelled'
+    API->>DB: ค้นหาคำสั่งซื้อที่มัดจำไว้ (WHERE payment_status = 'DEPOSIT_PAID')
+    API->>DB: UPDATE orders SET payment_status = 'REFUND_PENDING', settlement_status = 'CANCELLED'
+    API->>DB: COMMIT TRANSACTION
+
+    API->>Notify: สั่งส่งแจ้งเตือนการยกเลิกสินค้าและกระบวนการคืนเงินมัดจำ
+    Notify-->>Customer: "แจ้งเตือน: สินค้าถูกยกเลิกการผลิตโดยผู้ผลิต ทางร้านจะคืนเงินมัดจำ 100%"
+    
+    Finance->>API: GET /api/finance/refunds/pending
+    API-->>Finance: รายการออเดอร์ที่ต้องคืนเงินมัดจำ พร้อมบัญชีลูกค้า
+    Finance->>Customer: โอนเงินคืนเข้าบัญชีลูกค้า
+    Finance->>API: POST /api/finance/refunds/confirm (orderId, transferProofSlip)
+    API->>DB: UPDATE orders SET payment_status = 'REFUNDED'
+    API->>Notify: แจ้งเตือนสลิปการโอนเงินคืนสำเร็จ
+    Notify-->>Customer: "ส่งหลักฐานการโอนเงินคืนมัดจำเรียบร้อยแล้ว"
+```
+
+---
+
+### 6.8 โฟลว์การเคลมสินค้าและกระบวนการ RMA (Product Defect Claims & RMA Flow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer as ลูกค้า (Customer)
+    participant UI as ระบบหน้าบ้าน (Next.js Claims)
+    participant API as Claims Service (Express)
+    participant DB as ฐานข้อมูล (PostgreSQL)
+    actor Staff as เจ้าหน้าที่ตรวจสอบ (Staff/Admin)
+
+    Customer->>UI: กรอกแบบฟอร์มเคลม (เลือกออเดอร์, อาการชำรุด, รูปถ่าย + ลิงก์วิดีโอแกะกล่อง)
+    UI->>API: POST /api/claims (orderId, claimType, description, videoUrl, photos)
+    API->>DB: ตรวจสอบ NOW() <= order.delivered_at + 7 วัน
+    alt เกินกำหนด 7 วัน หรือไม่มีวิดีโอแกะกล่อง
+        API-->>UI: 400 Bad Request (CLAIM_EXPIRED หรือ VIDEO_REQUIRED)
+        UI-->>Customer: แจ้งเตือน: เกินกำหนด 7 วัน หรือจำเป็นต้องแนบคลิปวิดีโอขณะแกะพัสดุ
+    else ข้อมูลครบถ้วน
+        API->>DB: INSERT INTO order_claims (status = 'SUBMITTED')
+        API-->>UI: 201 Created (Claim ID)
+        UI-->>Customer: บันทึกคำร้องสำเร็จ รอเจ้าหน้าที่ตรวจสอบใน 1-2 วันทำการ
+    end
+
+    Staff->>API: GET /api/admin/claims/pending
+    API-->>Staff: รายการคำร้องเคลม พร้อมเปิดดูคลิปวิดีโอและรูปถ่าย
+    Staff->>API: PATCH /api/admin/claims/:id (action: 'APPROVE', resolution: 'REPLACEMENT')
+    API->>DB: UPDATE order_claims SET status = 'APPROVED', resolution_type = 'REPLACEMENT'
+    API->>DB: สร้างรายการพัสดุใหม่ใน shipments สำหรับส่งชิ้นส่วนทดแทน
+    API-->>Customer: ส่ง LINE / Email แจ้งผลการอนุมัติเคลม พร้อมเลขติดตามพัสดุชิ้นใหม่
+```
+
+---
+
+### 6.9 วงจรการแยกจัดส่งและการติดตามพัสดุหลายชิ้น (Split Shipment & Multi-Parcel Tracking Lifecycle)
+
+```mermaid
+flowchart TD
+    OrderCreated[คำสั่งซื้อ Mixed Cart ชำระงวดแรกสำเร็จ<br/>Shipping Policy = SPLIT] --> SplitInit{แยกสายงานพัสดุ}
+    
+    SplitInit -->|งวดแรก: มังงะพร้อมส่ง| Ship1[สร้างพัสดุรอบที่ 1: shipments.shipping_stage = INITIAL]
+    Ship1 --> Pack1[คลังแพ็คสินค้ามังงะ]
+    Pack1 --> Track1[ออกเลข Tracking รอบแรก เช่น Flash TH0123]
+    Track1 --> Delivered1[จัดส่งถึงลูกค้า: Shipment #1 DELIVERED<br/>สถานะคำสั่งซื้อยังคงเป็น processing]
+    
+    SplitInit -->|งวดที่สอง: ฟิกเกอร์พรีออเดอร์| WaitArrive[รอฟิกเกอร์ผลิตเสร็จและเข้าคลังไทย 6-9 เดือน]
+    WaitArrive --> Arrived[ฟิกเกอร์เข้าคลัง -> ลูกค้าชำระ Balance ใน 7 วัน]
+    Arrived --> Ship2[สร้างพัสดุรอบที่ 2: shipments.shipping_stage = BALANCE]
+    Ship2 --> Pack2[คลังแพ็คฟิกเกอร์ พร้อมห่อบับเบิ้ลกันกระแทกหนาพิเศษ]
+    Pack2 --> Track2[ออกเลข Tracking รอบสอง เช่น ไปรษณีย์ไทย EMS]
+    Track2 --> Delivered2[จัดส่งถึงลูกค้า: Shipment #2 DELIVERED]
+    
+    Delivered1 -.-> CheckAll{พัสดุทุกรอบส่งถึงครบถ้วน?}
+    Delivered2 --> CheckAll
+    CheckAll -->|ครบทุกชิ้น| OrderComplete[ปรับสถานะคำสั่งซื้อเป็น completed ปิดบิลสมบูรณ์]
+```
+
+---
+
 ## 7. ข้อกำหนดส่วนต่อประสานโปรแกรมประยุกต์ (API Specification & Contracts)
 
 ### 7.1 หมวดการพิสูจน์ตัวตน (Authentication Endpoints)
@@ -765,6 +1056,20 @@ sequenceDiagram
 | `PATCH` | `/api/staff/orders/shipped` | Staff / Admin | บันทึกเลข Tracking Number และสถานะจัดส่ง |
 | `POST` | `/api/tax-invoices` | Customer | ส่งคำขอออกใบกำกับภาษีเต็มรูปแบบ |
 | `GET` | `/api/finance/tax-invoices` | Finance / Admin | ดูรายงานใบกำกับภาษีและยอดสรุปภาษีมูลค่าเพิ่ม |
+
+### 7.5 หมวดการจัดการที่อยู่ การจัดส่ง และการเคลม (Addresses, Shipments & Claims Endpoints)
+| HTTP Method | Endpoint | สิทธิ์เข้าถึง (Auth) | คำอธิบาย (Description) |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/user/addresses` | Authenticated | ดึงรายการสมุดที่อยู่ทั้งหมดของผู้ใช้งาน |
+| `POST` | `/api/user/addresses` | Authenticated | เพิ่มที่อยู่จัดส่งใหม่ในสมุดที่อยู่ |
+| `PATCH` | `/api/user/addresses/:id` | Authenticated | แก้ไขข้อมูลที่อยู่จัดส่ง |
+| `PATCH` | `/api/orders/:id/shipping-address` | Customer | อัปเดตที่อยู่จัดส่งในออเดอร์พรีออเดอร์ก่อนถึงขั้นตอนแพ็คของ |
+| `GET` | `/api/orders/:id/shipments` | Authenticated | ดึงรายการพัสดุและเลข Tracking ทั้งหมดของคำสั่งซื้อ |
+| `POST` | `/api/claims` | Customer | ส่งคำร้องเคลมสินค้าชำรุดพร้อมคลิปวิดีโอแกะกล่อง |
+| `GET` | `/api/claims` | Customer | ตรวจสอบประวัติและสถานะคำร้องเคลมของตนเอง |
+| `GET` | `/api/admin/claims` | Staff / Admin | ดึงรายการคำร้องเคลมทั้งหมดที่รอตรวจสอบ |
+| `PATCH` | `/api/admin/claims/:id` | Staff / Admin | พิจารณาอนุมัติ/ปฏิเสธคำร้องเคลม และกำหนดรูปแบบการเยียวยา |
+| `POST` | `/api/admin/preorders/cancel-batch` | Admin | สั่งยกเลิกพรีออเดอร์กรณีผู้ผลิตยกเลิก และส่งต่อเรื่องคืนมัดจำให้การเงิน |
 
 ---
 
@@ -807,6 +1112,23 @@ sequenceDiagram
 | `SLIP_AMOUNT_MISMATCH` | 400 | ยอดเงินในสลิปไม่ตรงกับยอดที่ระบบเรียกเก็บ |
 | `BALANCE_PAYMENT_OVERDUE`| 410 | คำสั่งซื้อเกินกำหนดชำระเงิน 7 วัน และถูกริบมัดจำแล้ว |
 | `WAITLIST_TOKEN_EXPIRED` | 410 | สิทธิ์การสั่งซื้อสำหรับคิวสำรองหมดอายุ 48 ชั่วโมงแล้ว |
+| `CLAIM_EXPIRED` | 400 | เกินกำหนดระยะเวลา 7 วันในการยื่นคำร้องเคลมสินค้า |
+| `VIDEO_REQUIRED` | 400 | จำเป็นต้องแนบหลักฐานคลิปวิดีโอขณะแกะกล่องพัสดุ (Unboxing Video) |
+| `CANNOT_CHANGE_ADDRESS` | 400 | ไม่สามารถแก้ไขที่อยู่ได้เนื่องจากพัสดุเข้าสู่สถานะแพ็คสินค้าหรือจัดส่งแล้ว |
+
+### 8.3 การตรวจสอบย้อนกลับและการปฏิบัติตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (Audit Trail & PDPA Compliance)
+1. **การบันทึกประวัติการเปลี่ยนแปลงข้อมูลสำคัญ (Immutable Audit Trail):**
+   * บันทึกการกระทำของ Staff, Finance และ Admin ลงในตาราง `audit_logs` ทุกครั้งที่มีการ:
+     - กดยืนยันสินค้าเข้าคลัง (`FIGURE_ARRIVED`)
+     - อนุมัติสลิปด้วยมือ (`MANUAL_SLIP_APPROVE`) หรือปฏิเสธสลิป
+     - แก้ไขสต็อกสินค้า หรือโควตาพรีออเดอร์
+     - อนุมัติหรือปฏิเสธคำร้องเคลมสินค้า (Claims Resolution)
+     - บันทึกการคืนเงินมัดจำกรณีผู้ผลิตยกเลิกการผลิต
+   * ข้อมูล Log บันทึกแบบ Append-only ไม่สามารถแก้ไขหรือลบได้ เพื่อประโยชน์ในการตรวจสอบทางบัญชีและการสอบทานภายใน
+2. **การปฏิบัติตามกฎหมายคุ้มครองข้อมูลส่วนบุคคล (PDPA Compliance):**
+   * **Data Minimization:** จัดเก็บเฉพาะข้อมูลที่จำเป็นต่อการค้าและการออกใบกำกับภาษีตามประมวลรัษฎากร
+   * **Sensitive Data Protection:** เลขประจำตัวผู้เสียภาษี 13 หลัก และรูปถ่ายสลิปโอนเงิน เข้าถึงได้เฉพาะเจ้าของบัญชีและเจ้าหน้าที่ฝ่ายการเงินที่ได้รับมอบหมายเท่านั้น
+   * **Right to Erasure & Anonymization:** รองรับกระบวนการลบบัญชีผู้ใช้ โดยทำการ Mask ข้อมูลส่วนตัว (ชื่อ, เบอร์โทร, อีเมล, ที่อยู่) เป็น Anonymous string ในขณะที่ยังคงรักษาประวัติคำสั่งซื้อและใบกำกับภาษีไว้เพื่อการตรวจสอบทางภาษีตามที่กฎหมายกำหนด 5 ปี
 
 ---
 
@@ -852,17 +1174,21 @@ EMAIL_FROM=orders@mangacollectibles.com
 ระบบมีการตั้งค่า Cron Job อัตโนมัติผ่าน `node-cron` เพื่อดูแลรักษาสถานะข้อมูลให้เป็นปัจจุบัน:
 
 ```mermaid
-gantt
-    title กำหนดการทำงานของ Background Tasks ประจำวัน
-    dateFormat HH:mm
-    axisFormat %H:%M
+flowchart LR
+    subgraph DailyCron["🕛 Daily Cron (00:00 น.)"]
+        Forfeit["ริบเงินมัดจำออเดอร์ค้างชำระเกิน 7 วัน<br/>(DEPOSIT_FORFEITED)"]
+        ReleaseQuota["ปล่อยโควตาสินค้าคืนระบบ"]
+        Forfeit --> ReleaseQuota
+    end
 
-    section งานริบเงินมัดจำ
-    ตรวจจับออเดอร์ค้างชำระเกิน 7 วัน และริบมัดจำ :milestone, 00:00, 10m
-    
-    section งานคิวสำรอง Waitlist
-    ตรวจสอบ Offer ที่หมดอายุ 48 ชม. และส่งต่อสิทธิ์ให้คิวถัดไป :crit, active, 00:10, 15m
-    ตรวจเช็กความพร้อมคิวสำรองทุก 10 นาที :00:00, 23:59
+    subgraph PeriodicWorker["⏱️ Worker ทุก 10 นาที"]
+        CheckWaitlist["ตรวจสอบ Waitlist สถานะ OFFERED<br/>ที่หมดเวลา 48 ชม."]
+        ExpireOffer["ปรับสถานะเป็น EXPIRED"]
+        NextQueue["ส่งต่อ Offer ให้คิวสำรองลำดับถัดไป"]
+        CheckWaitlist --> ExpireOffer --> NextQueue
+    end
+
+    ReleaseQuota -.กระตุ้นคิว.-> CheckWaitlist
 ```
 
 1. **Daily Balance Forfeiture Cron (`0 0 * * *` - ทำงานทุกเที่ยงคืน):**
@@ -875,7 +1201,26 @@ gantt
 
 ---
 
-### 10. สรุปผลการวิเคราะห์และข้อเสนอแนะ (Conclusion & Next Steps)
-เอกสารการวิเคราะห์และออกแบบระบบ (SA) ฉบับนี้ครอบคลุมการทำงานครบทุกมิติของธุรกิจร้านค้ามังงะและฟิกเกอร์ของสะสม ทั้งในแง่ของโครงสร้างฐานข้อมูลที่มีความยืดหยุ่นสูง กฎเกณฑ์ทางธุรกิจที่รัดกุม (เช่น การแยกภาษี, การตรวจสลิปสองชั้น, การคิดค่าส่งตามขนาดกล่อง, วงจรมัดจำ 7 วัน และคิวสำรอง) 
+## 10. เมทริกซ์กรณีทดสอบและเกณฑ์การยอมรับ (Test Scenarios & Acceptance Criteria Matrix)
 
-ทีมพัฒนาสามารถใช้เอกสารนี้เป็นพิมพ์เขียว (Architecture Blueprint) ในการทดสอบระบบ (Test Scenarios), พัฒนาฟังก์ชันเพิ่มเติมในอนาคต เช่น การเชื่อมต่อ API คลังสินค้าภายนอก (WMS) หรือระบบสะสมแต้มแบบ Gamification ต่อไปได้อย่างมีประสิทธิภาพ
+ตารางกรณีทดสอบและเกณฑ์การยอมรับ (Test Scenarios & Acceptance Criteria Matrix) สำหรับทีมพัฒนาและฝ่ายประกันคุณภาพ (QA Engineer) เพื่อใช้สอบทานความถูกต้องของ Business Logic และ Security Controls ก่อนการนำระบบขึ้นสู่สภาวะจริง (Production Go-Live):
+
+| รหัสทดสอบ (TC ID) | โมดูล / ฟังก์ชัน | สถานการณ์ทดสอบ (Test Scenario) | เงื่อนไขล่วงหน้า (Pre-conditions) | ขั้นตอนการทดสอบ (Test Steps) | ผลลัพธ์ที่คาดหวัง (Expected Results) | ระดับความสำคัญ (Severity) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :---: |
+| **TC-SEC-01** | Payment / Slip Verify | ป้องกันการใช้สลิปโอนเงินซ้ำ (Anti-Double Spending) | มีออเดอร์ A แนบสลิปและผ่านการอนุมัติแล้ว | 1. นำไฟล์ภาพสลิปเดิมของออเดอร์ A มาอัปโหลดให้ออเดอร์ B<br/>2. ยิง Request ไปที่ `POST /api/payments/verify-slip` | ระบบต้องปฏิเสธทันทีด้วยรหัส `SLIP_ALREADY_USED` (HTTP 400) จากการตรวจพบ `slip_hash` ซ้ำในตาราง `bank_slips` โดยไม่อนุญาตให้ออเดอร์ B เปลี่ยนสถานะเป็นชำระแล้ว | **Critical** |
+| **TC-CON-02** | Ichiban Kuji | การแย่งกดตั๋วใบสุดท้ายพร้อมกัน (Race Condition on Last One Prize) | ตู้สลากเหลือตั๋วใบสุดท้าย (remainingTickets = 1) | ผู้ใช้งาน 2 คน (User X และ User Y) กดปุ่มซื้อตั๋วใบสุดท้ายพร้อมกันในระดับมิลลิวินาที | ระบบต้องใช้ Database Row Locking (`SELECT FOR UPDATE`) ให้ User คนแรกดึงตั๋วใบสุดท้ายสำเร็จพร้อมได้รับรางวัล Last One Prize เพียงคนเดียว ส่วน User อีกคนต้องได้ข้อผิดพลาด `SOLD_OUT` โดยไม่มีการแจกรางวัลซ้ำซ้อน | **Critical** |
+| **TC-ORD-03** | Mixed Cart / Shipping | การแยกพัสดุและการแจ้งเลขติดตาม (Split Shipment Multi-Tracking) | คำสั่งซื้อมีทั้งมังงะพร้อมส่งและฟิกเกอร์พรีออเดอร์ เลือก `SPLIT` | 1. ชำระงวดแรกสำเร็จ<br/>2. คลังแพ็คมังงะและบันทึกเลขพัสดุ Flash Express | 1. ระบบสร้าง `shipments` รายการที่ 1 (รอบ INITIAL) พร้อมเลข Tracking<br/>2. สถานะคำสั่งซื้อหลักยังคงเป็น `processing`<br/>3. เมื่อฟิกเกอร์เข้าคลังและชำระ Balance สำเร็จ ระบบสร้าง `shipments` รายการที่ 2 (รอบ BALANCE) แยกเป็นอิสระ | **High** |
+| **TC-PRE-04** | Preorder Lifecycle | การริบเงินมัดจำและการส่งต่อคิวสำรองอัตโนมัติ (Forfeiture & Waitlist) | ออเดอร์สถานะ `AWAITING_BALANCE_PAYMENT` เกินกำหนด 7 วัน และมีลูกค้าคิว #1 รอใน Waitlist | Cron Job เที่ยงคืน (`0 0 * * *`) ทำงาน | 1. ออเดอร์เดิมเปลี่ยนสถานะเป็น `DEPOSIT_FORFEITED` (ริบมัดจำ)<br/>2. ระบบดึงคิวแรกใน `product_waitlists` เปลี่ยนสถานะเป็น `OFFERED`<br/>3. สร้าง `claim_token` อายุ 48 ชม.<br/>4. ส่งข้อความแจ้งเตือนทาง LINE / Email ถึงคิว #1 ทันที | **High** |
+| **TC-TAX-05** | e-Tax Invoice | ตรวจสอบความถูกต้องของเลขประจำตัวผู้เสียภาษี (Tax ID Modulo 11) | อยู่ในหน้า Checkout เลือกขอรับใบกำกับภาษีเต็มรูปแบบ | กรอกเลขประจำตัวผู้เสียภาษี 13 หลักที่ไม่ตรงตาม Checksum Modulo 11 (เช่น เลขสุ่มมั่ว) | ระบบ Frontend แสดงข้อความเตือน และ Backend ปฏิเสธการสร้างคำร้องด้วยรหัส `INVALID_TAX_ID` (HTTP 400) ป้องกันการออกใบกำกับภาษีผิดระเบียบสรรพากร | **High** |
+| **TC-TAX-06** | Tax Separation | การแจกแจงภาษีในใบกำกับ (Mixed VAT Separation with Discount) | มีมังงะ 500 บาท (Non-VAT) และฟิกเกอร์ 2,000 บาท (VAT 7%) พร้อมคูปองส่วนลด 200 บาท | ดำเนินการออกใบกำกับภาษีอิเล็กทรอนิกส์ | ระบบต้องเฉลี่ยส่วนลดตามสัดส่วนราคาสินค้า และคำนวณแยกภาษีถูกต้อง:<br/>- ยอดมังงะยกเว้นภาษีตาม ม.81(1)(ช)<br/>- ยอดฟิกเกอร์นำมาถอดภาษีมูลค่าเพิ่ม 7%<br/>- ตัวเลขยอดรวมและภาษีตรงกับไฟล์ PDF ที่สร้างขึ้น | **High** |
+| **TC-CLM-07** | Claims / RMA | การยื่นคำร้องเคลมสินค้าชำรุดพร้อมคลิปวิดีโอ (Unboxing Video Policy) | ออเดอร์สถานะ `DELIVERED` ภายใน 7 วัน | ยื่นคำร้องเคลมชิ้นส่วนหัก โดยไม่แนบลิงก์คลิปวิดีโอแกะกล่อง | ระบบปฏิเสธคำร้องด้วยรหัส `VIDEO_REQUIRED` (HTTP 400) อนุญาตให้บันทึกสำเร็จเฉพาะกรณีที่แนบหลักฐานครบตามเงื่อนไขเท่านั้น | **Medium** |
+| **TC-PRE-08** | Preorder Cancellation | ผู้ผลิตยกเลิกการผลิตและระบบคืนเงินมัดจำ 100% (Manufacturer Cancellation) | มีออเดอร์มัดจำฟิกเกอร์รหัส FIG-01 จำนวน 50 รายการ | แอดมินสั่งยกเลิกไลน์ผลิตผ่าน API `cancel-batch` | 1. ออเดอร์ทั้ง 50 รายการเปลี่ยนสถานะเป็น `REFUND_PENDING`<br/>2. ส่ง Push Notification แจ้งลูกค้าทุกคน<br/>3. ยอดมัดจำถูกส่งเข้าคิวรอคืนเงินของการเงิน เมื่อโอนคืนสำเร็จเปลี่ยนเป็น `REFUNDED` | **High** |
+| **TC-ADR-09** | Address Management | การแก้ไขที่อยู่จัดส่งสินค้าพรีออเดอร์ก่อนส่งมอบ (Address Update) | ออเดอร์พรีออเดอร์รอของเข้าคลัง (สถานะ `WAITING_FOR_ARRIVAL`) | ลูกค้าย้ายบ้านและกดแก้ไขที่อยู่จัดส่งในหน้าโปรไฟล์ออเดอร์ | ระบบอนุญาตให้อัปเดตที่อยู่จัดส่งใหม่ได้สำเร็จ แต่หากออเดอร์เข้าสู่สถานะ `READY_TO_PACK` แล้ว ระบบจะไม่อนุญาตให้แก้ไขด้วยรหัส `CANNOT_CHANGE_ADDRESS` | **Medium** |
+| **TC-SEC-10** | Security / Audit | การบันทึก Audit Log ของการดำเนินการที่สำคัญ (Audit Trail Immutability) | ผู้ใช้สิทธิ์ Admin หรือ Staff ล็อกอินเข้าสู่ระบบ | 1. กดรับฟิกเกอร์เข้าคลัง (`FIGURE_ARRIVED`)<br/>2. อนุมัติสลิปด้วยมือ (`MANUAL_SLIP_APPROVE`) | ในตาราง `audit_logs` ต้องมีเรคอร์ดบันทึก `performed_by_user_id`, `action`, `resource_id`, `old_values`, `new_values`, `ip_address` และ `created_at` แบบไม่สามารถแก้ไขได้ | **High** |
+
+---
+
+## 11. สรุปผลการวิเคราะห์และข้อเสนอแนะ (Conclusion & Next Steps)
+เอกสารการวิเคราะห์และออกแบบระบบ (SA) ฉบับสมบูรณ์นี้ครอบคลุมการทำงานครบทุกมิติของธุรกิจร้านค้ามังงะและฟิกเกอร์ของสะสม ทั้งในแง่ของโครงสร้างฐานข้อมูลที่มีความยืดหยุ่นสูง กฎเกณฑ์ทางธุรกิจที่รัดกุม (เช่น การแยกภาษีตาม ม.81, การตรวจสลิปสองชั้น SHA-256, การคิดค่าส่งตามขนาดกล่องจริง/ปริมาตร, วงจรมัดจำ 7 วัน, คิวสำรอง Waitlist FIFO, การแยกพัสดุ Split Shipment, นโยบายเคลมสินค้าชำรุด RMA, และการบันทึก Audit Log)
+
+ทีมพัฒนาและทีมทดสอบ (QA) สามารถใช้เอกสารนี้เป็นพิมพ์เขียวหลัก (Architecture Blueprint & Test Matrix) ในการพัฒนาฟังก์ชันเพิ่มเติม เชื่อมต่อระบบภายนอก (WMS / Courier APIs) และดำเนินการทดสอบระบบตามสถานการณ์ที่กำหนดเพื่อเตรียมความพร้อมสู่การใช้งานจริงได้อย่างสมบูรณ์แบบ
