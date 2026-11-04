@@ -41,6 +41,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",

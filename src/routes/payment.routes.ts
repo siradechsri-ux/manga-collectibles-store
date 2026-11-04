@@ -7,6 +7,7 @@ import {
 } from "../controllers/slipUpload.controller";
 import { SlipVerificationService } from "../checkout/slipVerificationService";
 import { uploadSingleSlip } from "../middlewares/upload.middleware";
+import { generatePromptPayQrDataUrl } from "../services/paymentQr.service";
 
 interface OrderOwnerRow {
   id: number;
@@ -66,8 +67,8 @@ export function authorizeOrderOwnerOrAdmin(pool: Pool): RequestHandler {
         return;
       }
 
-      const isAdmin = user.role === "ADMIN";
-      if (!isAdmin && order.user_id !== user.id) {
+      const isAdmin = user.role === "ADMIN" || user.role === "FINANCE" || user.role === "STAFF";
+      if (!isAdmin && Number(order.user_id) !== user.id) {
         sendAuthorizationError(
           response,
           403,
@@ -77,7 +78,7 @@ export function authorizeOrderOwnerOrAdmin(pool: Pool): RequestHandler {
         return;
       }
 
-      response.locals.authorizedOrderOwnerId = order.user_id;
+      response.locals.authorizedOrderOwnerId = Number(order.user_id);
       response.locals.isOrderOwnerAdmin = isAdmin;
       next();
     } catch (error) {
@@ -102,6 +103,42 @@ export function createPaymentRouter(
   middleware: PaymentRouteMiddleware,
 ): Router {
   const router = Router();
+
+  router.get(
+    "/api/orders/:orderId/slip",
+    async (request: Request, response: Response): Promise<void> => {
+      const parsedParams = orderIdParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) {
+        sendAuthorizationError(response, 400, "INVALID_ORDER_ID", "หมายเลขคำสั่งซื้อไม่ถูกต้อง");
+        return;
+      }
+      const amountVal = Number(request.query.amount ?? 0);
+      if (!Number.isFinite(amountVal) || amountVal <= 0) {
+        sendAuthorizationError(response, 400, "INVALID_AMOUNT", "ยอดชำระไม่ถูกต้อง");
+        return;
+      }
+      try {
+        const dataUrl = await generatePromptPayQrDataUrl(amountVal);
+        response.json({
+          success: true,
+          data: {
+            orderId: parsedParams.data.orderId,
+            amount: amountVal.toFixed(2),
+            dataUrl,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to generate balance QR:", err);
+        sendAuthorizationError(
+          response,
+          500,
+          "QR_GENERATION_FAILED",
+          "ไม่สามารถสร้าง QR สำหรับยอดคงเหลือได้",
+        );
+      }
+    },
+  );
+
   router.post(
     "/api/orders/:orderId/slip",
     middleware.authenticateToken,

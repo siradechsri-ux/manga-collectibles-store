@@ -7,6 +7,7 @@ import {
   SlipVerificationResponse,
   SlipVerificationService,
 } from "../checkout/slipVerificationService";
+import { getOrderSnapshotFromDb, saveOrderSnapshotToDb } from "../db/database";
 
 export interface SlipUploadSuccessResponse {
   success: true;
@@ -140,6 +141,57 @@ export function createSlipUploadController(
         userId,
         file,
       });
+
+      // Synchronize order_snapshots in PostgreSQL
+      try {
+        const existingSnap = await getOrderSnapshotFromDb(
+          slipVerificationService.pool,
+          parsedParams.data.orderId,
+        );
+        if (existingSnap) {
+          const isBalance = result.paymentStage === "BALANCE";
+          const isDeposit = result.paymentStatus === "DEPOSIT_PAID";
+          const updatedSnap = {
+            ...existingSnap,
+            detail: {
+              ...existingSnap.detail,
+              status: isBalance ? ("PAID" as const) : result.paymentStatus,
+              paymentStatus: result.paymentStatus,
+              timelineStage: "DEPOSIT_PAID" as const,
+              paidAmount: isBalance
+                ? existingSnap.detail.totalAmount
+                : Number(existingSnap.immediateAmount),
+              remainingBalance: isBalance
+                ? 0
+                : isDeposit
+                  ? existingSnap.detail.remainingBalance
+                  : 0,
+              ...(isBalance ? { balanceDueDate: null } : {}),
+              paymentRejectionReason: null,
+              paymentSlipFileName: file.originalname || "verified_slip.jpg",
+              items: isBalance
+                ? existingSnap.detail.items.map((item) => ({
+                    ...item,
+                    remainingBalance: 0,
+                  }))
+                : existingSnap.detail.items,
+              timeline: existingSnap.detail.timeline.map((event) =>
+                event.stage === "DEPOSIT_PAID"
+                  ? {
+                      ...event,
+                      label: `ยืนยันการชำระเงิน (${result.transactionRef})`,
+                      occurredAt: result.verifiedAt,
+                    }
+                  : event,
+              ),
+            },
+          };
+          await saveOrderSnapshotToDb(slipVerificationService.pool, updatedSnap);
+        }
+      } catch (snapErr) {
+        console.warn("Could not update order snapshot after slip verification:", snapErr);
+      }
+
       response.status(200).json({
         success: true,
         data: {

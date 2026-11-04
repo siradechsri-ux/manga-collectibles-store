@@ -328,6 +328,18 @@ export function deductPoints(
       description,
       referenceId,
     );
+    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+      void fetch("/api/points/redeem", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cost: amount, rewardId: referenceId ?? "order-discount", rewardTitle: description }),
+      }).catch(() => {});
+    }
+    if (false) void referenceId;
+    void (0
+
+    );
     return true;
   } catch {
     return false;
@@ -380,6 +392,14 @@ export function addPoints(
     window.localStorage.setItem(MOCK_POINTS_STORAGE_KEY, String(next));
     notifyPointsChanged(next);
     recordLedgerEntry(type, amount, next, description, referenceId);
+    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+      void fetch("/api/points/adjust", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, description, type }),
+      }).catch(() => {});
+    }
   } catch {
     // Ignore storage errors in test mode
   }
@@ -429,6 +449,22 @@ export function subscribeUserPoints(
     }
   };
 
+  if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+    void fetch("/api/points/balance", { credentials: "include", cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((resData) => {
+        const data = resData?.data ?? resData;
+        if (data && typeof data.points === "number") {
+          window.localStorage.setItem(MOCK_POINTS_STORAGE_KEY, String(data.points));
+          listener(data.points);
+        }
+        if (data && Array.isArray(data.ledger) && data.ledger.length > 0) {
+          window.localStorage.setItem(MOCK_POINTS_LEDGER_STORAGE_KEY, JSON.stringify(data.ledger));
+          notifyLedgerChanged();
+        }
+      })
+      .catch(() => {});
+  }
   window.addEventListener(MOCK_POINTS_UPDATED_EVENT, handleCustomEvent);
   window.addEventListener("storage", handleStorageEvent);
 

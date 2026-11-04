@@ -314,7 +314,28 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
       role: "GUEST" | "CUSTOMER" | "ADMIN" | "STAFF" | "FINANCE",
     ): Promise<AuthUser | null> => {
       if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-        throw new Error("Quick Test Login ใช้ได้เฉพาะเมื่อเปิดโหมด Prototype");
+        if (role === "GUEST") {
+          await fetch(`${apiBase}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(() => {});
+          accessTokenRef.current = null;
+          setUser(null);
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("mock_current_role", "GUEST");
+            window.dispatchEvent(new StorageEvent("storage", { key: "mock_current_role" }));
+          }
+          return null;
+        }
+        const roleEmailMap: Record<"CUSTOMER" | "ADMIN" | "STAFF" | "FINANCE", string> = {
+          CUSTOMER: "customer@test.com",
+          ADMIN: "admin@test.com",
+          STAFF: "staff@test.com",
+          FINANCE: "finance@test.com",
+        };
+        const loggedInUser = await login({ email: roleEmailMap[role], password: "password123" });
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("mock_current_role", role);
+          window.dispatchEvent(new StorageEvent("storage", { key: "mock_current_role" }));
+        }
+        return loggedInUser;
       }
       if (role === "GUEST") {
         logoutMockUser();
@@ -343,7 +364,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
       }
       return mockUser;
     },
-    [],
+    [apiBase, login],
   );
 
   const register = useCallback(

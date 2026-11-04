@@ -22,7 +22,7 @@ const nextConfig = {
     // routes (which early-return 404 when mock is off) correctly fall through to Express.
     if (!useMock) {
       return {
-        afterFiles: [
+        beforeFiles: [
           {
             source: "/api/:path*",
             destination: `${apiBase}/api/:path*`,

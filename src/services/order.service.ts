@@ -13,12 +13,21 @@ import {
   cancelMockOrder,
   rejectMockOrderPayment,
   approveMockOrderPaymentReview,
+  resubmitMockOrderSlip,
+  markMockOrderArrived,
+  markAllMockDepositOrdersArrived,
   advanceMockShipmentStatus,
   markMockOrderShipped,
   getMockWaitlistEntries,
   joinMockWaitlist,
   MOCK_ORDERS_UPDATED_EVENT,
 } from "../mocks/storage.mock";
+
+function notifyOrdersUpdated(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(MOCK_ORDERS_UPDATED_EVENT));
+  }
+}
 
 export class OrderService {
   /**
@@ -29,7 +38,7 @@ export class OrderService {
       return listMockOrders(userId);
     }
     const url = userId ? `/api/orders?userId=${userId}` : "/api/orders";
-    const res = await fetch(url);
+    const res = await fetch(url, { credentials: "include", cache: "no-store" });
     if (!res.ok) throw new Error("ไม่สามารถโหลดรายการคำสั่งซื้อได้");
     const data = await res.json();
     return data.orders;
@@ -42,7 +51,7 @@ export class OrderService {
     if (IS_MOCK_MODE) {
       return getMockOrder(orderId);
     }
-    const res = await fetch(`/api/orders/${orderId}`);
+    const res = await fetch(`/api/orders/${orderId}`, { credentials: "include", cache: "no-store" });
     if (!res.ok) {
       if (res.status === 404) return null;
       throw new Error("ไม่สามารถโหลดข้อมูลคำสั่งซื้อได้");
@@ -61,10 +70,12 @@ export class OrderService {
     }
     const res = await fetch("/api/orders", {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(order),
     });
     if (!res.ok) throw new Error("ไม่สามารถบันทึกคำสั่งซื้อได้");
+    notifyOrdersUpdated();
   }
 
   /**
@@ -76,11 +87,13 @@ export class OrderService {
     }
     const res = await fetch(`/api/orders/${orderId}/cancel`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ownerUserId }),
     });
     if (!res.ok) throw new Error("ไม่สามารถยกเลิกคำสั่งซื้อได้");
     const data = await res.json();
+    notifyOrdersUpdated();
     return data.order;
   }
 
@@ -93,11 +106,13 @@ export class OrderService {
     }
     const res = await fetch(`/api/orders/${orderId}/slip/reject`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason }),
     });
     if (!res.ok) throw new Error("ไม่สามารถปฏิเสธสลิปได้");
     const data = await res.json();
+    notifyOrdersUpdated();
     return data.order;
   }
 
@@ -110,10 +125,66 @@ export class OrderService {
     }
     const res = await fetch(`/api/orders/${orderId}/slip/approve`, {
       method: "POST",
+      credentials: "include",
     });
     if (!res.ok) throw new Error("ไม่สามารถอนุมัติสลิปได้");
     const data = await res.json();
+    notifyOrdersUpdated();
     return data.order;
+  }
+
+  /**
+   * Resubmits a payment slip after rejection.
+   */
+  static async resubmitSlip(orderId: number, fileName: string): Promise<MockStoredOrder> {
+    if (IS_MOCK_MODE) {
+      const order = getMockOrder(orderId);
+      return resubmitMockOrderSlip(orderId, order?.ownerUserId ?? 9001, fileName);
+    }
+    const res = await fetch(`/api/orders/${orderId}/slip/resubmit`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName }),
+    });
+    if (!res.ok) throw new Error("ไม่สามารถส่งสลิปใหม่ได้");
+    const data = await res.json();
+    notifyOrdersUpdated();
+    return data.order;
+  }
+
+  /**
+   * Marks a preorder deposit order as arrived and opens the 7-day payment window.
+   */
+  static async markOrderArrived(orderId: number): Promise<MockStoredOrder> {
+    if (IS_MOCK_MODE) {
+      return markMockOrderArrived(orderId);
+    }
+    const res = await fetch(`/api/orders/${orderId}/arrive`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("ไม่สามารถจำลองสินค้าเข้าคลังได้");
+    const data = await res.json();
+    notifyOrdersUpdated();
+    return data.order;
+  }
+
+  /**
+   * Marks all deposit-paid preorder orders as arrived (Admin Batch Trigger).
+   */
+  static async markAllDepositOrdersArrived(): Promise<number> {
+    if (IS_MOCK_MODE) {
+      return markAllMockDepositOrdersArrived().updatedCount;
+    }
+    const res = await fetch(`/api/orders/arrive-all`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("ไม่สามารถจำลองสินค้าเข้าคลังแบบกลุ่มได้");
+    const data = await res.json();
+    notifyOrdersUpdated();
+    return data.updatedCount ?? 0;
   }
 
   /**
@@ -125,9 +196,11 @@ export class OrderService {
     }
     const res = await fetch(`/api/orders/${orderId}/shipment/advance`, {
       method: "POST",
+      credentials: "include",
     });
     if (!res.ok) throw new Error("ไม่สามารถอัปเดตสถานะการจัดส่งได้");
     const data = await res.json();
+    notifyOrdersUpdated();
     return data.order;
   }
 
@@ -143,11 +216,13 @@ export class OrderService {
     }
     const res = await fetch(`/api/orders/${orderId}/shipment/ship`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ carrier }),
     });
     if (!res.ok) throw new Error("ไม่สามารถอัปเดตสถานะจัดส่งได้");
     const data = await res.json();
+    notifyOrdersUpdated();
     return data.order;
   }
 

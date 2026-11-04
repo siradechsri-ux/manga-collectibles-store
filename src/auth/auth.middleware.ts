@@ -2,11 +2,23 @@ import { NextFunction, Request, RequestHandler, Response } from "express";
 import { AuthService, AuthError } from "./auth.service";
 import type { UserRole } from "./auth.types";
 
+function extractToken(request: Request): string | null {
+  const authorization = request.header("authorization");
+  const match = authorization?.match(/^Bearer ([^\s]+)$/);
+  if (match?.[1]) {
+    return match[1];
+  }
+  const cookieToken = request.cookies?.access_token;
+  if (typeof cookieToken === "string" && cookieToken.trim().length > 0) {
+    return cookieToken.trim();
+  }
+  return null;
+}
+
 export function authenticateToken(authService: AuthService): RequestHandler {
   return (request: Request, response: Response, next: NextFunction): void => {
-    const authorization = request.header("authorization");
-    const match = authorization?.match(/^Bearer ([^\s]+)$/);
-    if (!match) {
+    const token = extractToken(request);
+    if (!token) {
       response.status(401).json({
         success: false,
         error: {
@@ -18,7 +30,7 @@ export function authenticateToken(authService: AuthService): RequestHandler {
     }
 
     try {
-      request.user = authService.verifyAccessToken(match[1]);
+      request.user = authService.verifyAccessToken(token);
       next();
     } catch (error) {
       if (error instanceof AuthError) {
@@ -33,6 +45,20 @@ export function authenticateToken(authService: AuthService): RequestHandler {
       }
       next(error);
     }
+  };
+}
+
+export function optionalAuthenticateToken(authService: AuthService): RequestHandler {
+  return (request: Request, _response: Response, next: NextFunction): void => {
+    const token = extractToken(request);
+    if (token) {
+      try {
+        request.user = authService.verifyAccessToken(token);
+      } catch {
+        // Ignore expired/invalid token on optional routes
+      }
+    }
+    next();
   };
 }
 

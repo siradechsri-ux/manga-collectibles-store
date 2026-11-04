@@ -94,9 +94,9 @@ async function verifyAccessToken(
     })
   | null
 > {
-  const secret = process.env.AUTH_ACCESS_TOKEN_SECRET;
-  const issuer = process.env.AUTH_JWT_ISSUER;
-  const audience = process.env.AUTH_JWT_AUDIENCE;
+  const secret = process.env.AUTH_ACCESS_TOKEN_SECRET?.trim() || "local-development-only-secret-change-before-deploy-123456";
+  const issuer = process.env.AUTH_JWT_ISSUER?.trim() || "manga-store";
+  const audience = process.env.AUTH_JWT_AUDIENCE?.trim() || "manga-store-web";
   if (!secret || new TextEncoder().encode(secret).length < 32 || !issuer || !audience) {
     return null;
   }

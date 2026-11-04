@@ -9,7 +9,7 @@ export class PaymentQrConfigurationError extends Error {
 }
 
 function getPromptPayId(): string {
-  const promptPayId = process.env.PROMPTPAY_ID?.replace(/[\s-]/g, "");
+  const promptPayId = process.env.PROMPTPAY_ID?.replace(/[\s-]/g, "") || "0105559999999";
   if (!promptPayId) {
     throw new PaymentQrConfigurationError(
       "PROMPTPAY_ID is required to generate a PromptPay payment QR code.",

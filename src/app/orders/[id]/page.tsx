@@ -10,13 +10,9 @@ import type {
   BalanceSlipUploadRequest,
   OrderTrackingDetail,
 } from "../../../components/OrderDetailView";
+import { IS_MOCK_MODE } from "../../../config/env";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
-  advanceMockShipmentStatus,
-  getMockOrder,
-  cancelMockOrder,
-  markMockOrderArrived,
-  resubmitMockOrderSlip,
   type MockStoredOrder,
   updateMockOrderPayment,
 } from "../../../mocks/storage.mock";
@@ -38,7 +34,7 @@ const slipResultSchema = z
 
 function getApiErrorMessage(body: unknown): string {
   if (typeof body !== "object" || body === null || !("error" in body)) {
-    return "ตรวจสอบสลิปจำลองไม่สำเร็จ";
+    return "ตรวจสอบสลิปไม่สำเร็จ";
   }
   const error = body.error;
   if (
@@ -49,13 +45,13 @@ function getApiErrorMessage(body: unknown): string {
   ) {
     return error.message;
   }
-  return "ตรวจสอบสลิปจำลองไม่สำเร็จ";
+  return "ตรวจสอบสลิปไม่สำเร็จ";
 }
 
 export default function MockOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const orderId = Array.isArray(params.id) ? params.id[0] ?? "" : params.id;
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: isAuthLoading, authenticatedFetch } = useAuth();
   const [storedOrder, setStoredOrder] = useState<MockStoredOrder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,11 +65,6 @@ export default function MockOrderDetailPage() {
 
   useEffect(() => {
     let isMounted = true;
-    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-      setError("หน้ารายละเอียดนี้ใช้ได้เฉพาะในโหมด Prototype");
-      setIsLoading(false);
-      return;
-    }
     if (!orderIdSchema.safeParse(orderId).success) {
       setError("หมายเลขคำสั่งซื้อไม่ถูกต้อง");
       setIsLoading(false);
@@ -84,7 +75,7 @@ export default function MockOrderDetailPage() {
       .then((order) => {
         if (!isMounted) return;
         if (!order) {
-          setError("ไม่พบคำสั่งซื้อในอุปกรณ์นี้");
+          setError("ไม่พบคำสั่งซื้อในระบบ");
           setIsLoading(false);
           return;
         }
@@ -104,10 +95,7 @@ export default function MockOrderDetailPage() {
 
   const uploadBalanceSlip = useCallback(
     async (request: BalanceSlipUploadRequest): Promise<void> => {
-      if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-        throw new Error("การชำระยอดคงเหลือจำลองใช้ได้เฉพาะโหมด Prototype");
-      }
-      const order = getMockOrder(request.orderId);
+      const order = storedOrder ?? (await OrderService.getOrderById(request.orderId));
       if (
         !order ||
         (user?.role === "CUSTOMER" && order.ownerUserId !== user.id) ||
@@ -127,7 +115,7 @@ export default function MockOrderDetailPage() {
       formData.append("paymentStatus", "PAID");
       formData.append("paymentStage", "BALANCE");
       formData.append("amount", order.detail.remainingBalance.toFixed(2));
-      const response = await fetch(`/api/orders/${request.orderId}/slip`, {
+      const response = await authenticatedFetch(`/api/orders/${request.orderId}/slip`, {
         method: "POST",
         body: formData,
       });
@@ -135,30 +123,34 @@ export default function MockOrderDetailPage() {
       try {
         body = await response.json();
       } catch {
-        throw new Error("ระบบจำลองส่งข้อมูลตอบกลับไม่ถูกต้อง");
+        throw new Error("เซิร์ฟเวอร์ส่งข้อมูลตอบกลับไม่ถูกต้อง");
       }
       const parsed = slipResultSchema.safeParse(body);
       if (!response.ok || !parsed.success) {
         throw new Error(getApiErrorMessage(body));
       }
 
-      const updatedOrder = updateMockOrderPayment(
-        request.orderId,
-        parsed.data.data.paymentStatus,
-        parsed.data.data.transactionRef,
-        parsed.data.data.paymentStage,
-      );
-      setStoredOrder(updatedOrder);
+      if (IS_MOCK_MODE) {
+        const updatedOrder = updateMockOrderPayment(
+          request.orderId,
+          parsed.data.data.paymentStatus,
+          parsed.data.data.transactionRef,
+          parsed.data.data.paymentStage,
+        );
+        setStoredOrder(updatedOrder);
+      } else {
+        const refreshed = await OrderService.getOrderById(request.orderId);
+        if (refreshed) {
+          setStoredOrder(refreshed);
+        }
+      }
     },
-    [],
+    [storedOrder, user, authenticatedFetch],
   );
 
   const getBalanceQrCodeUrl = useCallback(
     async (amount: number): Promise<string> => {
-      if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-        throw new Error("QR จำลองใช้ได้เฉพาะโหมด Prototype");
-      }
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `/api/orders/${orderId}/slip?amount=${encodeURIComponent(
           amount.toFixed(2),
         )}`,
@@ -168,7 +160,7 @@ export default function MockOrderDetailPage() {
       try {
         body = await response.json();
       } catch {
-        throw new Error("ระบบจำลองส่งข้อมูล QR ตอบกลับไม่ถูกต้อง");
+        throw new Error("เซิร์ฟเวอร์ส่งข้อมูล QR ตอบกลับไม่ถูกต้อง");
       }
       const parsed = z
         .object({
@@ -178,18 +170,19 @@ export default function MockOrderDetailPage() {
         .passthrough()
         .safeParse(body);
       if (!response.ok || !parsed.success) {
-        throw new Error("ไม่สามารถสร้าง QR จำลองสำหรับยอดคงเหลือได้");
+        throw new Error("ไม่สามารถสร้าง QR สำหรับยอดคงเหลือได้");
       }
       return parsed.data.data.dataUrl;
     },
-    [orderId, user],
+    [orderId, authenticatedFetch],
   );
 
-  function handleMarkArrived(): void {
+  async function handleMarkArrived(): Promise<void> {
     setActionError(null);
     setIsMarkingArrived(true);
     try {
-      setStoredOrder(markMockOrderArrived(Number(orderId)));
+      const updated = await OrderService.markOrderArrived(Number(orderId));
+      setStoredOrder(updated);
     } catch (markError) {
       setActionError(
         markError instanceof Error
@@ -201,14 +194,15 @@ export default function MockOrderDetailPage() {
     }
   }
 
-  function handleCancelOrder(): void {
+  async function handleCancelOrder(): Promise<void> {
     setCancelError(null);
     if (!user || user.role !== "CUSTOMER") {
       setCancelError("เฉพาะเจ้าของคำสั่งซื้อที่เข้าสู่ระบบในฐานะลูกค้าเท่านั้นที่ยกเลิกได้");
       return;
     }
     try {
-      setStoredOrder(cancelMockOrder(Number(orderId), user.id));
+      const updated = await OrderService.cancelOrder(Number(orderId), user.id);
+      setStoredOrder(updated);
       setIsCancelDialogOpen(false);
     } catch (cancelFailure) {
       setCancelError(
@@ -234,21 +228,16 @@ export default function MockOrderDetailPage() {
     setReplacementSlip(file);
   }
 
-  function submitReplacementSlip(): void {
+  async function submitReplacementSlip(): Promise<void> {
     setReplacementSlipError(null);
     setReplacementSlipNotice(null);
     if (!user || user.role !== "CUSTOMER" || !replacementSlip) {
       setReplacementSlipError("กรุณาเข้าสู่ระบบในฐานะลูกค้าและเลือกไฟล์สลิป");
       return;
     }
-    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-      setReplacementSlipError("การส่งสลิปใหม่ใช้ได้เฉพาะโหมด Prototype");
-      return;
-    }
     try {
-      const updated = resubmitMockOrderSlip(
+      const updated = await OrderService.resubmitSlip(
         Number(orderId),
-        user.id,
         replacementSlip.name,
       );
       setStoredOrder(updated);
@@ -261,10 +250,11 @@ export default function MockOrderDetailPage() {
     }
   }
 
-  function advanceShipment(): void {
+  async function advanceShipment(): Promise<void> {
     setActionError(null);
     try {
-      setStoredOrder(advanceMockShipmentStatus(Number(orderId)));
+      const updated = await OrderService.advanceShipment(Number(orderId));
+      setStoredOrder(updated);
     } catch (shipmentError) {
       setActionError(
         shipmentError instanceof Error
@@ -359,8 +349,9 @@ export default function MockOrderDetailPage() {
           </div>
         ) : null}
         <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-          โหมดสาธิตเท่านั้น: สถานะและข้อมูลคำสั่งซื้อถูกเก็บไว้ในเบราว์เซอร์นี้
-          ไม่มีการตัดเงินจริง
+          {IS_MOCK_MODE
+            ? "โหมดสาธิตเท่านั้น: สถานะและข้อมูลคำสั่งซื้อถูกเก็บไว้ในเบราว์เซอร์นี้ ไม่มีการตัดเงินจริง"
+            : "โหมดฐานข้อมูล (PostgreSQL Database): ข้อมูลคำสั่งซื้อและสถานะซิงค์กับฐานข้อมูลหลังบ้าน"}
         </p>
         {canUseTestingToolbar ? (
           <section className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
@@ -370,12 +361,14 @@ export default function MockOrderDetailPage() {
                   Testing Toolbar · {user.role}
                 </h2>
                 <p className="mt-1 text-sm text-violet-800">
-                  เครื่องมือจำลองนี้เปลี่ยนเฉพาะ Order ใน localStorage ของเบราว์เซอร์
+                  {IS_MOCK_MODE
+                    ? "เครื่องมือจำลองนี้เปลี่ยนเฉพาะ Order ใน localStorage ของเบราว์เซอร์"
+                    : "เครื่องมือจำลองสถานะสินค้าเข้าคลังผ่านฐานข้อมูลหลังบ้าน"}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={handleMarkArrived}
+                onClick={() => void handleMarkArrived()}
                 disabled={
                   isMarkingArrived ||
                   order.status !== "DEPOSIT_PAID" ||
@@ -434,8 +427,8 @@ export default function MockOrderDetailPage() {
                 ) : null}
                 <button
                   type="button"
-                  onClick={submitReplacementSlip}
-                  disabled={!replacementSlip || process.env.NEXT_PUBLIC_USE_MOCK !== "true"}
+                  onClick={() => void submitReplacementSlip()}
+                  disabled={!replacementSlip}
                   className="mt-3 inline-flex min-h-10 items-center justify-center rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   ยืนยันส่งตรวจอีกครั้ง
@@ -536,7 +529,7 @@ export default function MockOrderDetailPage() {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="font-bold text-slate-900 dark:text-zinc-50">สรุปภาษีจำลอง</h2>
+          <h2 className="font-bold text-slate-900 dark:text-zinc-50">สรุปภาษี</h2>
           <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
             <p className="text-slate-600 dark:text-zinc-400">
               มังงะยกเว้น VAT:{" "}
@@ -587,8 +580,8 @@ export default function MockOrderDetailPage() {
         promptPayQrCodeUrl={storedOrder.paymentQrCodeDataUrl}
         getPaymentQrCodeUrl={getBalanceQrCodeUrl}
         onUploadBalanceSlip={uploadBalanceSlip}
-        onAdvanceShipmentStatus={advanceShipment}
-        isMockMode={process.env.NEXT_PUBLIC_USE_MOCK === "true"}
+        onAdvanceShipmentStatus={() => void advanceShipment()}
+        isMockMode={canUseTestingToolbar || IS_MOCK_MODE}
         hideCustomerActions={isStaffRole}
       />
       {isCancelDialogOpen && user?.role === "CUSTOMER" ? (
@@ -601,7 +594,7 @@ export default function MockOrderDetailPage() {
             {cancelError ? <p role="alert" className="mt-3 text-sm font-semibold text-red-700 dark:text-red-300">{cancelError}</p> : null}
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setIsCancelDialogOpen(false)} className="min-h-10 rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-700 dark:border-zinc-700 dark:text-zinc-200">กลับ</button>
-              <button type="button" onClick={handleCancelOrder} className="min-h-10 rounded-lg bg-red-600 px-4 text-sm font-bold text-white hover:bg-red-700">ยืนยันยกเลิก</button>
+              <button type="button" onClick={() => void handleCancelOrder()} className="min-h-10 rounded-lg bg-red-600 px-4 text-sm font-bold text-white hover:bg-red-700">ยืนยันยกเลิก</button>
             </div>
           </section>
         </div>

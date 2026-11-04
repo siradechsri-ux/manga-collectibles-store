@@ -18,17 +18,31 @@ export async function GET(
   request: Request,
   context: SlipRouteContext,
 ): Promise<NextResponse> {
+  const resolvedParams = await context.params;
+
   if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-    return NextResponse.json(
-      {
-        success: false,
-        error: { code: "MOCK_MODE_DISABLED", message: "โหมด Prototype ปิดอยู่" },
-      },
-      { status: 404 },
-    );
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000").replace(/\/+$/, "");
+    const search = new URL(request.url).search;
+    const headers = new Headers();
+    const auth = request.headers.get("authorization");
+    const cookie = request.headers.get("cookie");
+    if (auth) headers.set("authorization", auth);
+    if (cookie) headers.set("cookie", cookie);
+    headers.set("accept", "application/json");
+
+    const upstream = await fetch(`${apiBase}/api/orders/${resolvedParams.id}/slip${search}`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    });
+    const data = await upstream.json().catch(() => ({
+      success: false,
+      error: { code: "UPSTREAM_ERROR", message: "ไม่สามารถโหลด QR ได้" },
+    }));
+    return NextResponse.json(data, { status: upstream.status });
   }
 
-  const parsedParams = paramsSchema.safeParse(await context.params);
+  const parsedParams = paramsSchema.safeParse(resolvedParams);
   const orderId = parsedParams.success ? Number(parsedParams.data.id) : Number.NaN;
   const amountValue = new URL(request.url).searchParams.get("amount");
   const parsedAmount = amountSchema.safeParse(amountValue);
@@ -80,20 +94,34 @@ export async function POST(
   request: Request,
   context: SlipRouteContext,
 ): Promise<NextResponse> {
+  const resolvedParams = await context.params;
+
   if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "MOCK_MODE_DISABLED",
-          message: "โหมด Prototype ปิดอยู่",
-        },
-      },
-      { status: 404 },
-    );
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000").replace(/\/+$/, "");
+    const headers = new Headers();
+    const auth = request.headers.get("authorization");
+    const cookie = request.headers.get("cookie");
+    const contentType = request.headers.get("content-type");
+    if (auth) headers.set("authorization", auth);
+    if (cookie) headers.set("cookie", cookie);
+    if (contentType) headers.set("content-type", contentType);
+    headers.set("accept", "application/json");
+
+    const arrayBuffer = await request.arrayBuffer();
+    const upstream = await fetch(`${apiBase}/api/orders/${resolvedParams.id}/slip`, {
+      method: "POST",
+      headers,
+      body: arrayBuffer,
+      cache: "no-store",
+    });
+    const data = await upstream.json().catch(() => ({
+      success: false,
+      error: { code: "UPSTREAM_ERROR", message: "ไม่สามารถตรวจสอบสลิปได้" },
+    }));
+    return NextResponse.json(data, { status: upstream.status });
   }
 
-  const parsedParams = paramsSchema.safeParse(await context.params);
+  const parsedParams = paramsSchema.safeParse(resolvedParams);
   const orderId = parsedParams.success ? Number(parsedParams.data.id) : Number.NaN;
   if (
     !parsedParams.success ||

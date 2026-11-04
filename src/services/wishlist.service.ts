@@ -82,10 +82,24 @@ export function toggleWishlist(product: WishlistItem): boolean {
         ),
     );
     notifyWishlistChanged(filtered);
+    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+      void fetch(`/api/wishlist/${encodeURIComponent(String(product.id))}`, {
+        method: "DELETE",
+        credentials: "include",
+      }).catch(() => {});
+    }
     return false;
   } else {
     const next = [...current, product];
     notifyWishlistChanged(next);
+    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+      void fetch("/api/wishlist", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(product),
+      }).catch(() => {});
+    }
     return true;
   }
 }
@@ -104,13 +118,28 @@ export function removeFromWishlist(productId: string | number, itemType?: string
       ),
   );
   notifyWishlistChanged(filtered);
+  if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+    void fetch(`/api/wishlist/${encodeURIComponent(targetId)}`, {
+      method: "DELETE",
+      credentials: "include",
+    }).catch(() => {});
+  }
 }
 
 /**
  * ล้างรายการทั้งหมด
  */
 export function clearWishlist(): void {
+  const current = getWishlist();
   notifyWishlistChanged([]);
+  if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+    for (const item of current) {
+      void fetch(`/api/wishlist/${encodeURIComponent(String(item.id))}`, {
+        method: "DELETE",
+        credentials: "include",
+      }).catch(() => {});
+    }
+  }
 }
 
 /**
@@ -118,6 +147,19 @@ export function clearWishlist(): void {
  */
 export function subscribeWishlist(listener: (items: WishlistItem[]) => void): () => void {
   if (typeof window === "undefined") return () => {};
+
+  if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+    void fetch("/api/wishlist", { credentials: "include", cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((resData) => {
+        const data = resData?.data ?? resData;
+        if (data && Array.isArray(data.items)) {
+          localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(data.items));
+          listener(data.items);
+        }
+      })
+      .catch(() => {});
+  }
 
   const handleCustomEvent = (event: Event) => {
     const custom = event as CustomEvent<{ items: WishlistItem[] }>;

@@ -38,6 +38,7 @@ import {
   MOCK_ORDERS_UPDATED_EVENT,
 } from "../../mocks/storage.mock";
 import { listAdminProducts } from "../../mocks/admin-products.mock";
+import { OrderService } from "../../services/order.service";
 
 const PAGE_SIZE = 5;
 
@@ -56,7 +57,7 @@ export default function AdminDashboardPage() {
   const [waitlistPage, setWaitlistPage] = useState(1);
 
   const refreshDashboard = useCallback((): void => {
-    setOrders(listMockOrders());
+    void OrderService.getOrders().then((data) => setOrders(data)).catch(() => setOrders(listMockOrders()));
     setWaitlist(getMockWaitlistEntries());
   }, []);
 
@@ -85,7 +86,8 @@ export default function AdminDashboardPage() {
     setIsTriggeringArrival(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      const result = markAllMockDepositOrdersArrived();
+      const updatedCount = await OrderService.markAllDepositOrdersArrived();
+      const result = { updatedCount };
       refreshDashboard();
       setNotice(
         result.updatedCount > 0

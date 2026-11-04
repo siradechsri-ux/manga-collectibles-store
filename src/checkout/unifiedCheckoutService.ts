@@ -54,6 +54,9 @@ export const unifiedCheckoutPayloadSchema = z
       .strict()
       .optional(),
     taxInvoiceRequest: taxInvoiceRequestSchema.optional(),
+    promoCode: z.string().trim().optional(),
+    redeemedPoints: z.number().int().nonnegative().optional(),
+    catalogSnapshot: z.unknown().optional(),
   })
   .strict();
 
@@ -305,7 +308,7 @@ function calculateFigureBillableWeight(
 }
 
 export class UnifiedCheckoutService {
-  constructor(private readonly pool: Pool) {}
+  constructor(public readonly pool: Pool) {}
 
   async createOrder(userId: number, input: unknown): Promise<UnifiedCheckoutResponse> {
     if (!Number.isSafeInteger(userId) || userId <= 0) {
@@ -392,7 +395,10 @@ export class UnifiedCheckoutService {
         const requiresPreorder =
           item.productType === "MANGA_PREORDER" ||
           item.productType === "FIGURE_DEPOSIT" ||
-          (item.productType === "FIGURE_FULL" && preorderIsOpen);
+          (item.productType === "FIGURE_FULL" && preorderIsOpen) ||
+          item.productType === "LIGHT_NOVEL_PREORDER" ||
+          item.productType === "PLAMO_DEPOSIT" ||
+          (item.productType === "PLAMO_FULL" && preorderIsOpen);
 
         if (
           (item.productType === "MANGA_PREORDER" ||
@@ -420,7 +426,7 @@ export class UnifiedCheckoutService {
         let isPreorder = requiresPreorder;
         let billableWeightKg: number;
 
-        if (item.productType === "FIGURE_DEPOSIT") {
+        if (item.productType === "FIGURE_DEPOSIT" || item.productType === "PLAMO_DEPOSIT") {
           if (!preorder) {
             throw new PreorderClosedError(item.productVariantId);
           }
@@ -444,7 +450,7 @@ export class UnifiedCheckoutService {
           balancePerUnitCents = fullPriceCents - depositCents;
           paymentType = "DEPOSIT";
           containsDeposit = true;
-        } else if (item.productType === "FIGURE_FULL" && requiresPreorder && preorder) {
+        } else if ((item.productType === "FIGURE_FULL" || item.productType === "PLAMO_FULL") && requiresPreorder && preorder) {
           unitPriceCents = amountToCents(preorder.full_price, "preorders.full_price");
           immediateUnitPriceCents = unitPriceCents;
         } else {

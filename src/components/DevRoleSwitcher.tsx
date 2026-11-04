@@ -72,7 +72,7 @@ export default function DevRoleSwitcher({
     setMounted(true);
   }, []);
 
-  if (!mounted || process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+  if (!mounted) {
     return null;
   }
 

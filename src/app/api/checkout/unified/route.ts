@@ -5,16 +5,28 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<NextResponse> {
   if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "MOCK_MODE_DISABLED",
-          message: "โหมด Prototype ปิดอยู่",
-        },
-      },
-      { status: 404 },
-    );
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000").replace(/\/+$/, "");
+    const headers = new Headers();
+    const auth = request.headers.get("authorization");
+    const cookie = request.headers.get("cookie");
+    const contentType = request.headers.get("content-type");
+    if (auth) headers.set("authorization", auth);
+    if (cookie) headers.set("cookie", cookie);
+    if (contentType) headers.set("content-type", contentType);
+    headers.set("accept", "application/json");
+
+    const rawBody = await request.text();
+    const upstream = await fetch(`${apiBase}/api/checkout/unified`, {
+      method: "POST",
+      headers,
+      body: rawBody,
+      cache: "no-store",
+    });
+    const data = await upstream.json().catch(() => ({
+      success: false,
+      error: { code: "UPSTREAM_ERROR", message: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้" },
+    }));
+    return NextResponse.json(data, { status: upstream.status });
   }
 
   let body: unknown;

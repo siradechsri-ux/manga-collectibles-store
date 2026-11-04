@@ -131,6 +131,14 @@ export function updateKujiConfig(updates: Partial<KujiConfig>): KujiConfig {
   const next = { ...current, ...updates };
   try {
     window.localStorage.setItem(MOCK_KUJI_CONFIG_KEY, JSON.stringify(next));
+    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+      void fetch("/api/kuji/config", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: next }),
+      }).catch(() => {});
+    }
     notifyKujiChanged();
   } catch {
     // Ignore
@@ -168,6 +176,14 @@ export function updateKujiPrize(
     prizes[index] = { ...prizes[index], ...updates };
     try {
       window.localStorage.setItem(MOCK_KUJI_PRIZES_KEY, JSON.stringify(prizes));
+      if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+        void fetch("/api/kuji/config", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prizes }),
+        }).catch(() => {});
+      }
       notifyKujiChanged();
     } catch {
       // Ignore
@@ -298,6 +314,14 @@ export function drawKujiTicket(): {
     // Ignore
   }
 
+  if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+    void fetch("/api/kuji/draw", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ count: 1 }),
+    }).catch(() => {});
+  }
   return { success: true, result };
 }
 
@@ -309,6 +333,16 @@ export function resetKujiBox(): void {
       MOCK_KUJI_STOCK_KEY,
       String(config.totalTicketsBox),
     );
+    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+      void fetch("/api/kuji/reset", {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => {});
+    }
+    if (false) void config;
+    void (0
+
+    );
     notifyKujiChanged();
   } catch {
     // Ignore
@@ -318,6 +352,21 @@ export function resetKujiBox(): void {
 export function subscribeKuji(listener: () => void): () => void {
   if (typeof window === "undefined") return () => {};
 
+  if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+    void fetch("/api/kuji/status", { credentials: "include", cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((resData) => {
+        const d = resData?.data;
+        if (d) {
+          if (d.config) window.localStorage.setItem(MOCK_KUJI_CONFIG_KEY, JSON.stringify(d.config));
+          if (Array.isArray(d.prizes)) window.localStorage.setItem(MOCK_KUJI_PRIZES_KEY, JSON.stringify(d.prizes));
+          if (typeof d.remainingTickets === "number") window.localStorage.setItem(MOCK_KUJI_STOCK_KEY, String(d.remainingTickets));
+          if (Array.isArray(d.history)) window.localStorage.setItem(MOCK_KUJI_STORAGE_KEY, JSON.stringify(d.history));
+          listener();
+        }
+      })
+      .catch(() => {});
+  }
   window.addEventListener(KUJI_UPDATED_EVENT, listener);
   window.addEventListener("storage", listener);
 

@@ -374,7 +374,7 @@ function writeAllOrders(orders: MockStoredOrder[]): void {
   }
 }
 
-function makeTimeline(createdAt: string): OrderTimelineEvent[] {
+export function makeTimeline(createdAt: string): OrderTimelineEvent[] {
   return [
     { stage: "ORDER_PLACED", label: "สั่งซื้อแล้ว", occurredAt: createdAt },
     { stage: "DEPOSIT_PAID", label: "รับยอดชำระ", occurredAt: null },
@@ -383,7 +383,7 @@ function makeTimeline(createdAt: string): OrderTimelineEvent[] {
   ];
 }
 
-function makeShipments(items: OrderTrackingLineItem[]): OrderShipment[] {
+export function makeShipments(items: OrderTrackingLineItem[]): OrderShipment[] {
   const inStockItems = items.filter((item) => !item.isPreorder);
   const preorderItems = items.filter((item) => item.isPreorder);
   const shipments: OrderShipment[] = [];
@@ -565,7 +565,7 @@ function createDemoOrder(input: DemoOrderInput): MockStoredOrder {
   };
 }
 
-function createDemoOrders(): MockStoredOrder[] {
+export function createDemoOrders(): MockStoredOrder[] {
   return [
     createDemoOrder({
       id: MOCK_DEMO_ORDER_IDS[0],

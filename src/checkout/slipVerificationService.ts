@@ -385,7 +385,7 @@ export class SlipVerificationService {
   private readonly mockSlipVerification: boolean;
 
   constructor(
-    private readonly pool: Pool,
+    public readonly pool: Pool,
     options: SlipVerificationServiceOptions,
   ) {
     if (normalizeAccountNumber(options.merchantRecipientAccount).length === 0) {

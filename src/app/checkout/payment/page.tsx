@@ -18,6 +18,7 @@ import {
   getMockOrder,
   updateMockOrderPayment,
 } from "../../../mocks/storage.mock";
+import { OrderService } from "../../../services/order.service";
 import {
   addPoints,
   calculateEarnedPoints,
@@ -169,7 +170,25 @@ function CheckoutPaymentContent() {
         } else {
           setQrWasUnavailable(true);
         }
-        window.sessionStorage.removeItem(key);
+        setQrWasUnavailable(false);
+        return;
+      }
+      void OrderService.getOrderById(Number(orderIdValue)).then((dbOrder) => {
+        if (dbOrder?.paymentQrCodeDataUrl) {
+          const parsed = safeQrDataUrlSchema.safeParse(dbOrder.paymentQrCodeDataUrl);
+          if (parsed.success) {
+            setQrDataUrl(parsed.data);
+            setQrWasUnavailable(false);
+            if (!paymentAmount && dbOrder.immediateAmount) setPaymentAmount(dbOrder.immediateAmount);
+            if (!displayOrderNumber && dbOrder.detail.orderNumber) setDisplayOrderNumber(dbOrder.detail.orderNumber);
+            return;
+          }
+        }
+        setQrWasUnavailable(true);
+      }).catch(() => {
+        setQrWasUnavailable(true);
+      });
+      if (false) {
       } else {
         setQrWasUnavailable(true);
       }
@@ -270,6 +289,16 @@ function CheckoutPaymentContent() {
       if (useMockMode) {
         router.replace(`/orders/${orderIdValue}`);
         return;
+      }
+      const paidAmount = Number(paymentAmount || parsedSuccess.data.data.verifiedAmount) || 0;
+      const { totalEarnedPoints } = calculateEarnedPoints(paidAmount);
+      if (totalEarnedPoints > 0) {
+        addPoints(
+          totalEarnedPoints,
+          `รับแต้มจากการชำระเงินคำสั่งซื้อ #${displayOrderNumber || orderIdValue}`,
+          "EARN_ORDER",
+          orderIdValue,
+        );
       }
       setPaymentResult({
         ...parsedSuccess.data.data,

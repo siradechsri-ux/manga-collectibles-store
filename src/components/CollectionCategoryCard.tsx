@@ -105,7 +105,7 @@ export default function CollectionCategoryCard({
     setIsImageVisible(true);
   }, [collection.slug]);
 
-  const theme = categoryThemes[collection.slug] ?? categoryThemes.manga;
+  const theme = categoryThemes[collection.slug as keyof typeof categoryThemes] ?? categoryThemes.manga;
   const CategoryIcon = theme.icon;
 
   return (
