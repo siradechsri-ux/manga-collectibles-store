@@ -9,6 +9,7 @@ const nextConfig = {
       { source: "/light-novel", destination: "/collections/light-novel", permanent: false },
       { source: "/goods", destination: "/collections/goods", permanent: false },
       { source: "/accessories", destination: "/collections/accessories", permanent: false },
+      { source: "/admin/orders", destination: "/admin", permanent: false },
     ];
   },
 

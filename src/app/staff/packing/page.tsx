@@ -10,7 +10,7 @@ import type { ShipmentCarrier } from "../../../components/OrderDetailView";
 import { resolveOrderItemImage } from "../../../components/OrderDetailView";
 
 export default function StaffPackingPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, quickLogin } = useAuth();
   const [orders, setOrders] = useState<MockStoredOrder[]>([]);
   const [ordersPage, setOrdersPage] = useState(1);
   const [shoppingDisabledNotice, setShoppingDisabledNotice] = useState(false);
@@ -130,21 +130,34 @@ export default function StaffPackingPage() {
   if (user?.role !== "STAFF" && user?.role !== "ADMIN") {
     return (
       <main className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center px-5 text-center">
-        <span className="rounded-2xl bg-red-50 p-4 text-red-700 dark:bg-red-950/40 dark:text-red-300">
-          <AlertTriangle size={32} aria-hidden="true" />
+        <span className="rounded-2xl bg-blue-50 p-4 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+          <PackageCheck size={32} aria-hidden="true" />
         </span>
-        <p className="mt-5 text-sm font-bold uppercase tracking-wider text-red-700 dark:text-red-400">
-          HTTP 403 · Access Denied
+        <p className="mt-5 text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">
+          STAFF WAREHOUSE PORTAL
         </p>
         <h1 className="mt-2 text-2xl font-extrabold text-slate-950 dark:text-zinc-50">
-          หน้านี้สำหรับพนักงานคลังสินค้าเท่านั้น
+          ระบบจัดการแพ็คสินค้าคลัง (Staff Packing)
         </h1>
         <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-zinc-400">
-          ต้องเป็น STAFF หรือ ADMIN เพื่อเข้าถึงหน้าจัดการคลังสินค้า
+          หน้านี้สำหรับเจ้าหน้าที่คลังตรวจสอบรายการแพ็คของ พิมพ์ Packing Slip และบันทึกเลขพัสดุ
         </p>
-        <Link href="/" className="mt-5 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-950">
-          กลับหน้าร้าน
-        </Link>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => void quickLogin("STAFF")}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-blue-700"
+          >
+            <span>⚡ สลับบทบาทเป็น STAFF ทันที</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void quickLogin("ADMIN")}
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-bold text-zinc-800 transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+          >
+            <span>สลับเป็น ADMIN</span>
+          </button>
+        </div>
       </main>
     );
   }

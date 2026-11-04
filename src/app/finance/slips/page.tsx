@@ -37,7 +37,7 @@ import {
 type SlipTab = "PENDING" | "APPROVED" | "REJECTED";
 
 export default function FinanceSlipsPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, quickLogin } = useAuth();
   const [orders, setOrders] = useState<MockStoredOrder[]>([]);
   const [activeTab, setActiveTab] = useState<SlipTab>("PENDING");
   const [selectedSlipOrder, setSelectedSlipOrder] = useState<MockStoredOrder | null>(null);
@@ -145,24 +145,34 @@ export default function FinanceSlipsPage() {
   if (user?.role !== "FINANCE" && user?.role !== "ADMIN") {
     return (
       <main className="mx-auto flex min-h-[70vh] max-w-lg flex-col items-center justify-center px-6 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400">
-          <ShieldAlert size={28} aria-hidden="true" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+          <ReceiptText size={28} aria-hidden="true" />
         </div>
-        <p className="mt-4 text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400">
-          HTTP 403 · เข้าถึงไม่ได้
+        <p className="mt-4 text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+          FINANCE & ADMIN PORTAL
         </p>
         <h1 className="mt-2 text-2xl font-black text-slate-900 dark:text-zinc-50">
-          เฉพาะฝ่ายการเงิน (FINANCE) และผู้ดูแลระบบ
+          ระบบตรวจสอบสลิปโอนเงิน (Slip Verification)
         </h1>
         <p className="mt-2 text-xs text-slate-600 dark:text-zinc-400">
-          บัญชีของคุณไม่มีสิทธิ์เข้าถึงระบบตรวจสอบสลิปโอนเงิน กรุณาสลับบทบาทเป็น FINANCE หรือ ADMIN ผ่านตัวสลับบทบาทมุมขวาล่าง
+          หน้านี้สำหรับเจ้าหน้าที่ฝ่ายการเงินในการตรวจสอบสลิป อนุมัติยอด และส่งต่อให้คลังแพ็คของ
         </p>
-        <Link
-          href="/"
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-        >
-          กลับสู่หน้าหลัก
-        </Link>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => void quickLogin("FINANCE")}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-xs font-bold text-white shadow-md transition hover:bg-emerald-700"
+          >
+            <span>⚡ สลับบทบาทเป็น FINANCE ทันที</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void quickLogin("ADMIN")}
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-3 text-xs font-bold text-zinc-800 transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+          >
+            <span>สลับเป็น ADMIN</span>
+          </button>
+        </div>
       </main>
     );
   }

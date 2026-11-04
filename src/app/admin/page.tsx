@@ -42,7 +42,7 @@ import { listAdminProducts } from "../../mocks/admin-products.mock";
 const PAGE_SIZE = 5;
 
 export default function AdminDashboardPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, quickLogin } = useAuth();
   const [orders, setOrders] = useState<MockStoredOrder[]>([]);
   const [waitlist, setWaitlist] = useState<MockWaitlistEntry[]>([]);
   const [shoppingDisabledNotice, setShoppingDisabledNotice] = useState(false);
@@ -290,14 +290,23 @@ export default function AdminDashboardPage() {
           ไม่มีสิทธิ์เข้าถึงระบบจัดการ
         </h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
-          สลับ Role เป็น ADMIN ผ่านแถบสลับบทบาททดสอบเพื่อเปิดหน้าจำลองนี้
+          ขณะนี้คุณไม่ได้อยู่ในบทบาท ADMIN สามารถกดปุ่มด้านล่างเพื่อเข้าสู่ระบบจำลองทันที
         </p>
-        <Link
-          href="/"
-          className="mt-5 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-950"
-        >
-          กลับหน้าร้าน
-        </Link>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => void quickLogin("ADMIN")}
+            className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-orange-700"
+          >
+            <span>⚡ สลับบทบาทเป็น ADMIN ทันที</span>
+          </button>
+          <Link
+            href="/"
+            className="rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-bold text-zinc-800 transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+          >
+            กลับหน้าร้าน
+          </Link>
+        </div>
       </main>
     );
   }
