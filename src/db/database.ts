@@ -505,6 +505,53 @@ CREATE TABLE IF NOT EXISTS kuji_box_state (
   history_json JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS user_addresses (
+  id VARCHAR(100) PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label VARCHAR(60) NOT NULL,
+  recipient_name VARCHAR(150) NOT NULL,
+  recipient_phone VARCHAR(30) NOT NULL,
+  address_line VARCHAR(300) NOT NULL,
+  address_village VARCHAR(100) DEFAULT '',
+  street VARCHAR(150) DEFAULT '',
+  subdistrict VARCHAR(120) NOT NULL,
+  district VARCHAR(120) NOT NULL,
+  province VARCHAR(120) NOT NULL,
+  postal_code VARCHAR(10) NOT NULL,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS claims (
+  id SERIAL PRIMARY KEY,
+  claim_code VARCHAR(50) UNIQUE NOT NULL,
+  order_id BIGINT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  issue_type VARCHAR(50) NOT NULL,
+  description TEXT NOT NULL,
+  photo_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
+  unboxing_video_url TEXT NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+  resolution_type VARCHAR(50),
+  admin_notes TEXT,
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id SERIAL PRIMARY KEY,
+  performed_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  action VARCHAR(100) NOT NULL,
+  resource_type VARCHAR(50) NOT NULL,
+  resource_id VARCHAR(100),
+  old_values JSONB,
+  new_values JSONB,
+  ip_address VARCHAR(45),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `;
 
 async function seedDatabase(pool: Pool): Promise<void> {
@@ -899,14 +946,30 @@ export async function createDatabasePool(connectionString: string): Promise<Pool
   const dataDir = path.resolve(process.cwd(), ".data/pglite");
   fs.mkdirSync(dataDir, { recursive: true });
 
-  const pgLite = await PGlite.create({
-    dataDir,
-    parsers: {
-      // Match node-postgres behavior: return BIGINT (INT8, OID 20) and NUMERIC (OID 1700) as strings
-      [pgliteTypes.INT8]: (val: string) => String(val),
-      [pgliteTypes.NUMERIC]: (val: string) => String(val),
-    },
-  });
+  let pgLite: PGlite;
+  try {
+    pgLite = await PGlite.create({
+      dataDir,
+      parsers: {
+        // Match node-postgres behavior: return BIGINT (INT8, OID 20) and NUMERIC (OID 1700) as strings
+        [pgliteTypes.INT8]: (val: string) => String(val),
+        [pgliteTypes.NUMERIC]: (val: string) => String(val),
+      },
+    });
+  } catch (initErr) {
+    console.warn("Retrying PGlite initialization after cleaning stale directory...", initErr);
+    try {
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    } catch {}
+    fs.mkdirSync(dataDir, { recursive: true });
+    pgLite = await PGlite.create({
+      dataDir,
+      parsers: {
+        [pgliteTypes.INT8]: (val: string) => String(val),
+        [pgliteTypes.NUMERIC]: (val: string) => String(val),
+      },
+    });
+  }
 
   const adapterPool = new PGlitePoolAdapter(pgLite) as unknown as Pool;
   await adapterPool.query(BOOTSTRAP_DDL);
@@ -959,6 +1022,39 @@ export async function listOrderSnapshotsFromDb(
         `SELECT snapshot_json FROM order_snapshots ORDER BY order_id DESC`,
       );
   return res.rows.map((r) => r.snapshot_json);
+}
+
+export interface AuditLogEntry {
+  performedByUserId?: number | null;
+  action: string;
+  resourceType: string;
+  resourceId?: string | number | null;
+  oldValues?: any;
+  newValues?: any;
+  ipAddress?: string | null;
+}
+
+export async function recordAuditLog(
+  pool: Pool,
+  entry: AuditLogEntry,
+): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO audit_logs (performed_by_user_id, action, resource_type, resource_id, old_values, new_values, ip_address, created_at)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, CURRENT_TIMESTAMP)`,
+      [
+        entry.performedByUserId ?? null,
+        entry.action,
+        entry.resourceType,
+        entry.resourceId ? String(entry.resourceId) : null,
+        entry.oldValues ? JSON.stringify(entry.oldValues) : null,
+        entry.newValues ? JSON.stringify(entry.newValues) : null,
+        entry.ipAddress ?? null,
+      ],
+    );
+  } catch (error) {
+    console.error("Failed to record audit log:", error);
+  }
 }
 
 export { makeShipments, makeTimeline };

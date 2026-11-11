@@ -397,6 +397,29 @@ export default function CheckoutPage() {
       return;
     }
     if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+      void fetch("/api/user/addresses", { credentials: "include" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          const addresses = (data?.data?.addresses || []) as SavedShippingAddress[];
+          setSavedAddresses(addresses);
+          const defaultAddress =
+            addresses.find((address) => address.isDefault) ?? addresses[0];
+          if (defaultAddress) {
+            setSelectedAddressId(defaultAddress.id);
+            setShippingAddress({
+              recipientName: defaultAddress.recipientName,
+              recipientPhone: defaultAddress.recipientPhone,
+              addressLine: defaultAddress.addressLine,
+              addressVillage: defaultAddress.addressVillage ?? "",
+              street: defaultAddress.street ?? "",
+              subdistrict: defaultAddress.subdistrict,
+              district: defaultAddress.district,
+              province: defaultAddress.province,
+              postalCode: defaultAddress.postalCode,
+            });
+          }
+        })
+        .catch(() => {});
       return;
     }
     try {
@@ -520,38 +543,58 @@ export default function CheckoutPage() {
       setCheckoutError("กรุณาตรวจสอบข้อมูลที่อยู่จัดส่งให้ครบถ้วน");
       return;
     }
-    if (
-      saveAddressForNextTime &&
-      user?.role === "CUSTOMER" &&
-      useMockMode
-    ) {
+    if (saveAddressForNextTime && user?.role === "CUSTOMER") {
       try {
-        let updatedAddresses = saveShippingAddress(
-          user.id,
-          {
-            label: selectedAddressId
-              ? savedAddresses.find((address) => address.id === selectedAddressId)
-                  ?.label ?? "ที่อยู่จาก Checkout"
-              : "ที่อยู่จาก Checkout",
-            ...parsedAddress.data,
-            addressVillage: parsedAddress.data.addressVillage ?? "",
-            street: parsedAddress.data.street ?? "",
-          },
-          selectedAddressId || undefined,
-        );
-        const savedAddress =
-          updatedAddresses.find((address) => address.id === selectedAddressId) ??
-          updatedAddresses[updatedAddresses.length - 1];
-        if (
-          savedAddress &&
-          (updatedAddresses.length === 1 ||
-            !updatedAddresses.some((item) => item.isDefault))
-        ) {
-          updatedAddresses = setDefaultShippingAddress(user.id, savedAddress.id);
-        }
-        setSavedAddresses(updatedAddresses);
-        if (savedAddress) {
-          setSelectedAddressId(savedAddress.id);
+        if (useMockMode) {
+          let updatedAddresses = saveShippingAddress(
+            user.id,
+            {
+              label: selectedAddressId
+                ? savedAddresses.find((address) => address.id === selectedAddressId)
+                    ?.label ?? "ที่อยู่จาก Checkout"
+                : "ที่อยู่จาก Checkout",
+              ...parsedAddress.data,
+              addressVillage: parsedAddress.data.addressVillage ?? "",
+              street: parsedAddress.data.street ?? "",
+            },
+            selectedAddressId || undefined,
+          );
+          const savedAddress =
+            updatedAddresses.find((address) => address.id === selectedAddressId) ??
+            updatedAddresses[updatedAddresses.length - 1];
+          if (
+            savedAddress &&
+            (updatedAddresses.length === 1 ||
+              !updatedAddresses.some((item) => item.isDefault))
+          ) {
+            updatedAddresses = setDefaultShippingAddress(user.id, savedAddress.id);
+          }
+          setSavedAddresses(updatedAddresses);
+          if (savedAddress) {
+            setSelectedAddressId(savedAddress.id);
+          }
+        } else {
+          void fetch("/api/user/addresses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              label: selectedAddressId
+                ? savedAddresses.find((address) => address.id === selectedAddressId)
+                    ?.label ?? "ที่อยู่จาก Checkout"
+                : "ที่อยู่จาก Checkout",
+              recipientName: parsedAddress.data.recipientName,
+              recipientPhone: parsedAddress.data.recipientPhone,
+              addressLine: parsedAddress.data.addressLine,
+              addressVillage: parsedAddress.data.addressVillage ?? "",
+              street: parsedAddress.data.street ?? "",
+              subdistrict: parsedAddress.data.subdistrict,
+              district: parsedAddress.data.district,
+              province: parsedAddress.data.province,
+              postalCode: parsedAddress.data.postalCode,
+              isDefault: savedAddresses.length === 0,
+            }),
+          }).catch(() => {});
         }
       } catch (addressError) {
         setCheckoutError(

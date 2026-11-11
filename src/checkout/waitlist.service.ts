@@ -220,7 +220,34 @@ async function rollbackTransaction(client: PoolClient, started: boolean): Promis
 }
 
 export class WaitlistService {
-  constructor(private readonly repository: WaitlistRepository) {}
+  constructor(public readonly repository: WaitlistRepository) {}
+
+  async listAllEntries() {
+    const res = await this.repository.pool.query(`
+      SELECT pw.id, pw.product_variant_id, pw.user_id, pw.queue_position, pw.status,
+             pw.claim_token, pw.offer_expires_at, pw.offered_at, pw.created_at,
+             u.full_name, u.email, p.name as product_title, pv.sku
+      FROM product_waitlists pw
+      LEFT JOIN users u ON u.id = pw.user_id
+      LEFT JOIN product_variants pv ON pv.id = pw.product_variant_id
+      LEFT JOIN products p ON p.id = pv.product_id
+      ORDER BY pw.queue_position ASC
+    `);
+    return res.rows.map((row) => ({
+      id: Number(row.id),
+      variantId: Number(row.product_variant_id),
+      productTitle: row.product_title || `ฟิกเกอร์ SKU: ${row.sku}`,
+      userId: row.user_id,
+      userName: row.full_name || "ลูกค้า",
+      userEmail: row.email || "",
+      queuePosition: Number(row.queue_position),
+      status: row.status,
+      claimToken: row.claim_token,
+      offerExpiresAt: row.offer_expires_at ? new Date(row.offer_expires_at).toISOString() : null,
+      offeredAt: row.offered_at ? new Date(row.offered_at).toISOString() : null,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  }
 
   async joinWaitlist(userIdInput: number, productVariantIdInput: number): Promise<JoinWaitlistResponse> {
     const userId = parsePositiveId(userIdInput, "userId");

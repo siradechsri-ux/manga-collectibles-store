@@ -153,5 +153,17 @@ export function createWaitlistRouter(
     middleware.requireCustomerAuthentication,
     createCancelWaitlistController(service),
   );
+  router.get("/api/waitlist", async (_request, response) => {
+    try {
+      const entries = await service.listAllEntries();
+      response.json({ success: true, data: { entries } });
+    } catch (error) {
+      console.error("Failed to list waitlist entries:", error);
+      response
+        .status(500)
+        .json({ success: false, error: { message: "ไม่สามารถโหลดข้อมูลคิวสำรองได้" } });
+    }
+  });
+
   return router;
 }

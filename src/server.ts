@@ -24,6 +24,8 @@ import { createOrderRouter } from "./routes/order.routes";
 import { createPointsRouter } from "./routes/points.routes";
 import { createKujiRouter } from "./routes/kuji.routes";
 import { createWishlistRouter } from "./routes/wishlist.routes";
+import { createAddressRouter } from "./routes/address.routes";
+import { createClaimRouter } from "./routes/claim.routes";
 import { TaxInvoiceService } from "./tax/taxInvoice.service";
 import { createTaxInvoiceRouter } from "./tax/taxInvoice.controller";
 import { LocalTaxInvoiceStorage } from "./tax/taxInvoiceStorage";
@@ -157,7 +159,8 @@ export async function startServer(portOverride?: number) {
   app.use("/api/products", createCatalogRouter(pool));
 
   // 4. Orders Management Router
-  app.use("/api/orders", optionalAuth, createOrderRouter(pool, authService));
+  const orderRouter = createOrderRouter(pool, authService);
+  app.use("/api/orders", optionalAuth, orderRouter);
 
   // 5. Unified Checkout
   app.post(
@@ -204,6 +207,20 @@ export async function startServer(portOverride?: number) {
 
   // 12. Wishlist Router
   app.use("/api/wishlist", optionalAuth, createWishlistRouter(pool, authService));
+
+  // 13. Address Book Router
+  app.use("/api/user/addresses", optionalAuth, createAddressRouter(pool, authService));
+
+  // 14. Claims & RMA Router
+  const claimRouter = createClaimRouter(pool, authService);
+  app.use("/api/claims", optionalAuth, claimRouter);
+  app.use("/api/admin/claims", optionalAuth, claimRouter);
+
+  // 15. Admin Preorders Batch Cancellation Router
+  app.use("/api/admin/preorders/cancel-batch", optionalAuth, (req, res, next) => {
+    req.url = "/admin/preorders/cancel-batch";
+    orderRouter(req, res, next);
+  });
 
   const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
     console.error("Unhandled Express request error.", error);

@@ -57,8 +57,19 @@ export default function AdminDashboardPage() {
   const [waitlistPage, setWaitlistPage] = useState(1);
 
   const refreshDashboard = useCallback((): void => {
-    void OrderService.getOrders().then((data) => setOrders(data)).catch(() => setOrders(listMockOrders()));
-    setWaitlist(getMockWaitlistEntries());
+    void OrderService.getOrders()
+      .then((data) => setOrders(data))
+      .catch(() => setOrders(listMockOrders()));
+    void fetch("/api/waitlist")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.data?.entries && Array.isArray(data.data.entries)) {
+          setWaitlist(data.data.entries);
+        } else {
+          setWaitlist(getMockWaitlistEntries());
+        }
+      })
+      .catch(() => setWaitlist(getMockWaitlistEntries()));
   }, []);
 
   useEffect(() => {

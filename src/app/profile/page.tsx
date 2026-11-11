@@ -158,9 +158,20 @@ export default function ProfilePage() {
       setFullName(nextProfile.fullName);
       setPhoneNumber(nextProfile.phoneNumber);
       setTaxProfile(nextProfile.savedTaxProfile ?? emptyTaxProfile);
-      setAddresses(
-        user.role === "CUSTOMER" ? listShippingAddresses(user.id) : [],
-      );
+      if (process.env.NEXT_PUBLIC_USE_MOCK !== "true" && user.role === "CUSTOMER") {
+        void fetch("/api/user/addresses", { credentials: "include" })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.data?.addresses && Array.isArray(data.data.addresses)) {
+              setAddresses(data.data.addresses);
+            }
+          })
+          .catch(() => {});
+      } else {
+        setAddresses(
+          user.role === "CUSTOMER" ? listShippingAddresses(user.id) : [],
+        );
+      }
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -269,29 +280,52 @@ export default function ProfilePage() {
     setError(null);
   }
 
-  function handleSaveAddress(event: React.FormEvent<HTMLFormElement>): void {
+  async function handleSaveAddress(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!user || user.role !== "CUSTOMER") {
       return;
     }
     setIsSaving(true);
     try {
-      let updated = saveShippingAddress(
-        user.id,
-        addressDraft,
-        editingAddressId ?? undefined,
-      );
-      const savedAddress = updated.find(
-        (address) =>
-          address.id === editingAddressId ||
-          (!editingAddressId &&
-            address.recipientName === addressDraft.recipientName &&
-            address.label === addressDraft.label),
-      );
-      if (makeAddressDefault && savedAddress) {
-        updated = setDefaultShippingAddress(user.id, savedAddress.id);
+      if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+        const url = editingAddressId ? `/api/user/addresses/${editingAddressId}` : "/api/user/addresses";
+        const method = editingAddressId ? "PATCH" : "POST";
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            ...addressDraft,
+            isDefault: makeAddressDefault,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error?.message || "บันทึกที่อยู่ไม่สำเร็จ");
+        }
+        const listRes = await fetch("/api/user/addresses", { credentials: "include" });
+        const listData = await listRes.json().catch(() => ({}));
+        if (listData?.data?.addresses) {
+          setAddresses(listData.data.addresses);
+        }
+      } else {
+        let updated = saveShippingAddress(
+          user.id,
+          addressDraft,
+          editingAddressId ?? undefined,
+        );
+        const savedAddress = updated.find(
+          (address) =>
+            address.id === editingAddressId ||
+            (!editingAddressId &&
+              address.recipientName === addressDraft.recipientName &&
+              address.label === addressDraft.label),
+        );
+        if (makeAddressDefault && savedAddress) {
+          updated = setDefaultShippingAddress(user.id, savedAddress.id);
+        }
+        setAddresses(updated);
       }
-      setAddresses(updated);
       setAddressModalOpen(false);
       showMessage(editingAddressId ? "แก้ไขที่อยู่เรียบร้อยแล้ว" : "เพิ่มที่อยู่เรียบร้อยแล้ว");
     } catch (saveError) {
@@ -301,24 +335,54 @@ export default function ProfilePage() {
     }
   }
 
-  function handleSetDefault(addressId: string): void {
+  async function handleSetDefault(addressId: string): Promise<void> {
     if (!user) {
       return;
     }
     try {
-      setAddresses(setDefaultShippingAddress(user.id, addressId));
+      if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+        const res = await fetch(`/api/user/addresses/${addressId}/default`, {
+          method: "POST",
+          credentials: "include",
+        });
+        if (!res.ok) {
+          throw new Error("ตั้งค่าที่อยู่เริ่มต้นไม่สำเร็จ");
+        }
+        const listRes = await fetch("/api/user/addresses", { credentials: "include" });
+        const listData = await listRes.json().catch(() => ({}));
+        if (listData?.data?.addresses) {
+          setAddresses(listData.data.addresses);
+        }
+      } else {
+        setAddresses(setDefaultShippingAddress(user.id, addressId));
+      }
       showMessage("ตั้งค่าที่อยู่เริ่มต้นเรียบร้อยแล้ว");
     } catch (defaultError) {
       showError(defaultError, "ตั้งค่าที่อยู่เริ่มต้นไม่สำเร็จ");
     }
   }
 
-  function handleDeleteAddress(addressId: string): void {
+  async function handleDeleteAddress(addressId: string): Promise<void> {
     if (!user || !window.confirm("ยืนยันการลบที่อยู่นี้หรือไม่")) {
       return;
     }
     try {
-      setAddresses(deleteShippingAddress(user.id, addressId));
+      if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+        const res = await fetch(`/api/user/addresses/${addressId}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        if (!res.ok) {
+          throw new Error("ลบที่อยู่ไม่สำเร็จ");
+        }
+        const listRes = await fetch("/api/user/addresses", { credentials: "include" });
+        const listData = await listRes.json().catch(() => ({}));
+        if (listData?.data?.addresses) {
+          setAddresses(listData.data.addresses);
+        }
+      } else {
+        setAddresses(deleteShippingAddress(user.id, addressId));
+      }
       showMessage("ลบที่อยู่เรียบร้อยแล้ว");
     } catch (deleteError) {
       showError(deleteError, "ลบที่อยู่ไม่สำเร็จ");

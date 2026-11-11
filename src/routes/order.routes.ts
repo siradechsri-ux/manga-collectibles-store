@@ -5,6 +5,7 @@ import {
   getOrderSnapshotFromDb,
   listOrderSnapshotsFromDb,
   saveOrderSnapshotToDb,
+  recordAuditLog,
 } from "../db/database";
 import { generatePromptPayQrDataUrl } from "../services/paymentQr.service";
 import { AuthService } from "../auth/auth.service";
@@ -219,6 +220,15 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
         [orderId],
       );
       await saveOrderSnapshotToDb(pool, cancelledOrder);
+      await recordAuditLog(pool, {
+        performedByUserId: request.user?.id ?? 9001,
+        action: "ORDER_CANCEL",
+        resourceType: "order",
+        resourceId: orderId,
+        oldValues: { status: existing.detail.status },
+        newValues: { status: "CANCELLED" },
+        ipAddress: request.ip,
+      });
       response.json({ success: true, order: cancelledOrder });
     } catch (error) {
       const message =
@@ -301,6 +311,15 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
           ],
         );
         await saveOrderSnapshotToDb(pool, updatedOrder);
+        await recordAuditLog(pool, {
+          performedByUserId: request.user?.id ?? 9004,
+          action: "MANUAL_SLIP_APPROVE",
+          resourceType: "order",
+          resourceId: orderId,
+          oldValues: { status: existing.detail.status, paymentStatus: existing.detail.paymentStatus },
+          newValues: { status: nextStatus, paymentStatus: nextPaymentStatus },
+          ipAddress: request.ip,
+        });
         response.json({ success: true, order: updatedOrder });
       } catch (error) {
         const message =
@@ -353,6 +372,15 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
           [orderId],
         );
         await saveOrderSnapshotToDb(pool, updatedOrder);
+        await recordAuditLog(pool, {
+          performedByUserId: request.user?.id ?? 9004,
+          action: "SLIP_REJECT",
+          resourceType: "order",
+          resourceId: orderId,
+          oldValues: { status: existing.detail.status },
+          newValues: { status: "PAYMENT_REJECTED", reason },
+          ipAddress: request.ip,
+        });
         response.json({ success: true, order: updatedOrder });
       } catch (error) {
         const message =
@@ -400,6 +428,15 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
           [orderId],
         );
         await saveOrderSnapshotToDb(pool, updatedOrder);
+        await recordAuditLog(pool, {
+          performedByUserId: request.user?.id ?? 9001,
+          action: "SLIP_RESUBMIT",
+          resourceType: "order",
+          resourceId: orderId,
+          oldValues: { status: existing.detail.status },
+          newValues: { status: "PAYMENT_REVIEW_PENDING", fileName },
+          ipAddress: request.ip,
+        });
         response.json({ success: true, order: updatedOrder });
       } catch (error) {
         const message =
@@ -461,6 +498,15 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
           [orderId, dueDate.toISOString()],
         );
         await saveOrderSnapshotToDb(pool, updatedOrder);
+        await recordAuditLog(pool, {
+          performedByUserId: request.user?.id ?? 9003,
+          action: "FIGURE_ARRIVED",
+          resourceType: "order",
+          resourceId: orderId,
+          oldValues: { status: existing.detail.status },
+          newValues: { status: "AWAITING_BALANCE_PAYMENT", balanceDueDate: dueDate.toISOString() },
+          ipAddress: request.ip,
+        });
         response.json({ success: true, order: updatedOrder });
       } catch (error) {
         const message =
@@ -553,6 +599,15 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
           [orderId, nextOrderStatus],
         );
         await saveOrderSnapshotToDb(pool, updatedOrder);
+        await recordAuditLog(pool, {
+          performedByUserId: request.user?.id ?? 9003,
+          action: "SHIPMENT_ADVANCE",
+          resourceType: "order",
+          resourceId: orderId,
+          oldValues: { status: existing.detail.status },
+          newValues: { status: nextOrderStatus },
+          ipAddress: request.ip,
+        });
         response.json({ success: true, order: updatedOrder });
       } catch (error) {
         const message =
@@ -621,6 +676,15 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
           [orderId],
         );
         await saveOrderSnapshotToDb(pool, updatedOrder);
+        await recordAuditLog(pool, {
+          performedByUserId: request.user?.id ?? 9003,
+          action: "ORDER_SHIPPED",
+          resourceType: "order",
+          resourceId: orderId,
+          oldValues: { status: existing.detail.status },
+          newValues: { status: "SHIPPED", trackingNumber, carrier },
+          ipAddress: request.ip,
+        });
         response.json({ success: true, order: updatedOrder });
       } catch (error) {
         const message =
@@ -663,6 +727,201 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
       }
     },
   );
+
+  /**
+   * PATCH /api/orders/:orderId/shipping-address
+   * Updates shipping address for preorder before packing stage (TC-ADR-09).
+   */
+  router.patch(
+    "/:orderId/shipping-address",
+    async (request: Request, response: Response): Promise<void> => {
+      const parsedId = positiveIntegerSchema.safeParse(request.params.orderId);
+      if (!parsedId.success) {
+        response
+          .status(400)
+          .json({ success: false, error: { message: "หมายเลขคำสั่งซื้อไม่ถูกต้อง" } });
+        return;
+      }
+
+      const orderId = parsedId.data;
+      const existing = await getOrderSnapshotFromDb(pool, orderId);
+      if (!existing) {
+        response
+          .status(404)
+          .json({ success: false, error: { code: "NOT_FOUND", message: "ไม่พบคำสั่งซื้อ" } });
+        return;
+      }
+
+      const status = existing.detail.status;
+      // TC-ADR-09: If ready to pack, shipped, delivered, or cancelled, reject with CANNOT_CHANGE_ADDRESS
+      if (
+        status === "READY_TO_PACK" ||
+        status === "SHIPPED" ||
+        status === "DELIVERED" ||
+        status === "CANCELLED"
+      ) {
+        response.status(400).json({
+          success: false,
+          error: {
+            code: "CANNOT_CHANGE_ADDRESS",
+            message: "ไม่สามารถแก้ไขที่อยู่ได้เนื่องจากคำสั่งซื้ออยู่ในขั้นตอนการแพ็คหรือจัดส่งแล้ว",
+          },
+        });
+        return;
+      }
+
+      const newAddress = request.body.shippingAddress || request.body;
+      if (!newAddress || !newAddress.recipientName || !newAddress.addressLine) {
+        response.status(400).json({
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "ข้อมูลที่อยู่จัดส่งไม่ครบถ้วน" },
+        });
+        return;
+      }
+
+      const updatedOrder = {
+        ...existing,
+        detail: {
+          ...existing.detail,
+          shippingAddress: {
+            ...existing.detail.shippingAddress,
+            ...newAddress,
+          },
+        },
+      };
+
+      await saveOrderSnapshotToDb(pool, updatedOrder);
+      await recordAuditLog(pool, {
+        performedByUserId: request.user?.id ?? 9001,
+        action: "UPDATE_SHIPPING_ADDRESS",
+        resourceType: "order",
+        resourceId: orderId,
+        oldValues: { shippingAddress: existing.detail.shippingAddress },
+        newValues: { shippingAddress: updatedOrder.detail.shippingAddress },
+        ipAddress: request.ip,
+      });
+
+      response.json({ success: true, order: updatedOrder });
+    },
+  );
+
+  /**
+   * GET /api/orders/:orderId/shipments
+   * Retrieves shipment records and tracking numbers.
+   */
+  router.get(
+    "/:orderId/shipments",
+    async (request: Request, response: Response): Promise<void> => {
+      const parsedId = positiveIntegerSchema.safeParse(request.params.orderId);
+      if (!parsedId.success) {
+        response
+          .status(400)
+          .json({ success: false, error: { message: "หมายเลขคำสั่งซื้อไม่ถูกต้อง" } });
+        return;
+      }
+
+      const order = await getOrderSnapshotFromDb(pool, parsedId.data);
+      if (!order) {
+        response
+          .status(404)
+          .json({ success: false, error: { code: "NOT_FOUND", message: "ไม่พบคำสั่งซื้อ" } });
+        return;
+      }
+
+      response.json({
+        success: true,
+        data: {
+          orderId: order.detail.id,
+          shipments: order.detail.shipments || [],
+        },
+      });
+    },
+  );
+
+  /**
+   * POST /api/orders/admin/preorders/cancel-batch
+   * Manufacturer cancellation: cancel batch preorders and mark for 100% refund (TC-PRE-08, FR-10.1, FR-10.2).
+   */
+  router.post(
+    "/admin/preorders/cancel-batch",
+    async (request: Request, response: Response): Promise<void> => {
+      try {
+        const {
+          variantId,
+          cancellationReason = "ผู้ผลิตประกาศยกเลิกการผลิตฟิกเกอร์ (Cancelled by Manufacturer)",
+        } = request.body;
+        const allOrders = await listOrderSnapshotsFromDb(pool);
+        let cancelledCount = 0;
+        const affectedOrderIds: number[] = [];
+
+        for (const order of allOrders) {
+          const hasTargetVariant = variantId
+            ? order.detail.items.some(
+                (item) => item.variantId === variantId || (item as any).id === variantId,
+              )
+            : order.detail.isPreorder;
+
+          if (
+            hasTargetVariant &&
+            order.detail.status !== "CANCELLED" &&
+            order.detail.status !== "REFUNDED"
+          ) {
+            const oldStatus = order.detail.status;
+            const updatedOrder = {
+              ...order,
+              detail: {
+                ...order.detail,
+                status: "REFUND_PENDING" as any,
+                cancellationReason,
+                timeline: [
+                  ...order.detail.timeline,
+                  {
+                    status: "REFUND_PENDING",
+                    label: `ยกเลิกโดยผู้ผลิต - รอคืนเงินมัดจำ 100% (${cancellationReason})`,
+                    occurredAt: new Date().toISOString(),
+                  },
+                ],
+              },
+            };
+            await saveOrderSnapshotToDb(pool, updatedOrder);
+            await pool.query(
+              `UPDATE orders SET order_status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+              [order.detail.id],
+            );
+            affectedOrderIds.push(order.detail.id);
+            cancelledCount++;
+
+            await recordAuditLog(pool, {
+              performedByUserId: request.user?.id ?? 9002,
+              action: "MANUFACTURER_CANCEL_BATCH",
+              resourceType: "order",
+              resourceId: order.detail.id,
+              oldValues: { status: oldStatus },
+              newValues: { status: "REFUND_PENDING", reason: cancellationReason },
+              ipAddress: request.ip,
+            });
+          }
+        }
+
+        response.json({
+          success: true,
+          data: {
+            cancelledCount,
+            affectedOrderIds,
+            status: "REFUND_PENDING",
+            refundPolicy: "FULL_REFUND_100_PERCENT",
+          },
+        });
+      } catch (error) {
+        console.error("Failed to cancel preorder batch:", error);
+        response.status(500).json({
+          success: false,
+          error: { message: "ไม่สามารถยกเลิกคำสั่งซื้อพรีออเดอร์แบบกลุ่มได้" },
+        });
+      }
+    },
+  );
+
 
   return router;
 }
