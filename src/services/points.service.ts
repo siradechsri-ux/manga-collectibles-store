@@ -333,7 +333,15 @@ export function deductPoints(
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cost: amount, rewardId: referenceId ?? "order-discount", rewardTitle: description }),
+        body: JSON.stringify({
+          pointsRequired: amount,
+          cost: amount,
+          rewardId: referenceId ?? "order-discount",
+          title: description,
+          rewardTitle: description,
+          type,
+          referenceId,
+        }),
       }).catch(() => {});
     }
     if (false) void referenceId;

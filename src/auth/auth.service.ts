@@ -40,6 +40,8 @@ interface RefreshDatabaseRow {
   token_hash: string;
   expires_at: Date;
   user_email: string;
+  user_full_name: string;
+  user_phone_number: string | null;
   user_role: string;
   is_active: boolean;
 }
@@ -169,7 +171,7 @@ export class AuthService {
 
   async refreshToken(
     currentRefreshToken: string,
-  ): Promise<{ user: AuthenticatedUser; tokens: AuthTokenPair }> {
+  ): Promise<{ user: PublicUser; tokens: AuthTokenPair }> {
     if (!this.isRefreshTokenFormatValid(currentRefreshToken)) {
       throw new InvalidRefreshTokenError();
     }
@@ -191,6 +193,8 @@ export class AuthService {
            refresh.token_hash,
            refresh.expires_at,
            users.email AS user_email,
+           users.full_name AS user_full_name,
+           users.phone_number AS user_phone_number,
            users.role::text AS user_role,
            users.is_active
          FROM refresh_tokens AS refresh
@@ -209,9 +213,11 @@ export class AuthService {
       }
 
       const role = this.parseUserRole(token.user_role);
-      const user: AuthenticatedUser = {
+      const user: PublicUser = {
         id: token.user_id,
         email: token.user_email,
+        fullName: token.user_full_name,
+        phoneNumber: token.user_phone_number,
         role,
       };
 

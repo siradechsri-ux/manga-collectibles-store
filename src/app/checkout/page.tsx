@@ -83,9 +83,7 @@ const shippingAddressSchema = z
     recipientPhone: z
       .string()
       .trim()
-      .min(8, "กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง")
-      .max(30)
-      .regex(/^[0-9+(). -]+$/, "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง"),
+      .regex(/^\d{10}$/, "กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก"),
     addressLine: z.string().trim().min(1, "กรุณากรอกบ้านเลขที่/ที่อยู่").max(300),
     addressVillage: z.string().trim().max(100),
     street: z.string().trim().max(150),
@@ -408,7 +406,7 @@ export default function CheckoutPage() {
             setSelectedAddressId(defaultAddress.id);
             setShippingAddress({
               recipientName: defaultAddress.recipientName,
-              recipientPhone: defaultAddress.recipientPhone,
+              recipientPhone: (defaultAddress.recipientPhone ?? "").replace(/\D/g, "").slice(0, 10),
               addressLine: defaultAddress.addressLine,
               addressVillage: defaultAddress.addressVillage ?? "",
               street: defaultAddress.street ?? "",
@@ -432,7 +430,7 @@ export default function CheckoutPage() {
         setSelectedAddressId(defaultAddress.id);
         setShippingAddress({
           recipientName: defaultAddress.recipientName,
-          recipientPhone: defaultAddress.recipientPhone,
+          recipientPhone: (defaultAddress.recipientPhone ?? "").replace(/\D/g, "").slice(0, 10),
           addressLine: defaultAddress.addressLine,
           addressVillage: defaultAddress.addressVillage,
           street: defaultAddress.street,
@@ -446,7 +444,7 @@ export default function CheckoutPage() {
         setShippingAddress((current) => ({
           ...current,
           recipientName: current.recipientName || profile.fullName,
-          recipientPhone: current.recipientPhone || profile.phoneNumber,
+          recipientPhone: (current.recipientPhone || profile.phoneNumber || "").replace(/\D/g, "").slice(0, 10),
         }));
       }
     } catch (addressError) {
@@ -497,7 +495,7 @@ export default function CheckoutPage() {
     }
     setShippingAddress({
       recipientName: selected.recipientName,
-      recipientPhone: selected.recipientPhone,
+      recipientPhone: (selected.recipientPhone ?? "").replace(/\D/g, "").slice(0, 10),
       addressLine: selected.addressLine,
       addressVillage: selected.addressVillage,
       street: selected.street,
@@ -849,8 +847,11 @@ export default function CheckoutPage() {
                     value={shippingAddress.recipientPhone}
                     error={formErrors.recipientPhone}
                     autoComplete="tel"
-                    inputMode="tel"
-                    onChange={(value) => setAddressField("recipientPhone", value)}
+                    inputMode="numeric"
+                    maxLength={10}
+                    onChange={(value) =>
+                      setAddressField("recipientPhone", value.replace(/\D/g, "").slice(0, 10))
+                    }
                   />
                   <Field
                     label="บ้านเลขที่ / อาคาร / หมู่บ้าน"
@@ -1004,7 +1005,7 @@ export default function CheckoutPage() {
               ) : null}
             </div>
 
-            <aside className="lg:sticky lg:top-6 space-y-4">
+            <aside className="lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:overscroll-contain space-y-4">
               <BookCoverAddonBox />
 
               <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -1012,7 +1013,7 @@ export default function CheckoutPage() {
                   <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">สรุปคำสั่งซื้อ</h2>
                   <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{itemCount} ชิ้น</p>
                 </div>
-                <div className="max-h-[420px] space-y-4 overflow-y-auto p-5">
+                <div className="max-h-60 space-y-3 overflow-y-auto overscroll-contain p-5">
                   {items.map((item) => {
                     const fullUnitPrice =
                       item.kind === "MANGA" || item.kind === "LIGHT_NOVEL"

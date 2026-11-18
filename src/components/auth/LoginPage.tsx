@@ -21,7 +21,7 @@ const rememberEmailKey = "manga-store-remembered-email";
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -40,9 +40,21 @@ export default function LoginPage() {
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       const redirectPath = searchParams.get("redirect");
-      router.replace(redirectPath?.startsWith("/") ? redirectPath : "/account");
+      const safeRedirect =
+        redirectPath?.startsWith("/") && !redirectPath.startsWith("//")
+          ? redirectPath
+          : null;
+      const defaultPath =
+        user?.role === "ADMIN"
+          ? "/admin"
+          : user?.role === "STAFF"
+            ? "/staff/packing"
+            : user?.role === "FINANCE"
+              ? "/finance/slips"
+              : "/account/orders";
+      router.replace(safeRedirect ?? defaultPath);
     }
-  }, [isAuthenticated, isLoading, router, searchParams]);
+  }, [isAuthenticated, isLoading, router, searchParams, user?.role]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -45,10 +45,12 @@ const slipSuccessSchema = z
         verifiedAmount: z.string(),
         transactionRef: z.string(),
         message: z.string(),
+        verifiedAt: z.string().optional(),
+        settlementStatus: z.string().optional(),
       })
-      .strict(),
+      .passthrough(),
   })
-  .strict();
+  .passthrough();
 
 const slipFailureSchema = z
   .object({
@@ -336,7 +338,7 @@ function CheckoutPaymentContent() {
         <h1 className="mt-4 text-xl font-bold text-slate-900">ข้อมูลการชำระเงินไม่ครบถ้วน</h1>
         <p className="mt-2 text-sm text-slate-500">กรุณากลับไปตรวจสอบคำสั่งซื้อในบัญชีของคุณ</p>
         <Link
-          href={useMockMode ? "/" : "/account"}
+          href={useMockMode ? "/" : "/account/orders"}
           className="mt-5 font-semibold text-orange-700"
         >
           {mockOrderMissing ? "ไม่พบคำสั่งซื้อบนอุปกรณ์นี้" : "กลับไปหน้าร้าน"}
@@ -360,11 +362,7 @@ function CheckoutPaymentContent() {
           <p className="mt-1 text-xl font-bold text-slate-900">{formatBaht(paymentResult.verifiedAmount)}</p>
         </div>
         <Link
-          href={
-            useMockMode
-              ? `/orders/${paymentResult.orderId}`
-              : `/account/orders/${paymentResult.orderId}`
-          }
+          href={`/orders/${paymentResult.orderId}`}
           className="mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
         >
           ดูรายละเอียดคำสั่งซื้อ

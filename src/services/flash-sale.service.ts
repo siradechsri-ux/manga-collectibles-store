@@ -44,7 +44,7 @@ export const FLASH_SALE_UPDATED_EVENT = "mock_flash_sale_updated";
 export const DEFAULT_FLASH_DEALS: FlashSaleItem[] = [
   // --- ดีลรอบวันนี้ (TODAY) ---
   {
-    id: 2001,
+    id: 50001,
     kind: "MANGA",
     title: "Chainsaw Man เล่ม 1 (ลิขสิทธิ์แท้)",
     categoryLabel: "มังงะลดพิเศษ",
@@ -79,7 +79,7 @@ export const DEFAULT_FLASH_DEALS: FlashSaleItem[] = [
     isActive: true,
   },
   {
-    id: 3001,
+    id: 51001,
     kind: "MANGA",
     title: "Frieren: คำอธิษฐานในวันที่จากลา เล่ม 1",
     categoryLabel: "มังงะลดพิเศษ",
@@ -116,7 +116,7 @@ export const DEFAULT_FLASH_DEALS: FlashSaleItem[] = [
 
   // --- ดีลรอบวันถัดไป (TOMORROW / UPCOMING) ---
   {
-    id: 2003,
+    id: 1001,
     kind: "MANGA",
     title: "Jujutsu Kaisen มหาเวทผนึกมาร เล่ม 1",
     categoryLabel: "มังงะลดล่วงหน้า",
@@ -183,10 +183,25 @@ export function getFlashSaleDeals(): FlashSaleItem[] {
       return DEFAULT_FLASH_DEALS;
     }
 
-    // Auto-heal legacy broken routes and compute progress
+    // Auto-heal legacy broken routes, variant IDs, and compute progress
     let needsUpdate = false;
     const sanitized = parsed.map((item: FlashSaleItem) => {
+      let id = item.id;
       let href = item.href;
+      if (item.kind === "MANGA" && id === 2001) {
+        id = 50001;
+        needsUpdate = true;
+      } else if (
+        item.kind === "MANGA" &&
+        id === 3001 &&
+        (href?.includes("frieren") || item.title?.includes("Frieren"))
+      ) {
+        id = 51001;
+        needsUpdate = true;
+      } else if (item.kind === "MANGA" && id === 2003) {
+        id = 1001;
+        needsUpdate = true;
+      }
       if (href === "/manga/chainsaw") {
         href = "/manga/chainsaw-man";
         needsUpdate = true;
@@ -205,6 +220,7 @@ export function getFlashSaleDeals(): FlashSaleItem[] {
       const { soldPercent, stockNote } = calculateFlashSaleProgress(quota, soldCount, item.kind);
       return {
         ...item,
+        id,
         href,
         quota,
         soldCount,

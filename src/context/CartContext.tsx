@@ -317,8 +317,29 @@ function getUnitImmediatePrice(item: CartItem): number {
   return getUnitFullPrice(item);
 }
 
+function normalizeLegacyCartItem(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) {
+    return raw;
+  }
+  const candidate = raw as Record<string, unknown>;
+  if (candidate.kind === "MANGA") {
+    const id = candidate.id;
+    const title = String(candidate.title ?? "");
+    if (id === 2001) {
+      return { ...candidate, id: 50001 };
+    }
+    if (id === 2003) {
+      return { ...candidate, id: 1001 };
+    }
+    if (id === 3001 && (title.includes("Frieren") || title.includes("คำอธิษฐาน"))) {
+      return { ...candidate, id: 51001 };
+    }
+  }
+  return raw;
+}
+
 function validateCartItem(item: CartItem): CartItem {
-  const parsed = cartItemSchema.safeParse(item);
+  const parsed = cartItemSchema.safeParse(normalizeLegacyCartItem(item));
   if (!parsed.success) {
     throw new TypeError(
       `ข้อมูลสินค้าในตะกร้าไม่ถูกต้อง: ${parsed.error.issues
@@ -344,7 +365,10 @@ export function CartProvider({ children }: CartProviderProps) {
       let parsedItems: CartItem[] = [];
       if (savedCart) {
         const parsedJson: unknown = JSON.parse(savedCart);
-        const parsedCart = storedCartSchema.safeParse(parsedJson);
+        const normalizedJson = Array.isArray(parsedJson)
+          ? parsedJson.map(normalizeLegacyCartItem)
+          : parsedJson;
+        const parsedCart = storedCartSchema.safeParse(normalizedJson);
         if (parsedCart.success) {
           parsedItems = parsedCart.data;
           setItems(parsedItems);
@@ -353,12 +377,38 @@ export function CartProvider({ children }: CartProviderProps) {
         }
       }
 
+      const validItemKeys = new Set(parsedItems.map(getCartItemKey));
+      const remapSelectedKey = (key: unknown): string | null => {
+        if (typeof key !== "string") return null;
+        if (key === "MANGA-2001" && validItemKeys.has("MANGA-50001")) {
+          return "MANGA-50001";
+        }
+        if (key === "MANGA-2003" && validItemKeys.has("MANGA-1001")) {
+          return "MANGA-1001";
+        }
+        if (key === "MANGA-3001" && validItemKeys.has("MANGA-51001")) {
+          return "MANGA-51001";
+        }
+        return validItemKeys.has(key) ? key : null;
+      };
+
       const savedSelected = window.localStorage.getItem(SELECTED_ITEMS_STORAGE_KEY);
       if (savedSelected) {
         try {
           const parsed = JSON.parse(savedSelected);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setSelectedCartItemKeys(parsed);
+            const normalizedKeys = Array.from(
+              new Set(
+                parsed
+                  .map(remapSelectedKey)
+                  .filter((k): k is string => Boolean(k)),
+              ),
+            );
+            setSelectedCartItemKeys(
+              normalizedKeys.length > 0
+                ? normalizedKeys
+                : parsedItems.map(getCartItemKey),
+            );
           } else if (parsedItems.length > 0) {
             // Default to all selected if empty
             setSelectedCartItemKeys(parsedItems.map(getCartItemKey));

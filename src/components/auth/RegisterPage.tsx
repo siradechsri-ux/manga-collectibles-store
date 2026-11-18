@@ -13,7 +13,13 @@ const registerFormSchema = z
   .object({
     fullName: z.string().trim().min(1, "กรุณากรอกชื่อ-นามสกุล").max(150),
     email: z.string().trim().email("กรุณากรอกอีเมลให้ถูกต้อง").max(255),
-    phoneNumber: z.string().trim().max(20, "เบอร์โทรศัพท์ยาวเกินไป"),
+    phoneNumber: z
+      .string()
+      .trim()
+      .refine(
+        (v) => v === "" || /^\d{10}$/.test(v),
+        "กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก",
+      ),
     password: z.string().min(8, "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร").max(72),
     confirmPassword: z.string(),
   })
@@ -154,11 +160,14 @@ export default function RegisterPage() {
             <input
               id="register-phone"
               type="tel"
+              inputMode="numeric"
               autoComplete="tel"
-              maxLength={20}
+              maxLength={10}
               value={phoneNumber}
-              onChange={(event) => setPhoneNumber(event.currentTarget.value)}
-              placeholder="08X-XXX-XXXX"
+              onChange={(event) =>
+                setPhoneNumber(event.currentTarget.value.replace(/\D/g, "").slice(0, 10))
+              }
+              placeholder="0812345678"
               className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
             />
           </div>

@@ -79,7 +79,7 @@ const taxProfileFormSchema = z
     province: z.string().trim().min(1, "กรุณากรอกจังหวัด").max(120),
     postalCode: z.string().regex(/^\d{5}$/, "รหัสไปรษณีย์ต้องมี 5 หลัก"),
     contactEmail: z.string().email("กรุณากรอกอีเมลที่ถูกต้อง"),
-    contactPhone: z.string().min(8).max(30),
+    contactPhone: z.string().regex(/^\d{10}$/, "กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก"),
   })
   .strict();
 
@@ -89,8 +89,10 @@ const accountFormSchema = z
     phoneNumber: z
       .string()
       .trim()
-      .max(30)
-      .regex(/^[0-9+(). -]*$/, "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง"),
+      .refine(
+        (v) => v === "" || /^\d{10}$/.test(v),
+        "กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก",
+      ),
   })
   .strict();
 
@@ -106,14 +108,7 @@ function formatDate(value: string): string {
 }
 
 function isValidThaiTaxId(value: string): boolean {
-  if (!/^\d{13}$/.test(value)) {
-    return false;
-  }
-  let sum = 0;
-  for (let index = 0; index < 12; index += 1) {
-    sum += Number(value[index]) * (13 - index);
-  }
-  return (11 - (sum % 11)) % 10 === Number(value[12]);
+  return /^\d{13}$/.test(value.trim());
 }
 
 function roleLabel(role: UserProfile["role"]): string {
@@ -156,8 +151,17 @@ export default function ProfilePage() {
       const nextProfile = getUserProfile(user);
       setProfile(nextProfile);
       setFullName(nextProfile.fullName);
-      setPhoneNumber(nextProfile.phoneNumber);
-      setTaxProfile(nextProfile.savedTaxProfile ?? emptyTaxProfile);
+      setPhoneNumber((nextProfile.phoneNumber ?? "").replace(/\D/g, "").slice(0, 10));
+      setTaxProfile(
+        nextProfile.savedTaxProfile
+          ? {
+              ...nextProfile.savedTaxProfile,
+              contactPhone: (nextProfile.savedTaxProfile.contactPhone ?? "")
+                .replace(/\D/g, "")
+                .slice(0, 10),
+            }
+          : emptyTaxProfile,
+      );
       if (process.env.NEXT_PUBLIC_USE_MOCK !== "true" && user.role === "CUSTOMER") {
         void fetch("/api/user/addresses", { credentials: "include" })
           .then((res) => (res.ok ? res.json() : null))
@@ -273,7 +277,10 @@ export default function ProfilePage() {
       updatedAt: _updatedAt,
       ...draft
     } = address;
-    setAddressDraft(draft);
+    setAddressDraft({
+      ...draft,
+      recipientPhone: (draft.recipientPhone ?? "").replace(/\D/g, "").slice(0, 10),
+    });
     setEditingAddressId(address.id);
     setMakeAddressDefault(isDefault);
     setAddressModalOpen(true);
@@ -283,6 +290,13 @@ export default function ProfilePage() {
   async function handleSaveAddress(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!user || user.role !== "CUSTOMER") {
+      return;
+    }
+    if (!/^\d{10}$/.test(addressDraft.recipientPhone.trim())) {
+      showError(
+        new Error("กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก"),
+        "กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก",
+      );
       return;
     }
     setIsSaving(true);
@@ -550,8 +564,11 @@ export default function ProfilePage() {
                     id="profile-phone"
                     label="เบอร์โทรศัพท์"
                     value={phoneNumber}
-                    onChange={setPhoneNumber}
+                    onChange={(value) => setPhoneNumber(value.replace(/\D/g, "").slice(0, 10))}
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="0812345678"
                   />
                   <div className="flex flex-wrap gap-3 pt-2">
                     <button
@@ -882,9 +899,15 @@ export default function ProfilePage() {
                     label="เบอร์โทรศัพท์"
                     value={taxProfile.contactPhone}
                     onChange={(value) =>
-                      setTaxProfile((current) => ({ ...current, contactPhone: value }))
+                      setTaxProfile((current) => ({
+                        ...current,
+                        contactPhone: value.replace(/\D/g, "").slice(0, 10),
+                      }))
                     }
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="0812345678"
                     required
                   />
                   <button
@@ -982,9 +1005,15 @@ export default function ProfilePage() {
                 label="เบอร์โทรศัพท์"
                 value={addressDraft.recipientPhone}
                 onChange={(value) =>
-                  setAddressDraft((current) => ({ ...current, recipientPhone: value }))
+                  setAddressDraft((current) => ({
+                    ...current,
+                    recipientPhone: value.replace(/\D/g, "").slice(0, 10),
+                  }))
                 }
                 type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="0812345678"
                 required
               />
               <ProfileField

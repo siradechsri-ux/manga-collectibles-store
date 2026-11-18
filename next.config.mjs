@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    agentUpgrade: "security",
+  },
   async redirects() {
     return [
       { source: "/gunpla", destination: "/collections/gunpla", permanent: false },
@@ -10,6 +13,8 @@ const nextConfig = {
       { source: "/goods", destination: "/collections/goods", permanent: false },
       { source: "/accessories", destination: "/collections/accessories", permanent: false },
       { source: "/admin/orders", destination: "/admin", permanent: false },
+      { source: "/account", destination: "/account/orders", permanent: false },
+      { source: "/account/orders/:id", destination: "/orders/:id", permanent: false },
     ];
   },
 

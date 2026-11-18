@@ -152,10 +152,16 @@ export function subscribeWishlist(listener: (items: WishlistItem[]) => void): ()
     void fetch("/api/wishlist", { credentials: "include", cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((resData) => {
-        const data = resData?.data ?? resData;
-        if (data && Array.isArray(data.items)) {
-          localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(data.items));
-          listener(data.items);
+        const items = Array.isArray(resData?.data)
+          ? resData.data
+          : Array.isArray(resData?.data?.items)
+            ? resData.data.items
+            : Array.isArray(resData?.items)
+              ? resData.items
+              : null;
+        if (items) {
+          localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items));
+          listener(items);
         }
       })
       .catch(() => {});

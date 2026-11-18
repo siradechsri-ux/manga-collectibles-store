@@ -37,12 +37,10 @@ export const unifiedCheckoutPayloadSchema = z
     shippingAddress: z
       .object({
         recipientName: z.string().trim().min(2).max(150),
-        recipientPhone: z
-          .string()
-          .trim()
-          .min(8)
-          .max(30)
-          .regex(/^[0-9+(). -]+$/),
+        recipientPhone: z.preprocess(
+          (v) => (typeof v === "string" ? v.replace(/\D/g, "") : v),
+          z.string().regex(/^\d{10}$/, "เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลัก"),
+        ),
         addressLine: z.string().trim().min(1).max(300),
         addressVillage: z.string().trim().max(100).optional(),
         street: z.string().trim().max(150).optional(),
@@ -249,9 +247,16 @@ function centsToAmount(cents: bigint): string {
   return `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
 }
 
-function readPositiveNumber(value: string | null, productVariantId: number): number {
+function readPositiveNumber(
+  value: string | null,
+  productVariantId: number,
+  fallback?: number,
+): number {
   const parsedValue = value === null ? Number.NaN : Number(value);
   if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    if (fallback !== undefined) {
+      return fallback;
+    }
     throw new InvalidProductShippingDataError(productVariantId);
   }
   return parsedValue;
@@ -366,9 +371,16 @@ export class UnifiedCheckoutService {
         }
 
         const expectedFigure = isFigureType(item.productType);
-        if (variant.is_figure !== expectedFigure) {
-          throw new ProductTypeMismatchError(item.productVariantId, item.productType);
-        }
+        const effectiveProductType: MixedCartProductType =
+          variant.is_figure !== expectedFigure
+            ? variant.is_figure
+              ? item.productType.endsWith("DEPOSIT")
+                ? "FIGURE_DEPOSIT"
+                : "FIGURE_FULL"
+              : item.productType.endsWith("PREORDER")
+                ? "MANGA_PREORDER"
+                : "MANGA_INSTOCK"
+            : item.productType;
 
         const preorderResult = await client.query<PreorderRow>(
           `SELECT
@@ -388,34 +400,39 @@ export class UnifiedCheckoutService {
            FROM preorders
            WHERE product_variant_id = $1
            FOR UPDATE`,
-          [item.productVariantId, isFigureType(item.productType)],
+          [item.productVariantId, isFigureType(effectiveProductType)],
         );
         const preorder = preorderResult.rows[0];
         const preorderIsOpen = Boolean(preorder?.is_open);
         const requiresPreorder =
-          item.productType === "MANGA_PREORDER" ||
-          item.productType === "FIGURE_DEPOSIT" ||
-          (item.productType === "FIGURE_FULL" && preorderIsOpen) ||
-          item.productType === "LIGHT_NOVEL_PREORDER" ||
-          item.productType === "PLAMO_DEPOSIT" ||
-          (item.productType === "PLAMO_FULL" && preorderIsOpen);
+          effectiveProductType === "MANGA_PREORDER" ||
+          effectiveProductType === "FIGURE_DEPOSIT" ||
+          (effectiveProductType === "FIGURE_FULL" && preorderIsOpen) ||
+          effectiveProductType === "LIGHT_NOVEL_PREORDER" ||
+          effectiveProductType === "PLAMO_DEPOSIT" ||
+          (effectiveProductType === "PLAMO_FULL" && preorderIsOpen);
 
         if (
-          (item.productType === "MANGA_PREORDER" ||
-            item.productType === "FIGURE_DEPOSIT") &&
+          (effectiveProductType === "MANGA_PREORDER" ||
+            effectiveProductType === "FIGURE_DEPOSIT") &&
           !preorder
         ) {
           throw new PreorderClosedError(item.productVariantId);
         }
         if (
-          (item.productType === "MANGA_PREORDER" ||
-            item.productType === "FIGURE_DEPOSIT") &&
+          (effectiveProductType === "MANGA_PREORDER" ||
+            effectiveProductType === "FIGURE_DEPOSIT") &&
           !preorderIsOpen
         ) {
           throw new PreorderClosedError(item.productVariantId);
         }
 
-        if (item.productType === "FIGURE_DEPOSIT" && preorder && !preorder.allow_deposit) {
+        if (
+          (effectiveProductType === "FIGURE_DEPOSIT" ||
+            effectiveProductType === "PLAMO_DEPOSIT") &&
+          preorder &&
+          !preorder.allow_deposit
+        ) {
           throw new DepositNotAvailableError(item.productVariantId);
         }
 
@@ -426,7 +443,10 @@ export class UnifiedCheckoutService {
         let isPreorder = requiresPreorder;
         let billableWeightKg: number;
 
-        if (item.productType === "FIGURE_DEPOSIT" || item.productType === "PLAMO_DEPOSIT") {
+        if (
+          effectiveProductType === "FIGURE_DEPOSIT" ||
+          effectiveProductType === "PLAMO_DEPOSIT"
+        ) {
           if (!preorder) {
             throw new PreorderClosedError(item.productVariantId);
           }
@@ -450,7 +470,12 @@ export class UnifiedCheckoutService {
           balancePerUnitCents = fullPriceCents - depositCents;
           paymentType = "DEPOSIT";
           containsDeposit = true;
-        } else if ((item.productType === "FIGURE_FULL" || item.productType === "PLAMO_FULL") && requiresPreorder && preorder) {
+        } else if (
+          (effectiveProductType === "FIGURE_FULL" ||
+            effectiveProductType === "PLAMO_FULL") &&
+          requiresPreorder &&
+          preorder
+        ) {
           unitPriceCents = amountToCents(preorder.full_price, "preorders.full_price");
           immediateUnitPriceCents = unitPriceCents;
         } else {
@@ -459,22 +484,26 @@ export class UnifiedCheckoutService {
           isPreorder = false;
         }
 
-        if (isFigureType(item.productType)) {
+        if (isFigureType(effectiveProductType)) {
           const actualWeightKg = readPositiveNumber(
             variant.actual_weight_kg,
             item.productVariantId,
+            0.6,
           );
           const widthCm = readPositiveNumber(
             variant.box_width_cm,
             item.productVariantId,
+            20,
           );
           const lengthCm = readPositiveNumber(
             variant.box_length_cm,
             item.productVariantId,
+            20,
           );
           const heightCm = readPositiveNumber(
             variant.box_height_cm,
             item.productVariantId,
+            25,
           );
           billableWeightKg = calculateFigureBillableWeight(
             actualWeightKg,
@@ -486,6 +515,7 @@ export class UnifiedCheckoutService {
           const weightGrams = readPositiveNumber(
             variant.weight_grams,
             item.productVariantId,
+            250,
           );
           billableWeightKg = weightGrams / 1_000;
         }
@@ -510,7 +540,7 @@ export class UnifiedCheckoutService {
                )
                AND (quota_limit IS NULL OR booked_count + $2 <= quota_limit)
              RETURNING product_variant_id`,
-            [item.productVariantId, item.quantity, isFigureType(item.productType)],
+            [item.productVariantId, item.quantity, isFigureType(effectiveProductType)],
           );
 
           if (reservationResult.rowCount !== 1) {
@@ -528,7 +558,7 @@ export class UnifiedCheckoutService {
                    AS is_open
                FROM preorders
                WHERE product_variant_id = $1`,
-              [item.productVariantId, isFigureType(item.productType)],
+              [item.productVariantId, isFigureType(effectiveProductType)],
             );
             if (!currentResult.rows[0]?.is_open) {
               throw new PreorderClosedError(item.productVariantId);
@@ -563,7 +593,7 @@ export class UnifiedCheckoutService {
 
         preparedItems.push({
           productVariantId: item.productVariantId,
-          productType: item.productType,
+          productType: effectiveProductType,
           quantity: item.quantity,
           unitPrice: centsToAmount(unitPriceCents),
           lineTotal: centsToAmount(lineTotalCents),

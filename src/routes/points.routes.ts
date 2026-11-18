@@ -100,7 +100,9 @@ export function createPointsRouter(pool: Pool, _authService: AuthService): Route
   router.post("/redeem", async (request: Request, response: Response): Promise<void> => {
     try {
       const userId = request.user?.id ?? 9001;
-      const { rewardId, pointsRequired, title, type, referenceId } = request.body;
+      const { rewardId, type, referenceId } = request.body;
+      const pointsRequired = Number(request.body.pointsRequired ?? request.body.cost);
+      const title = request.body.title ?? request.body.rewardTitle;
 
       if (!pointsRequired || pointsRequired <= 0) {
         response.status(400).json({ success: false, error: { message: "จำนวนแต้มไม่ถูกต้อง" } });

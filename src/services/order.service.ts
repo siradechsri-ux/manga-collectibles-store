@@ -184,7 +184,7 @@ export class OrderService {
     if (!res.ok) throw new Error("ไม่สามารถจำลองสินค้าเข้าคลังแบบกลุ่มได้");
     const data = await res.json();
     notifyOrdersUpdated();
-    return data.updatedCount ?? 0;
+    return data.data?.updatedCount ?? data.updatedCount ?? 0;
   }
 
   /**

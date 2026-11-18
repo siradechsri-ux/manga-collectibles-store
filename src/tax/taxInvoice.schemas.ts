@@ -27,12 +27,10 @@ export const taxInvoiceRequestSchema = z
     province: z.string().trim().min(1).max(120),
     postalCode: z.string().trim().regex(/^\d{5}$/, "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก"),
     contactEmail: z.string().trim().email().max(320),
-    contactPhone: z
-      .string()
-      .trim()
-      .min(8)
-      .max(30)
-      .regex(/^[0-9+(). -]+$/, "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง"),
+    contactPhone: z.preprocess(
+      (v) => (typeof v === "string" ? v.replace(/\D/g, "") : v),
+      z.string().regex(/^\d{10}$/, "กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก"),
+    ),
     saveForNextTime: z.boolean().default(false),
   })
   .strict()

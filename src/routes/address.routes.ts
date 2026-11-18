@@ -6,7 +6,10 @@ import { AuthService } from "../auth/auth.service";
 const addressInputSchema = z.object({
   label: z.string().trim().min(1, "กรุณากรอกชื่อเรียกที่อยู่").max(60),
   recipientName: z.string().trim().min(1, "กรุณากรอกชื่อผู้รับ").max(150),
-  recipientPhone: z.string().trim().min(1, "กรุณากรอกเบอร์โทรศัพท์").max(30),
+  recipientPhone: z.preprocess(
+    (v) => (typeof v === "string" ? v.replace(/\D/g, "") : v),
+    z.string().regex(/^\d{10}$/, "กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก"),
+  ),
   addressLine: z.string().trim().min(1, "กรุณากรอกที่อยู่").max(300),
   addressVillage: z.string().trim().max(100).optional().default(""),
   street: z.string().trim().max(150).optional().default(""),

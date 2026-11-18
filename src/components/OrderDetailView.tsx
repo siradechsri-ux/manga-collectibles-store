@@ -484,6 +484,217 @@ export default function OrderDetailView({
     }
   }
 
+  function getShipmentDisplayState(shipment: OrderShipment): {
+    badgeLabel: string;
+    badgeClass: string;
+    statusNote: string | null;
+    noteClass: string;
+    currentStep: number;
+  } {
+    const isDepositOrder =
+      order.paymentStatus === "DEPOSIT_PAID" ||
+      order.items.some((item) => item.paymentType === "DEPOSIT");
+
+    if (order.status === "CANCELLED" || order.status === "DEPOSIT_FORFEITED") {
+      return {
+        badgeLabel:
+          order.status === "DEPOSIT_FORFEITED"
+            ? "หมดสิทธิ์มัดจำ / ยกเลิกจัดส่ง"
+            : "ยกเลิกการจัดส่ง",
+        badgeClass:
+          "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+        statusNote:
+          order.status === "DEPOSIT_FORFEITED"
+            ? "คำสั่งซื้อเลยกำหนดชำระยอดคงเหลือและถูกริบมัดจำแล้ว จึงไม่มีการจัดส่ง"
+            : "คำสั่งซื้อถูกยกเลิก ไม่มีการจัดส่งพัสดุรายการนี้",
+        noteClass:
+          "border-rose-200 bg-rose-50/70 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200",
+        currentStep: -1,
+      };
+    }
+
+    if (
+      order.status === "UNPAID" ||
+      (order.status === "ORDER_PLACED" && order.paymentStatus === "UNPAID")
+    ) {
+      return {
+        badgeLabel: "รอชำระเงินก่อนจัดส่ง",
+        badgeClass:
+          "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+        statusNote:
+          "ระบบจะเริ่มจัดเตรียมพัสดุหลังจากที่คุณชำระเงินและได้รับการยืนยันยอดเรียบร้อยแล้ว",
+        noteClass:
+          "border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200",
+        currentStep: -1,
+      };
+    }
+
+    if (order.status === "PAYMENT_REVIEW_PENDING") {
+      const isBalanceReview = order.paymentReviewStage === "BALANCE";
+      return {
+        badgeLabel: isBalanceReview
+          ? "รอตรวจสอบสลิปยอดคงเหลือ"
+          : "รอตรวจสอบยอดชำระเงิน",
+        badgeClass:
+          "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
+        statusNote: isBalanceReview
+          ? "ฝ่ายการเงินกำลังตรวจสอบสลิปยอดคงเหลือ เมื่ออนุมัติแล้วคลังสินค้าจะจัดส่งพัสดุทันที"
+          : "ฝ่ายการเงินกำลังตรวจสอบสลิปโอนเงิน เมื่ออนุมัติแล้วจึงจะเข้าสู่ขั้นตอนจัดเตรียมพัสดุ",
+        noteClass:
+          "border-sky-200 bg-sky-50/70 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200",
+        currentStep: isBalanceReview ? 0 : -1,
+      };
+    }
+
+    if (order.status === "PAYMENT_REJECTED") {
+      const isBalanceRejected =
+        order.paymentReviewStage === "BALANCE" ||
+        order.paymentStatus === "DEPOSIT_PAID";
+      return {
+        badgeLabel: "รออัปโหลดสลิปใหม่",
+        badgeClass:
+          "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+        statusNote:
+          "หลักฐานการโอนเงินไม่ผ่านการตรวจสอบ กรุณาแนบสลิปใหม่อีกครั้งเพื่อดำเนินการจัดส่ง",
+        noteClass:
+          "border-rose-200 bg-rose-50/70 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200",
+        currentStep: isBalanceRejected ? 0 : -1,
+      };
+    }
+
+    const trackingStatus =
+      shipment.trackingStatus ??
+      (shipment.status === "DELIVERED"
+        ? "DELIVERED"
+        : shipment.status === "SHIPPED"
+          ? "IN_TRANSIT"
+          : "PREPARING");
+
+    if (
+      order.status === "DELIVERED" ||
+      shipment.status === "DELIVERED" ||
+      trackingStatus === "DELIVERED"
+    ) {
+      return {
+        badgeLabel: "จัดส่งสำเร็จ",
+        badgeClass:
+          "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
+        statusNote: null,
+        noteClass: "",
+        currentStep: 4,
+      };
+    }
+
+    if (
+      order.status === "SHIPPED" ||
+      shipment.status === "SHIPPED" ||
+      trackingStatus === "OUT_FOR_DELIVERY" ||
+      trackingStatus === "IN_TRANSIT" ||
+      Boolean(shipment.trackingNumber)
+    ) {
+      const isOutForDelivery = trackingStatus === "OUT_FOR_DELIVERY";
+      return {
+        badgeLabel: isOutForDelivery
+          ? "พัสดุอยู่ระหว่างนำจ่าย"
+          : "ส่งมอบให้ขนส่งแล้ว",
+        badgeClass:
+          "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
+        statusNote: null,
+        noteClass: "",
+        currentStep: isOutForDelivery ? 3 : 2,
+      };
+    }
+
+    if (order.status === "AWAITING_BALANCE_PAYMENT") {
+      if (shipment.shipmentType === "PREORDER" || isDepositOrder) {
+        return {
+          badgeLabel: "สินค้าถึงไทยแล้ว · รอชำระยอดคงเหลือ",
+          badgeClass:
+            "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
+          statusNote:
+            "สินค้าพรีออเดอร์เข้าคลังแล้ว กรุณาชำระยอดคงเหลือเพื่อให้คลังสินค้าแพ็กและจัดส่งพัสดุ",
+          noteClass:
+            "border-orange-200 bg-orange-50/70 text-orange-900 dark:border-orange-900/50 dark:bg-orange-950/30 dark:text-orange-200",
+          currentStep: 0,
+        };
+      }
+      return {
+        badgeLabel: "รอรอบจัดส่งสินค้าพร้อมส่ง",
+        badgeClass:
+          "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
+        statusNote: "กล่องสินค้าพร้อมส่งอยู่ในคิวเตรียมจัดส่ง",
+        noteClass:
+          "border-sky-200 bg-sky-50/70 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200",
+        currentStep: 0,
+      };
+    }
+
+    if (order.status === "DEPOSIT_PAID") {
+      if (shipment.shipmentType === "PREORDER" || isDepositOrder) {
+        return {
+          badgeLabel: "ชำระมัดจำแล้ว · รอสินค้าเข้าคลัง",
+          badgeClass:
+            "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300",
+          statusNote:
+            "ชำระมัดจำเรียบร้อยแล้ว พัสดุจะเริ่มจัดเตรียมเมื่อสินค้าพรีออเดอร์เข้าคลังและชำระยอดคงเหลือครบถ้วน",
+          noteClass:
+            "border-violet-200 bg-violet-50/70 text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200",
+          currentStep: 0,
+        };
+      }
+      return {
+        badgeLabel: "ชำระมัดจำแล้ว · รอจัดเตรียมกล่องพร้อมส่ง",
+        badgeClass:
+          "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
+        statusNote: "สินค้าพร้อมส่งอยู่ในคิวรอจัดเตรียมพัสดุ",
+        noteClass:
+          "border-sky-200 bg-sky-50/70 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200",
+        currentStep: 0,
+      };
+    }
+
+    if (order.status === "PACKING") {
+      return {
+        badgeLabel: "กำลังจัดเตรียมและแพ็กพัสดุ",
+        badgeClass:
+          "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
+        statusNote: "พนักงานคลังสินค้ากำลังตรวจเช็กและบรรจุพัสดุลงกล่อง",
+        noteClass:
+          "border-blue-200 bg-blue-50/70 text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200",
+        currentStep: 1,
+      };
+    }
+
+    // PAID (full payment verified, awaiting packing or preorder arrival)
+    if (
+      shipment.shipmentType === "PREORDER" &&
+      order.timelineStage !== "ARRIVED_IN_THAILAND" &&
+      order.timelineStage !== "SHIPPED"
+    ) {
+      return {
+        badgeLabel: "ชำระเงินแล้ว · รอสินค้าพรีออเดอร์เข้าคลัง",
+        badgeClass:
+          "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
+        statusNote:
+          "ชำระเงินครบเรียบร้อยแล้ว ระบบจะแจ้งและจัดเตรียมพัสดุทันทีเมื่อสินค้าพรีออเดอร์เข้าคลัง",
+        noteClass:
+          "border-indigo-200 bg-indigo-50/70 text-indigo-900 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-200",
+        currentStep: 0,
+      };
+    }
+
+    return {
+      badgeLabel: "ชำระเงินสำเร็จ · รอคลังจัดเตรียมพัสดุ",
+      badgeClass:
+        "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
+      statusNote:
+        "ชำระเงินเรียบร้อยแล้ว คำสั่งซื้ออยู่ในคิวรอพนักงานคลังสินค้าแพ็กพัสดุ",
+      noteClass:
+        "border-sky-200 bg-sky-50/70 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200",
+      currentStep: 0,
+    };
+  }
+
   function renderShipmentCards(shipments: OrderShipment[]) {
     if (shipments.length === 0) {
       return (
@@ -493,8 +704,14 @@ export default function OrderDetailView({
       );
     }
 
+    const firstStepLabel =
+      order.paymentStatus === "DEPOSIT_PAID" ||
+      order.items.some((item) => item.paymentType === "DEPOSIT")
+        ? "ชำระมัดจำสำเร็จ"
+        : "ชำระเงินสำเร็จ";
+
     const shippingSteps = [
-      "ชำระเงินสำเร็จ",
+      firstStepLabel,
       "กำลังจัดเตรียมพัสดุ",
       "เข้าระบบขนส่ง",
       "พัสดุอยู่ระหว่างนำจ่าย",
@@ -502,23 +719,8 @@ export default function OrderDetailView({
     ];
 
     return shipments.map((shipment) => {
-      const trackingStatus =
-        shipment.trackingStatus ??
-        (shipment.status === "DELIVERED"
-          ? "DELIVERED"
-          : shipment.status === "SHIPPED"
-            ? "IN_TRANSIT"
-            : "PREPARING");
-      const currentStep =
-        trackingStatus === "DELIVERED"
-          ? 4
-          : trackingStatus === "OUT_FOR_DELIVERY"
-            ? 3
-            : trackingStatus === "IN_TRANSIT"
-              ? 2
-              : shipment.status === "PREPARING"
-                ? 1
-                : 0;
+      const display = getShipmentDisplayState(shipment);
+      const { currentStep } = display;
       return (
       <article
         key={shipment.id}
@@ -549,21 +751,17 @@ export default function OrderDetailView({
             </div>
           </div>
           <span
-            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
-              shipment.status === "DELIVERED"
-                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-                : shipment.status === "SHIPPED"
-                  ? "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
-                  : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-            }`}
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${display.badgeClass}`}
           >
-            {shipment.status === "DELIVERED"
-              ? "จัดส่งสำเร็จ"
-              : shipment.status === "SHIPPED"
-                ? "กำลังจัดส่ง"
-                : "กำลังเตรียมพัสดุ"}
+            {display.badgeLabel}
           </span>
         </div>
+
+        {display.statusNote ? (
+          <p className={`mt-3 rounded-xl border px-3 py-2 text-xs leading-5 ${display.noteClass}`}>
+            {display.statusNote}
+          </p>
+        ) : null}
 
         <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3 dark:border-zinc-800">
           {shipment.items.map((item) => (
@@ -583,7 +781,7 @@ export default function OrderDetailView({
         >
           <ol className="grid grid-cols-1 gap-3 sm:grid-cols-5">
             {shippingSteps.map((step, index) => {
-              const isComplete = index <= currentStep;
+              const isComplete = currentStep >= 0 && index <= currentStep;
               return (
                 <li
                   key={step}
@@ -596,7 +794,11 @@ export default function OrderDetailView({
                         : "bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400"
                     }`}
                   >
-                    {index + 1}
+                    {isComplete ? (
+                      <Check size={13} strokeWidth={3} aria-hidden="true" />
+                    ) : (
+                      index + 1
+                    )}
                   </span>
                   <span
                     className={`text-xs font-semibold ${
@@ -613,8 +815,10 @@ export default function OrderDetailView({
           </ol>
           {isMockMode &&
           onAdvanceShipmentStatus &&
+          currentStep >= 0 &&
           currentStep < 4 &&
-          order.paymentStatus === "PAID" ? (
+          order.paymentStatus === "PAID" &&
+          order.status !== "CANCELLED" ? (
             <button
               type="button"
               onClick={onAdvanceShipmentStatus}
@@ -741,25 +945,27 @@ export default function OrderDetailView({
             <Clock3 size={16} aria-hidden="true" />
             {order.status === "AWAITING_BALANCE_PAYMENT"
               ? "รอชำระยอดคงเหลือ"
-              : order.status === "PAYMENT_REJECTED"
-                ? "สลิปถูกปฏิเสธ"
-                : order.status === "PAYMENT_REVIEW_PENDING"
-                  ? "รอตรวจสอบสลิป"
-              : order.status === "DEPOSIT_FORFEITED"
-                ? "หมดเขตชำระยอดคงเหลือ"
-                : order.status === "DELIVERED"
-                  ? "จัดส่งสำเร็จ"
-                  : order.status === "SHIPPED"
-                    ? "จัดส่งแล้ว"
-                    : order.status === "PACKING"
-                      ? "กำลังแพ็กสินค้า"
-                      : order.status === "PAID"
-                        ? "ชำระเงินแล้ว"
-                        : order.status === "DEPOSIT_PAID"
-                          ? "ชำระมัดจำแล้ว"
-                          : order.status === "CANCELLED"
-                            ? "ยกเลิกแล้ว"
-                            : "ได้รับคำสั่งซื้อ"}
+              : order.status === "UNPAID"
+                ? "รอชำระเงิน"
+                : order.status === "PAYMENT_REJECTED"
+                  ? "สลิปถูกปฏิเสธ"
+                  : order.status === "PAYMENT_REVIEW_PENDING"
+                    ? "รอตรวจสอบสลิป"
+                    : order.status === "DEPOSIT_FORFEITED"
+                      ? "หมดเขตชำระยอดคงเหลือ"
+                      : order.status === "DELIVERED"
+                        ? "จัดส่งสำเร็จ"
+                        : order.status === "SHIPPED"
+                          ? "จัดส่งแล้ว"
+                          : order.status === "PACKING"
+                            ? "กำลังแพ็กสินค้า"
+                            : order.status === "PAID"
+                              ? "ชำระเงินแล้ว"
+                              : order.status === "DEPOSIT_PAID"
+                                ? "ชำระมัดจำแล้ว"
+                                : order.status === "CANCELLED"
+                                  ? "ยกเลิกแล้ว"
+                                  : "ได้รับคำสั่งซื้อ"}
           </span>
         </div>
       </header>
@@ -965,30 +1171,66 @@ export default function OrderDetailView({
           </section>
         </div>
 
-        <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <h2 className="text-lg font-bold text-slate-900">สรุปคำสั่งซื้อ</h2>
-          <dl className="mt-5 space-y-3 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">ยอดรวมสินค้า</dt>
-              <dd className="font-semibold text-slate-900">
-                {currencyFormatter.format(order.totalAmount)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">ชำระแล้ว</dt>
-              <dd className="font-semibold text-slate-900">
-                {currencyFormatter.format(order.paidAmount)}
-              </dd>
-            </div>
-            <div className="border-t border-slate-100 pt-3">
-              <div className="flex justify-between gap-4">
-                <dt className="font-semibold text-slate-700">ยอดคงเหลือ</dt>
-                <dd className="font-bold text-slate-900">
-                  {currencyFormatter.format(order.remainingBalance)}
-                </dd>
-              </div>
-            </div>
-          </dl>
+        <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-zinc-50">สรุปคำสั่งซื้อ</h2>
+          {(() => {
+            const actualRemainingUnpaid =
+              order.status === "CANCELLED" ||
+              order.status === "DEPOSIT_FORFEITED" ||
+              order.paymentStatus === "PAID"
+                ? 0
+                : order.paidAmount > 0 && order.remainingBalance > 0
+                  ? order.remainingBalance
+                  : Math.max(0, order.totalAmount - order.paidAmount);
+            const firstInstallmentDue =
+              order.paidAmount === 0 &&
+              order.status !== "CANCELLED" &&
+              order.status !== "DEPOSIT_FORFEITED" &&
+              order.remainingBalance > 0 &&
+              order.totalAmount > order.remainingBalance
+                ? order.totalAmount - order.remainingBalance
+                : 0;
+            return (
+              <dl className="mt-5 space-y-3 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-500 dark:text-zinc-400">ยอดรวมสินค้า</dt>
+                  <dd className="font-semibold text-slate-900 dark:text-zinc-100">
+                    {currencyFormatter.format(order.totalAmount)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-500 dark:text-zinc-400">ชำระแล้ว</dt>
+                  <dd className="font-semibold text-slate-900 dark:text-zinc-100">
+                    {currencyFormatter.format(order.paidAmount)}
+                  </dd>
+                </div>
+                <div className="border-t border-slate-100 pt-3 dark:border-zinc-800">
+                  <div className="flex justify-between gap-4">
+                    <dt className="font-semibold text-slate-700 dark:text-zinc-200">
+                      {actualRemainingUnpaid > 0 ? "ยอดคงเหลือที่ยังไม่ชำระ" : "ยอดคงเหลือ"}
+                    </dt>
+                    <dd
+                      className={`font-bold ${
+                        actualRemainingUnpaid > 0
+                          ? "text-orange-700 dark:text-amber-400"
+                          : "text-slate-900 dark:text-zinc-100"
+                      }`}
+                    >
+                      {currencyFormatter.format(actualRemainingUnpaid)}
+                    </dd>
+                  </div>
+                  {firstInstallmentDue > 0 ? (
+                    <div className="mt-2 flex justify-between gap-4 text-xs text-slate-500 dark:text-zinc-400">
+                      <dt>ยอดมัดจำรอบแรกที่ต้องชำระ</dt>
+                      <dd className="font-semibold text-slate-700 dark:text-zinc-300">
+                        {currencyFormatter.format(firstInstallmentDue)}
+                      </dd>
+                    </div>
+                  ) : null}
+                </div>
+              </dl>
+            );
+          })()}
 
           {order.paymentStatus === "DEPOSIT_FORFEITED" ? (
             <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">

@@ -23,7 +23,12 @@ export const registerSchema = z
     email: z.string().trim().email("รูปแบบอีเมลไม่ถูกต้อง").max(255),
     password: passwordSchema,
     full_name: z.string().trim().min(1).max(150),
-    phone: z.string().trim().max(20).optional(),
+    phone: z
+      .preprocess(
+        (v) => (typeof v === "string" ? v.replace(/\D/g, "") : v),
+        z.string().regex(/^\d{10}$/, "เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลัก"),
+      )
+      .optional(),
   })
   .strict();
 

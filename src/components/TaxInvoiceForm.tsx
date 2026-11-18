@@ -126,14 +126,7 @@ const DEFAULT_VALUES: FormValues = {
 };
 
 function isValidThaiTaxId(value: string): boolean {
-  if (!/^\d{13}$/.test(value)) {
-    return false;
-  }
-  let sum = 0;
-  for (let index = 0; index < 12; index += 1) {
-    sum += Number(value[index]) * (13 - index);
-  }
-  return (11 - (sum % 11)) % 10 === Number(value[12]);
+  return /^\d{13}$/.test(value.trim());
 }
 
 function parseCents(value: number | string): bigint {
@@ -177,7 +170,7 @@ function profileToForm(profile: z.infer<typeof savedProfileSchema>): FormValues 
     province: profile.province,
     postalCode: profile.postalCode,
     contactEmail: profile.contactEmail,
-    contactPhone: profile.contactPhone,
+    contactPhone: (profile.contactPhone ?? "").replace(/\D/g, "").slice(0, 10),
     saveForNextTime: true,
   };
 }
@@ -271,8 +264,8 @@ export function TaxInvoiceForm({
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.contactEmail)) {
       errors.push("กรุณากรอกอีเมลที่ถูกต้อง");
     }
-    if (!/^[0-9+(). -]{8,30}$/.test(values.contactPhone)) {
-      errors.push("กรุณากรอกเบอร์โทรศัพท์ที่ถูกต้อง");
+    if (!/^\d{10}$/.test(values.contactPhone)) {
+      errors.push("กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก");
     }
     return errors;
   }, [branchCodeError, taxIdError, values]);
@@ -782,9 +775,17 @@ export function TaxInvoiceForm({
                     <input
                       id="tax-phone"
                       type="tel"
+                      inputMode="numeric"
                       autoComplete="tel"
+                      maxLength={10}
+                      placeholder="0812345678"
                       value={values.contactPhone}
-                      onChange={(event) => updateField("contactPhone", event.target.value)}
+                      onChange={(event) =>
+                        updateField(
+                          "contactPhone",
+                          event.target.value.replace(/\D/g, "").slice(0, 10),
+                        )
+                      }
                       className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                     />
                   </div>
