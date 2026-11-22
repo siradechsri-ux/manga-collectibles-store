@@ -82,7 +82,6 @@ export default function MangaSeriesPage() {
 
   useEffect(() => {
     void loadSeries();
-    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") return;
     const refresh = (): void => {
       void loadSeries();
     };

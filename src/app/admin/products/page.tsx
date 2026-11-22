@@ -22,7 +22,8 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
   adjustAdminProductStock,
@@ -88,7 +89,7 @@ function productStock(product: AdminProduct): number {
 
 function productStatus(
   product: AdminProduct,
-): Exclude<ProductStatusFilter, "ALL"> {
+): "IN_STOCK" | "PREORDER" | "OUT_OF_STOCK" {
   if (product.type === "MANGA" || product.type === "LIGHT_NOVEL") {
     if (product.status === "OUT_OF_STOCK" || product.stock === 0) {
       return "OUT_OF_STOCK";
@@ -161,6 +162,7 @@ function productCategoryIcon(type: AdminProduct["type"]) {
 
 function statusLabel(status: ProductStatusFilter): string {
   if (status === "ALL") return "ทุกสถานะ";
+  if (status === "LOW_STOCK") return "ใกล้หมดสต็อก";
   if (status === "IN_STOCK") return "พร้อมส่ง";
   if (status === "PREORDER") return "เปิดพรีออเดอร์";
   return "สินค้าหมด";
@@ -168,17 +170,32 @@ function statusLabel(status: ProductStatusFilter): string {
 
 type VisibilityFilter = "ALL" | "PUBLISHED" | "HIDDEN" | "SCHEDULED";
 
-export default function AdminProductsPage() {
+function AdminProductsContent() {
   const { user, isLoading } = useAuth();
   const isAdmin = canManageInventory(user?.role);
   const canView = canViewStock(user?.role);
+  const searchParams = useSearchParams();
 
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<ProductCategoryFilter>("ALL");
-  const [status, setStatus] = useState<ProductStatusFilter>("ALL");
+  const [status, setStatus] = useState<ProductStatusFilter>(() => {
+    const filter = searchParams.get("filter") || searchParams.get("status");
+    if (filter === "low-stock" || filter === "LOW_STOCK") return "LOW_STOCK";
+    if (filter === "IN_STOCK" || filter === "PREORDER" || filter === "OUT_OF_STOCK") {
+      return filter as ProductStatusFilter;
+    }
+    return "ALL";
+  });
   const [visibility, setVisibility] = useState<VisibilityFilter>("ALL");
   const [bestSellerSettings, setBestSellerSettings] = useState<BestSellerSettings>(getBestSellerSettings);
+
+  useEffect(() => {
+    const filter = searchParams.get("filter") || searchParams.get("status");
+    if (filter === "low-stock" || filter === "LOW_STOCK") {
+      setStatus("LOW_STOCK");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     return subscribeBestSellerSettings((updated) => {
@@ -321,7 +338,12 @@ export default function AdminProductsPage() {
     const now = Date.now();
     return products.filter((product) => {
       if (category !== "ALL" && product.type !== category) return false;
-      if (status !== "ALL" && productStatus(product) !== status) return false;
+      if (status === "LOW_STOCK") {
+        const stock = productStock(product);
+        if (stock <= 0 || stock > 5) return false;
+      } else if (status !== "ALL" && productStatus(product) !== status) {
+        return false;
+      }
       if (visibility !== "ALL") {
         const isScheduled = Boolean(
           product.publishDate && new Date(product.publishDate).getTime() > now,
@@ -393,7 +415,7 @@ export default function AdminProductsPage() {
   }
 
   const lowStockCount = products.filter(
-    (product) => productStock(product) > 0 && productStock(product) < 5,
+    (product) => productStock(product) > 0 && productStock(product) <= 5,
   ).length;
   const preorderCount = products.filter(
     (product) => productStatus(product) === "PREORDER",
@@ -495,9 +517,36 @@ export default function AdminProductsPage() {
         {error ? <p role="alert" className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">{error}</p> : null}
 
         <section aria-label="สรุปสินค้า" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard icon={<Boxes size={19} />} label="รายการสินค้าทั้งหมด" value={products.length} />
-          <MetricCard icon={<AlertTriangle size={19} />} label="รายการสต็อกต่ำ" value={lowStockCount} accent="orange" />
-          <MetricCard icon={<Package size={19} />} label="รายการเปิดพรีออเดอร์" value={preorderCount} accent="violet" />
+          <button
+            type="button"
+            onClick={() => setStatus("ALL")}
+            className={`text-left transition rounded-2xl ${
+              status === "ALL" ? "ring-2 ring-zinc-400" : "hover:opacity-90"
+            }`}
+            title="คลิกเพื่อดูสินค้าทั้งหมด"
+          >
+            <MetricCard icon={<Boxes size={19} />} label="รายการสินค้าทั้งหมด" value={products.length} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatus((prev) => (prev === "LOW_STOCK" ? "ALL" : "LOW_STOCK"))}
+            className={`text-left transition rounded-2xl ${
+              status === "LOW_STOCK" ? "ring-2 ring-orange-500 shadow-md" : "hover:opacity-90"
+            }`}
+            title={status === "LOW_STOCK" ? "คลิกเพื่อยกเลิกการกรอง" : "คลิกเพื่อกรองเฉพาะสินค้าสต็อกต่ำ"}
+          >
+            <MetricCard icon={<AlertTriangle size={19} />} label="รายการสต็อกต่ำ" value={lowStockCount} accent="orange" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatus((prev) => (prev === "PREORDER" ? "ALL" : "PREORDER"))}
+            className={`text-left transition rounded-2xl ${
+              status === "PREORDER" ? "ring-2 ring-violet-500 shadow-md" : "hover:opacity-90"
+            }`}
+            title={status === "PREORDER" ? "คลิกเพื่อยกเลิกการกรอง" : "คลิกเพื่อกรองเฉพาะสินค้าพรีออเดอร์"}
+          >
+            <MetricCard icon={<Package size={19} />} label="รายการเปิดพรีออเดอร์" value={preorderCount} accent="violet" />
+          </button>
           <MetricCard icon={<EyeOff size={19} />} label="ซ่อน / รอวางขาย" value={hiddenCount} accent="zinc" />
         </section>
 
@@ -520,6 +569,7 @@ export default function AdminProductsPage() {
               </select>
               <select value={status} onChange={(event) => setStatus(event.target.value as ProductStatusFilter)} aria-label="กรองตามสถานะสินค้า" className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-950">
                 <option value="ALL">ทุกสถานะ</option>
+                <option value="LOW_STOCK">ใกล้หมดสต็อก (≤ 5 ชิ้น)</option>
                 <option value="IN_STOCK">พร้อมส่ง</option>
                 <option value="PREORDER">เปิดพรีออเดอร์</option>
                 <option value="OUT_OF_STOCK">สินค้าหมด</option>
@@ -598,7 +648,16 @@ export default function AdminProductsPage() {
                       <td className="px-4 py-3 text-right font-medium tabular-nums">{productPrice(product).toLocaleString("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3 text-right tabular-nums">
                         <span className="font-semibold">{productStock(product)}</span>
-                        {productStock(product) === 0 ? <span className="ml-2 rounded-full bg-red-100 px-2 py-1 text-[10px] font-bold text-red-800 dark:bg-red-950 dark:text-red-200">สินค้าหมด</span> : productStock(product) < 5 ? <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-[10px] font-bold text-orange-800 dark:bg-orange-950 dark:text-orange-200">สต็อกต่ำ</span> : null}
+                        {productStock(product) === 0 ? (
+                          <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800 dark:bg-red-950 dark:text-red-200">
+                            สินค้าหมด
+                          </span>
+                        ) : productStock(product) <= 5 ? (
+                          <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-950/80 dark:text-amber-300">
+                            <AlertTriangle size={10} aria-hidden="true" />
+                            ใกล้หมด
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={state} /></td>
                       <td className="px-4 py-3 text-center">
@@ -879,7 +938,7 @@ function MetricCard({
   );
 }
 
-function StatusBadge({ status }: { status: Exclude<ProductStatusFilter, "ALL"> }) {
+function StatusBadge({ status }: { status: "IN_STOCK" | "PREORDER" | "OUT_OF_STOCK" }) {
   const config = {
     IN_STOCK: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-300",
     PREORDER: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
@@ -907,5 +966,21 @@ function Dialog({
         {children}
       </section>
     </div>
+  );
+}
+
+export default function AdminProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-[60vh] items-center justify-center px-4">
+          <p role="status" className="text-sm text-zinc-500">
+            กำลังโหลดข้อมูลคลังสินค้า...
+          </p>
+        </main>
+      }
+    >
+      <AdminProductsContent />
+    </Suspense>
   );
 }
