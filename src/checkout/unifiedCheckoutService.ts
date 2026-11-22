@@ -2,8 +2,18 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { z } from "zod";
 import { taxInvoiceRequestSchema } from "../tax/taxInvoice.schemas";
+import { validatePromoCode } from "../utils/promo";
 
 const positiveInteger = z.number().int().positive().safe();
+
+const promoCouponSnapshotSchema = z
+  .object({
+    code: z.string().trim().min(1).max(60),
+    type: z.enum(["PERCENTAGE", "FIXED", "FREE_SHIPPING"]),
+    value: z.number().finite().nonnegative(),
+    minSpend: z.number().finite().nonnegative().optional(),
+  })
+  .strict();
 
 export const unifiedCheckoutPayloadSchema = z
   .object({
@@ -25,6 +35,9 @@ export const unifiedCheckoutPayloadSchema = z
               "GOODS_INSTOCK",
               "ACCESSORY_INSTOCK",
             ]),
+            isReward: z.boolean().optional(),
+            rewardLabel: z.string().trim().max(300).optional(),
+            imageUrl: z.string().trim().max(500).nullable().optional(),
           })
           .strict(),
       )
@@ -53,6 +66,7 @@ export const unifiedCheckoutPayloadSchema = z
       .optional(),
     taxInvoiceRequest: taxInvoiceRequestSchema.optional(),
     promoCode: z.string().trim().optional(),
+    promoCoupon: promoCouponSnapshotSchema.optional(),
     redeemedPoints: z.number().int().nonnegative().optional(),
     catalogSnapshot: z.unknown().optional(),
   })
@@ -72,6 +86,9 @@ export interface UnifiedCheckoutItemResponse {
   paymentType: UnifiedPaymentType;
   balanceAmount: string;
   isPreorder: boolean;
+  isReward?: boolean;
+  rewardLabel?: string;
+  imageUrl?: string | null;
 }
 
 export interface UnifiedCheckoutResponse {
@@ -221,6 +238,9 @@ interface NormalizedCheckoutItem {
   productVariantId: number;
   quantity: number;
   productType: MixedCartProductType;
+  isReward?: boolean;
+  rewardLabel?: string;
+  imageUrl?: string | null;
 }
 
 interface PreparedCheckoutItem extends UnifiedCheckoutItemResponse {
@@ -265,10 +285,11 @@ function readPositiveNumber(
 function normalizeItems(
   items: UnifiedCheckoutPayload["items"],
 ): NormalizedCheckoutItem[] {
-  const itemsByVariant = new Map<number, NormalizedCheckoutItem>();
+  const itemsByKey = new Map<string, NormalizedCheckoutItem>();
 
   for (const item of items) {
-    const current = itemsByVariant.get(item.productVariantId);
+    const mapKey = `${item.productVariantId}:${item.isReward ? "reward" : "paid"}`;
+    const current = itemsByKey.get(mapKey);
     if (current && current.productType !== item.productType) {
       throw new InvalidCheckoutPayloadError(
         `สินค้า variant ${item.productVariantId} ถูกระบุด้วยประเภทที่ขัดแย้งกัน`,
@@ -282,14 +303,17 @@ function normalizeItems(
       );
     }
 
-    itemsByVariant.set(item.productVariantId, {
+    itemsByKey.set(mapKey, {
       productVariantId: item.productVariantId,
       quantity,
       productType: item.productType,
+      ...(item.isReward ? { isReward: true } : {}),
+      ...(item.rewardLabel ? { rewardLabel: item.rewardLabel } : current?.rewardLabel ? { rewardLabel: current.rewardLabel } : {}),
+      ...(item.imageUrl ? { imageUrl: item.imageUrl } : current?.imageUrl ? { imageUrl: current.imageUrl } : {}),
     });
   }
 
-  return [...itemsByVariant.values()].sort(
+  return [...itemsByKey.values()].sort(
     (left, right) => left.productVariantId - right.productVariantId,
   );
 }
@@ -343,6 +367,7 @@ export class UnifiedCheckoutService {
 
       const preparedItems: PreparedCheckoutItem[] = [];
       let totalBillableWeightKg = 0;
+      let merchandiseFullCents = 0n;
       let merchandiseImmediateCents = 0n;
       let totalBalanceCents = 0n;
       let containsDeposit = false;
@@ -404,15 +429,18 @@ export class UnifiedCheckoutService {
         );
         const preorder = preorderResult.rows[0];
         const preorderIsOpen = Boolean(preorder?.is_open);
+        const isRewardItem = Boolean(item.isReward);
         const requiresPreorder =
-          effectiveProductType === "MANGA_PREORDER" ||
-          effectiveProductType === "FIGURE_DEPOSIT" ||
-          (effectiveProductType === "FIGURE_FULL" && preorderIsOpen) ||
-          effectiveProductType === "LIGHT_NOVEL_PREORDER" ||
-          effectiveProductType === "PLAMO_DEPOSIT" ||
-          (effectiveProductType === "PLAMO_FULL" && preorderIsOpen);
+          !isRewardItem &&
+          (effectiveProductType === "MANGA_PREORDER" ||
+            effectiveProductType === "FIGURE_DEPOSIT" ||
+            (effectiveProductType === "FIGURE_FULL" && preorderIsOpen) ||
+            effectiveProductType === "LIGHT_NOVEL_PREORDER" ||
+            effectiveProductType === "PLAMO_DEPOSIT" ||
+            (effectiveProductType === "PLAMO_FULL" && preorderIsOpen));
 
         if (
+          !isRewardItem &&
           (effectiveProductType === "MANGA_PREORDER" ||
             effectiveProductType === "FIGURE_DEPOSIT") &&
           !preorder
@@ -420,6 +448,7 @@ export class UnifiedCheckoutService {
           throw new PreorderClosedError(item.productVariantId);
         }
         if (
+          !isRewardItem &&
           (effectiveProductType === "MANGA_PREORDER" ||
             effectiveProductType === "FIGURE_DEPOSIT") &&
           !preorderIsOpen
@@ -428,6 +457,7 @@ export class UnifiedCheckoutService {
         }
 
         if (
+          !isRewardItem &&
           (effectiveProductType === "FIGURE_DEPOSIT" ||
             effectiveProductType === "PLAMO_DEPOSIT") &&
           preorder &&
@@ -443,7 +473,13 @@ export class UnifiedCheckoutService {
         let isPreorder = requiresPreorder;
         let billableWeightKg: number;
 
-        if (
+        if (isRewardItem) {
+          unitPriceCents = 0n;
+          immediateUnitPriceCents = 0n;
+          balancePerUnitCents = 0n;
+          paymentType = "FULL";
+          isPreorder = false;
+        } else if (
           effectiveProductType === "FIGURE_DEPOSIT" ||
           effectiveProductType === "PLAMO_DEPOSIT"
         ) {
@@ -583,6 +619,7 @@ export class UnifiedCheckoutService {
           }
         }
 
+        merchandiseFullCents += lineTotalCents;
         merchandiseImmediateCents += lineImmediateCents;
         totalBalanceCents += balanceAmountCents;
         totalBillableWeightKg += billableWeightKg * item.quantity;
@@ -601,6 +638,9 @@ export class UnifiedCheckoutService {
           balanceAmount: centsToAmount(balanceAmountCents),
           isPreorder,
           balanceAmountCents,
+          ...(item.isReward ? { isReward: true } : {}),
+          ...(item.rewardLabel ? { rewardLabel: item.rewardLabel } : {}),
+          ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
         });
       }
 
@@ -648,11 +688,70 @@ export class UnifiedCheckoutService {
         throw new AmbiguousShippingRateError(payload.carrier, payload.serviceAreaCode);
       }
 
-      const shippingFeeCents = amountToCents(
+      const rawShippingFeeCents = amountToCents(
         shippingRateResult.rows[0].shipping_fee,
         "shipping_rates.shipping_fee",
       );
-      const immediateAmountCents = merchandiseImmediateCents + shippingFeeCents;
+
+      let shippingFeeCents = rawShippingFeeCents;
+      // Auto free shipping promotion for orders >= 800 THB
+      if (merchandiseImmediateCents >= 80_000n) {
+        shippingFeeCents = 0n;
+      }
+
+      let promoDiscountCents = 0n;
+      if (payload.promoCode) {
+        const promoRes = validatePromoCode(
+          payload.promoCode,
+          Number(merchandiseFullCents) / 100,
+          Number(rawShippingFeeCents) / 100,
+        );
+        if (promoRes.valid) {
+          if (promoRes.freeShipping) {
+            shippingFeeCents = 0n;
+          } else {
+            promoDiscountCents = BigInt(Math.round(promoRes.discountAmount * 100));
+          }
+        } else if (
+          payload.promoCoupon &&
+          payload.promoCoupon.code.trim().toUpperCase() ===
+            payload.promoCode.trim().toUpperCase()
+        ) {
+          const minSpendCents = BigInt(
+            Math.round((payload.promoCoupon.minSpend ?? 0) * 100),
+          );
+          if (merchandiseFullCents >= minSpendCents) {
+            if (payload.promoCoupon.type === "FREE_SHIPPING") {
+              shippingFeeCents = 0n;
+            } else if (payload.promoCoupon.type === "PERCENTAGE") {
+              const pct = Math.min(100, Math.max(0, payload.promoCoupon.value));
+              promoDiscountCents = BigInt(
+                Math.round((Number(merchandiseFullCents) * pct) / 100),
+              );
+            } else {
+              promoDiscountCents = BigInt(
+                Math.round(payload.promoCoupon.value * 100),
+              );
+            }
+          }
+        }
+      }
+
+      if (promoDiscountCents > merchandiseImmediateCents) {
+        promoDiscountCents = merchandiseImmediateCents;
+      }
+
+      let pointsDiscountCents = 0n;
+      if (payload.redeemedPoints && payload.redeemedPoints > 0) {
+        pointsDiscountCents = BigInt(Math.floor(payload.redeemedPoints / 10) * 100);
+      }
+
+      const rawImmediateCents =
+        merchandiseImmediateCents +
+        shippingFeeCents -
+        promoDiscountCents -
+        pointsDiscountCents;
+      const immediateAmountCents = rawImmediateCents > 0n ? rawImmediateCents : 0n;
       const totalAmountCents = immediateAmountCents + totalBalanceCents;
       const paymentStatus: UnifiedPaymentStatus = "UNPAID";
       const orderNumber = `MIX-${randomUUID()}`;
@@ -835,6 +934,9 @@ export class UnifiedCheckoutService {
           paymentType: item.paymentType,
           balanceAmount: item.balanceAmount,
           isPreorder: item.isPreorder,
+          ...(item.isReward ? { isReward: true } : {}),
+          ...(item.rewardLabel ? { rewardLabel: item.rewardLabel } : {}),
+          ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
         })),
       };
     } catch (error) {

@@ -27,6 +27,8 @@ import { z } from "zod";
 import {
   CartItem,
   FigureCartItem,
+  getCartItemHref,
+  isRewardCartItem,
   MangaCartItem,
   useCart,
 } from "../../context/CartContext";
@@ -287,10 +289,12 @@ export default function CheckoutPage() {
     hasBookItems,
     bookCoverAddonPrice,
     appliedPromoCode,
+    appliedPromoType,
     promoDiscount,
     promoTitle,
     discountedImmediateTotal,
     isFreeShipping,
+    isPromoFreeShipping,
     removeItem,
     updateQuantity,
     updateFigurePaymentType,
@@ -338,18 +342,36 @@ export default function CheckoutPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [userPoints, setUserPoints] = useState<number>(() => getUserPoints());
+  const [userPoints, setUserPoints] = useState<number>(0);
   const [redeemedPoints, setRedeemedPoints] = useState<number>(0);
 
   useEffect(() => {
+    setUserPoints(user ? getUserPoints() : 0);
     return subscribeUserPoints((p) => setUserPoints(p));
-  }, []);
+  }, [user]);
+
+  const rawEstimatedShippingFee = useMemo(() => {
+    if (items.length === 0) return 0;
+    const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+    const hasHeavyCollectible = items.some(
+      (item) => item.kind === "FIGURE" || item.kind === "PLAMO",
+    );
+    if (carrier === "THAI_POST") {
+      return hasHeavyCollectible ? 80 : totalQty > 4 ? 70 : 50;
+    }
+    return hasHeavyCollectible ? 65 : totalQty > 4 ? 60 : 45;
+  }, [carrier, items]);
+
+  const effectiveShippingFee =
+    isFreeShipping || isPromoFreeShipping ? 0 : rawEstimatedShippingFee;
 
   // Max points redeemable: cannot exceed userPoints or the payable bill in points
   const maxRedeemablePoints = useMemo(() => {
-    const maxPointsForBill = Math.floor(discountedImmediateTotal * POINTS_TO_BAHT_RATE);
+    const maxPointsForBill = Math.floor(
+      (discountedImmediateTotal + effectiveShippingFee) * POINTS_TO_BAHT_RATE,
+    );
     return Math.max(0, Math.min(userPoints, maxPointsForBill));
-  }, [userPoints, discountedImmediateTotal]);
+  }, [userPoints, discountedImmediateTotal, effectiveShippingFee]);
 
   useEffect(() => {
     if (redeemedPoints > maxRedeemablePoints) {
@@ -362,8 +384,13 @@ export default function CheckoutPage() {
   }, [redeemedPoints]);
 
   const finalImmediateTotal = useMemo(() => {
-    return Math.max(0, Number((discountedImmediateTotal - pointsDiscountBaht).toFixed(2)));
-  }, [discountedImmediateTotal, pointsDiscountBaht]);
+    return Math.max(
+      0,
+      Number(
+        (discountedImmediateTotal + effectiveShippingFee - pointsDiscountBaht).toFixed(2),
+      ),
+    );
+  }, [discountedImmediateTotal, effectiveShippingFee, pointsDiscountBaht]);
 
   const pointsReward = useMemo(
     () => calculateEarnedPoints(finalImmediateTotal, Math.max(0, userPoints - redeemedPoints)),
@@ -631,10 +658,14 @@ export default function CheckoutPage() {
         productType = "ACCESSORY_INSTOCK";
       }
 
+      const isReward = isRewardCartItem(item);
+      const itemImg = item.image || item.coverImage || item.imageUrl || null;
       return {
         productVariantId: item.id,
         quantity: item.quantity,
         productType,
+        ...(isReward ? { isReward: true, rewardLabel: cartItemTitle(item) } : {}),
+        ...(itemImg ? { imageUrl: itemImg } : {}),
       };
     });
 
@@ -646,6 +677,12 @@ export default function CheckoutPage() {
       });
     }
 
+    const activeCouponObj = appliedPromoCode
+      ? availableCoupons.find(
+          (c) => c.code.toUpperCase() === appliedPromoCode.toUpperCase(),
+        )
+      : undefined;
+
     const payload = {
       items: payloadItems,
       carrier,
@@ -653,6 +690,16 @@ export default function CheckoutPage() {
       shippingPolicy: shipmentPolicy,
       shippingAddress: parsedAddress.data,
       promoCode: appliedPromoCode || undefined,
+      ...(activeCouponObj
+        ? {
+            promoCoupon: {
+              code: activeCouponObj.code,
+              type: activeCouponObj.type,
+              value: activeCouponObj.value,
+              minSpend: activeCouponObj.minSpend ?? 0,
+            },
+          }
+        : {}),
       redeemedPoints: redeemedPoints > 0 ? redeemedPoints : undefined,
       ...(useMockMode
         ? { catalogSnapshot: getCheckoutInventorySnapshot() }
@@ -1031,11 +1078,18 @@ export default function CheckoutPage() {
                         key={`${item.kind}-${item.id}`}
                         className="flex gap-3 border-b border-zinc-100 pb-4 last:border-0 last:pb-0 dark:border-zinc-800"
                       >
-                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-100 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-300">
+                        <Link
+                          href={getCartItemHref(item)}
+                          className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-100 text-zinc-600 transition hover:opacity-85 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-300"
+                          aria-label={`ดูรายละเอียด ${cartItemTitle(item)}`}
+                        >
                           {itemImg ? (
                             <img
                               src={itemImg}
                               alt={cartItemTitle(item)}
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
                               className="h-full w-full object-cover"
                             />
                           ) : item.kind === "MANGA" || item.kind === "LIGHT_NOVEL" ? (
@@ -1049,20 +1103,23 @@ export default function CheckoutPage() {
                           ) : (
                             <Package aria-hidden="true" className="h-5 w-5" />
                           )}
-                        </div>
+                        </Link>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <h3 className="line-clamp-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                              <Link
+                                href={getCartItemHref(item)}
+                                className="line-clamp-2 text-sm font-medium text-zinc-900 transition hover:text-orange-600 hover:underline dark:text-zinc-100 dark:hover:text-orange-400"
+                              >
                                 {cartItemTitle(item)}
-                              </h3>
+                              </Link>
                               <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                 <p className="text-xs text-zinc-600 dark:text-zinc-400">
                                   {itemTypeLabel(item)}
                                 </p>
-                                {item.kind === "GOODS" && item.isReward ? (
+                                {isRewardCartItem(item) ? (
                                   <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
-                                    แลกฟรี (0 บาท)
+                                    ของรางวัลฟรี (0 บาท)
                                   </span>
                                 ) : null}
                               </div>
@@ -1083,7 +1140,7 @@ export default function CheckoutPage() {
                                 onClick={() =>
                                   updateQuantity(item.kind, item.id, item.quantity - 1)
                                 }
-                                disabled={item.kind === "GOODS" && Boolean(item.isReward)}
+                                disabled={isRewardCartItem(item)}
                                 className="p-1.5 text-zinc-600 hover:text-zinc-950 disabled:opacity-30 dark:text-zinc-300 dark:hover:text-white"
                                 aria-label="ลดจำนวน"
                               >
@@ -1098,7 +1155,7 @@ export default function CheckoutPage() {
                                   updateQuantity(item.kind, item.id, item.quantity + 1)
                                 }
                                 disabled={
-                                  (item.kind === "GOODS" && Boolean(item.isReward)) ||
+                                  isRewardCartItem(item) ||
                                   item.quantity >= 99
                                 }
                                 className="p-1.5 text-zinc-600 hover:text-zinc-950 disabled:opacity-30 dark:text-zinc-300 dark:hover:text-white"
@@ -1107,7 +1164,7 @@ export default function CheckoutPage() {
                                 <Plus aria-hidden="true" className="h-3.5 w-3.5" />
                               </button>
                             </div>
-                            {isDepositEligible ? (
+                            {isDepositEligible && !isRewardCartItem(item) ? (
                               <select
                                 value={item.selectedPaymentType}
                                 onChange={(event) =>
@@ -1133,10 +1190,10 @@ export default function CheckoutPage() {
                             ) : null}
                           </div>
                           <div className="mt-2 flex justify-between text-xs">
-                            {item.kind === "GOODS" && item.isReward ? (
+                            {isRewardCartItem(item) ? (
                               <>
                                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                  แลกฟรี (0 บาท)
+                                  รับของรางวัลฟรี (0 บาท)
                                 </span>
                                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
                                   ฿0.00
@@ -1180,8 +1237,8 @@ export default function CheckoutPage() {
                             {appliedPromoCode} · {promoTitle}
                           </p>
                           <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                            {appliedPromoCode === "FREESHIP"
-                              ? "ใช้สิทธิ์ส่งฟรีสำเร็จ"
+                            {isPromoFreeShipping || appliedPromoType === "FREE_SHIPPING"
+                              ? `ใช้สิทธิ์ส่งฟรีสำเร็จ (หักค่าจัดส่ง ${money(rawEstimatedShippingFee)})`
                               : `ลดทันที ${money(promoDiscount)}`}
                           </p>
                         </div>
@@ -1464,20 +1521,42 @@ export default function CheckoutPage() {
                     </div>
                   ) : null}
                   <div className="flex justify-between text-sm text-zinc-600 dark:text-zinc-400">
-                    <span>ค่าจัดส่ง</span>
-                    <span className={`text-xs font-semibold ${isFreeShipping || appliedPromoCode === "FREESHIP" ? "text-emerald-700 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-400"}`}>
-                      {isFreeShipping ? "ฟรีค่าจัดส่ง (โปรส่งฟรีเมื่อช้อปครบ ฿800)" : appliedPromoCode === "FREESHIP" ? "ฟรีค่าจัดส่ง (โค้ด FREESHIP)" : "คำนวณตามพื้นที่"}
-                    </span>
+                    <span>ค่าจัดส่งโดยประมาณ</span>
+                    <div className="text-right">
+                      {isFreeShipping || isPromoFreeShipping ? (
+                        <div className="flex flex-col items-end">
+                          <div className="flex items-center gap-1.5">
+                            {rawEstimatedShippingFee > 0 ? (
+                              <span className="text-xs text-zinc-400 line-through">
+                                {money(rawEstimatedShippingFee)}
+                              </span>
+                            ) : null}
+                            <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400">
+                              ฿0.00 (ฟรีค่าจัดส่ง)
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                            {isPromoFreeShipping
+                              ? `จากโค้ด ${appliedPromoCode}`
+                              : "โปรส่งฟรีเมื่อช้อปครบ ฿800"}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                          {money(effectiveShippingFee)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-amber-950 dark:border-amber-800/60 dark:bg-amber-950/40">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm font-semibold text-amber-950 dark:text-amber-200">
-                        ยอดชำระทันที*
+                        ยอดชำระสุทธิโดยประมาณ*
                       </span>
                       <div className="text-right">
-                        {promoDiscount > 0 || pointsDiscountBaht > 0 ? (
+                        {promoDiscount > 0 || pointsDiscountBaht > 0 || (isFreeShipping && rawEstimatedShippingFee > 0) ? (
                           <span className="mr-2 text-xs text-zinc-400 line-through">
-                            {money(subtotal)}
+                            {money(subtotal + rawEstimatedShippingFee)}
                           </span>
                         ) : null}
                         <span className="text-lg font-bold text-orange-700 dark:text-amber-400">
@@ -1486,7 +1565,8 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-amber-900/80 dark:text-amber-300/80">
-                      * ยอดนี้ยังไม่รวมค่าจัดส่ง ซึ่งระบบจะแจ้งยอดจริงเมื่อสร้างคำสั่งซื้อ
+                      * ค่าจัดส่งจริงอาจปรับตามน้ำหนักและพื้นที่เมื่อยืนยันคำสั่งซื้อ
+                      {isFreeShipping || isPromoFreeShipping ? " (ได้รับสิทธิ์ฟรีค่าจัดส่ง ฿0.00)" : ""}
                     </p>
                   </div>
 

@@ -136,16 +136,28 @@ export class OrderService {
   /**
    * Resubmits a payment slip after rejection.
    */
-  static async resubmitSlip(orderId: number, fileName: string): Promise<MockStoredOrder> {
+  static async resubmitSlip(
+    orderId: number,
+    fileName: string,
+    slipImageDataUrl?: string,
+  ): Promise<MockStoredOrder> {
     if (IS_MOCK_MODE) {
       const order = getMockOrder(orderId);
-      return resubmitMockOrderSlip(orderId, order?.ownerUserId ?? 9001, fileName);
+      return resubmitMockOrderSlip(
+        orderId,
+        order?.ownerUserId ?? 9001,
+        fileName,
+        slipImageDataUrl,
+      );
     }
     const res = await fetch(`/api/orders/${orderId}/slip/resubmit`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileName }),
+      body: JSON.stringify({
+        fileName,
+        ...(slipImageDataUrl ? { slipImageDataUrl } : {}),
+      }),
     });
     if (!res.ok) throw new Error("ไม่สามารถส่งสลิปใหม่ได้");
     const data = await res.json();

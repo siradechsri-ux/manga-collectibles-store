@@ -21,7 +21,7 @@ export const DEFAULT_PROMO_CODES: PromoCoupon[] = [
     type: "PERCENTAGE",
     value: 10,
     minSpend: 0,
-    expiresAt: "2026-12-31T23:59:59.000Z",
+    expiresAt: "2027-12-31T23:59:59.000Z",
     isActive: true,
     createdAt: "2026-01-01T00:00:00.000Z",
   },
@@ -32,7 +32,7 @@ export const DEFAULT_PROMO_CODES: PromoCoupon[] = [
     type: "FREE_SHIPPING",
     value: 100,
     minSpend: 0,
-    expiresAt: "2026-12-31T23:59:59.000Z",
+    expiresAt: "2027-12-31T23:59:59.000Z",
     isActive: true,
     createdAt: "2026-01-01T00:00:00.000Z",
   },
@@ -43,7 +43,18 @@ export const DEFAULT_PROMO_CODES: PromoCoupon[] = [
     type: "FIXED",
     value: 50,
     minSpend: 300,
-    expiresAt: "2026-12-31T23:59:59.000Z",
+    expiresAt: "2027-12-31T23:59:59.000Z",
+    isActive: true,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  },
+  {
+    code: "KUJI50",
+    title: "ส่วนลด Kuji ฿50",
+    description: "คูปองส่วนลด 50 บาท จากรางวัลจับฉลาก Ichiban Kuji",
+    type: "FIXED",
+    value: 50,
+    minSpend: 0,
+    expiresAt: "2027-12-31T23:59:59.000Z",
     isActive: true,
     createdAt: "2026-01-01T00:00:00.000Z",
   },
@@ -70,6 +81,17 @@ export function listPromoCodes(): PromoCoupon[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
+      const existingCodes = new Set(
+        parsed.map((item: PromoCoupon) => String(item?.code ?? "").toUpperCase()),
+      );
+      const missingDefaults = DEFAULT_PROMO_CODES.filter(
+        (d) => !existingCodes.has(d.code.toUpperCase()),
+      );
+      if (missingDefaults.length > 0) {
+        const merged = [...parsed, ...missingDefaults];
+        localStorage.setItem(PROMO_STORAGE_KEY, JSON.stringify(merged));
+        return merged;
+      }
       return parsed;
     }
     return DEFAULT_PROMO_CODES;

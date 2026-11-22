@@ -150,6 +150,11 @@ export default function FigureDetailCard({
   } | null>(null);
   const [imageError, setImageError] = useState(false);
 
+  const primaryImageUrl = product.images?.[0] || "";
+  useEffect(() => {
+    setImageError(false);
+  }, [primaryImageUrl, product.id]);
+
   const figureItemType = (product.category as any) || "FIGURE";
   const isWishlisted = isInWishlist(product.id, figureItemType);
   const isCompared = isInCompare(product.id);

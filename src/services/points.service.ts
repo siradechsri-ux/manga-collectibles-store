@@ -2,7 +2,7 @@
 
 export const MOCK_POINTS_STORAGE_KEY = "mock_user_points";
 export const MOCK_POINTS_LEDGER_STORAGE_KEY = "mock_user_points_ledger";
-export const MOCK_POINTS_DEFAULT = 450;
+export const MOCK_POINTS_DEFAULT = 0;
 export const MOCK_POINTS_UPDATED_EVENT = "manga-collectibles-points-updated";
 export const MOCK_LEDGER_UPDATED_EVENT = "manga-collectibles-ledger-updated";
 
@@ -135,43 +135,7 @@ export function calculateEarnedPoints(
   };
 }
 
-const SEED_LEDGER_ENTRIES: PointsLedgerEntry[] = [
-  {
-    id: "tx-init-001",
-    type: "WELCOME_BONUS",
-    amount: 250,
-    balanceAfter: 250,
-    description: "โบนัสต้อนรับสมาชิกใหม่ ร้านสะสมมังงะและของสะสมแท้",
-    createdAt: "2026-03-01T10:00:00Z",
-  },
-  {
-    id: "tx-init-002",
-    type: "EARN_ORDER",
-    amount: 120,
-    balanceAfter: 370,
-    description: "รับแต้มจากคำสั่งซื้อ #1001 (Nendoroid Tanjiro Kamado)",
-    referenceId: "1001",
-    createdAt: "2026-03-10T14:30:00Z",
-  },
-  {
-    id: "tx-init-003",
-    type: "EARN_ORDER",
-    amount: 70,
-    balanceAfter: 440,
-    description: "รับแต้มจากคำสั่งซื้อ #1002 (มังงะ Jujutsu Kaisen เล่ม 1-3)",
-    referenceId: "1002",
-    createdAt: "2026-03-25T16:15:00Z",
-  },
-  {
-    id: "tx-init-004",
-    type: "EARN_REVIEW",
-    amount: 10,
-    balanceAfter: 450,
-    description: "รับแต้มพิเศษจากการเขียนรีวิวสินค้า 'มหาเวทผนึกมาร เล่ม 26'",
-    referenceId: "rev-001",
-    createdAt: "2026-04-02T11:20:00Z",
-  },
-];
+const SEED_LEDGER_ENTRIES: PointsLedgerEntry[] = [];
 
 /**
  * ดึงรายการประวัติการเคลื่อนไหวแต้มสะสม
@@ -414,7 +378,57 @@ export function addPoints(
 }
 
 /**
- * รีเซ็ตแต้มสะสมกลับเป็นค่าเริ่มต้น (450 แต้ม)
+ * รีเซ็ตแต้มสะสมใน LocalStorage เป็น 0 ทันที (เช่น เมื่อ Logout หรือสลับบัญชี)
+ */
+export function resetLocalPointsToZero(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(MOCK_POINTS_STORAGE_KEY, "0");
+    window.localStorage.setItem(MOCK_POINTS_LEDGER_STORAGE_KEY, JSON.stringify([]));
+    notifyPointsChanged(0);
+    notifyLedgerChanged();
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * ซิงค์แต้มสะสมล่าสุดจากเซิร์ฟเวอร์ (สำหรับ Live mode)
+ */
+export async function syncUserPointsFromServer(): Promise<number> {
+  if (typeof window === "undefined") return 0;
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
+    return getUserPoints();
+  }
+  try {
+    const res = await fetch("/api/points/balance", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      resetLocalPointsToZero();
+      return 0;
+    }
+    const resData = await res.json();
+    const data = resData?.data ?? resData;
+    const pts = typeof data?.points === "number" ? data.points : 0;
+    window.localStorage.setItem(MOCK_POINTS_STORAGE_KEY, String(pts));
+    notifyPointsChanged(pts);
+    if (Array.isArray(data?.ledger)) {
+      window.localStorage.setItem(
+        MOCK_POINTS_LEDGER_STORAGE_KEY,
+        JSON.stringify(data.ledger),
+      );
+      notifyLedgerChanged();
+    }
+    return pts;
+  } catch {
+    return getUserPoints();
+  }
+}
+
+/**
+ * รีเซ็ตแต้มสะสมกลับเป็นค่าเริ่มต้น (0 แต้ม)
  */
 export function resetPoints(): void {
   if (typeof window === "undefined") return;
@@ -458,20 +472,9 @@ export function subscribeUserPoints(
   };
 
   if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
-    void fetch("/api/points/balance", { credentials: "include", cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((resData) => {
-        const data = resData?.data ?? resData;
-        if (data && typeof data.points === "number") {
-          window.localStorage.setItem(MOCK_POINTS_STORAGE_KEY, String(data.points));
-          listener(data.points);
-        }
-        if (data && Array.isArray(data.ledger) && data.ledger.length > 0) {
-          window.localStorage.setItem(MOCK_POINTS_LEDGER_STORAGE_KEY, JSON.stringify(data.ledger));
-          notifyLedgerChanged();
-        }
-      })
-      .catch(() => {});
+    void syncUserPointsFromServer().then((pts) => {
+      listener(pts);
+    });
   }
   window.addEventListener(MOCK_POINTS_UPDATED_EVENT, handleCustomEvent);
   window.addEventListener("storage", handleStorageEvent);

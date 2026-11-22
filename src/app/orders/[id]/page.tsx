@@ -24,9 +24,10 @@ const slipResultSchema = z
     success: z.literal(true),
     data: z
       .object({
-        paymentStatus: z.enum(["PAID", "DEPOSIT_PAID"]),
+        paymentStatus: z.enum(["PAID", "DEPOSIT_PAID", "PENDING_REVIEW"]),
         paymentStage: z.enum(["INITIAL", "BALANCE"]),
         transactionRef: z.string().min(1),
+        slipImageUrl: z.string().optional(),
       })
       .passthrough(),
   })
@@ -136,6 +137,8 @@ export default function MockOrderDetailPage() {
           parsed.data.data.paymentStatus,
           parsed.data.data.transactionRef,
           parsed.data.data.paymentStage,
+          request.file.name,
+          parsed.data.data.slipImageUrl ?? null,
         );
         setStoredOrder(updatedOrder);
       } else {
@@ -236,9 +239,16 @@ export default function MockOrderDetailPage() {
       return;
     }
     try {
+      const slipImageDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(new Error("ไม่สามารถอ่านไฟล์รูปภาพสลิปได้"));
+        reader.readAsDataURL(replacementSlip);
+      });
       const updated = await OrderService.resubmitSlip(
         Number(orderId),
         replacementSlip.name,
+        slipImageDataUrl,
       );
       setStoredOrder(updated);
       setReplacementSlip(null);

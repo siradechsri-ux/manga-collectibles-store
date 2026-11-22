@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import CollectionListing from "../../../components/CollectionListing";
 import { STORE_COLLECTIONS } from "../../../lib/store-collections";
@@ -27,9 +28,17 @@ export default async function CollectionCategoryPage({
   if (!collection) notFound();
 
   return (
-    <CollectionListing
-      collection={collection}
-      initialStatus={status === "PREORDER" ? "PREORDER" : "ALL"}
-    />
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-7xl px-4 py-12 text-center text-sm text-zinc-500">
+          กำลังโหลดรายการสินค้า...
+        </div>
+      }
+    >
+      <CollectionListing
+        collection={collection}
+        initialStatus={status === "PREORDER" ? "PREORDER" : "ALL"}
+      />
+    </Suspense>
   );
 }

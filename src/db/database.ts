@@ -477,7 +477,7 @@ CREATE TABLE IF NOT EXISTS order_snapshots (
 
 CREATE TABLE IF NOT EXISTS user_points (
   user_id INTEGER PRIMARY KEY,
-  points INTEGER NOT NULL DEFAULT 450,
+  points INTEGER NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -586,6 +586,9 @@ async function seedDatabase(pool: Pool): Promise<void> {
   await pool.query(
     `SELECT setval(pg_get_serial_sequence('users', 'id'), GREATEST((SELECT COALESCE(MAX(id), 1) FROM users), 9010))`,
   );
+  await pool
+    .query(`ALTER TABLE user_points ALTER COLUMN points SET DEFAULT 0`)
+    .catch(() => {});
 
   // 2. Seed Shipping Rates (covering 0 up to 999 kg)
   const existingRates = await pool.query(`SELECT COUNT(*)::int AS cnt FROM shipping_rates`);

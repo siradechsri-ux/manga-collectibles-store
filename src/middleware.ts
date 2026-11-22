@@ -187,6 +187,7 @@ function dashboardForRole(role: EdgeUserRole): string {
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname;
+  const isStockCheckPage = pathname === "/admin/products";
   const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
   const isStaffPage = pathname === "/staff" || pathname.startsWith("/staff/");
   const isFinancePage =
@@ -231,7 +232,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   }
 
   if (
-    (isAdminPage && user.role !== "ADMIN") ||
+    (isStockCheckPage
+      ? user.role !== "ADMIN" && user.role !== "STAFF"
+      : isAdminPage && user.role !== "ADMIN") ||
     (isStaffPage && user.role !== "STAFF" && user.role !== "ADMIN") ||
     (isFinancePage && user.role !== "FINANCE" && user.role !== "ADMIN") ||
     ((pathname === "/account" ||

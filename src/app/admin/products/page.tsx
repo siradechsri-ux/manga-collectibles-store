@@ -36,6 +36,7 @@ import {
 } from "../../../mocks/admin-products.mock";
 import { resetMockCommerceData } from "../../../mocks/storage.mock";
 import { canManageInventory, canViewStock } from "../../../utils/permissions";
+import { ProductService } from "../../../services/product.service";
 import {
   getBestSellerSettings,
   saveBestSellerSettings,
@@ -228,8 +229,77 @@ export default function AdminProductsPage() {
 
   const refreshProducts = useCallback((): void => {
     try {
-      setProducts(listAdminProducts());
+      const localProducts = listAdminProducts();
+      setProducts(localProducts);
       setError(null);
+
+      if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") {
+        void ProductService.getProducts()
+          .then((catalog) => {
+            const bookStockMap = new Map<number, { stock: number; status: "IN_STOCK" | "PREORDER" | "OUT_OF_STOCK"; price: number }>();
+            for (const series of [...catalog.mangaSeries, ...(catalog.lightNovelSeries ?? [])]) {
+              for (const vol of series.volumes) {
+                bookStockMap.set(vol.id, {
+                  stock: vol.stock,
+                  status: vol.status,
+                  price: vol.price,
+                });
+              }
+            }
+            const collectibleStockMap = new Map<string, { stock: number; status: "PREORDER_OPEN" | "PREORDER_CLOSED" | "IN_STOCK"; fullPrice: number }>();
+            for (const item of [
+              ...catalog.figures,
+              ...(catalog.plamo ?? []),
+              ...(catalog.goods ?? []),
+              ...(catalog.accessories ?? []),
+            ]) {
+              const numericId = item.id.replace(/\D/g, "");
+              const info = {
+                stock: item.stockOrQuotaRemaining,
+                status: item.status,
+                fullPrice: item.fullPrice,
+              };
+              collectibleStockMap.set(item.id, info);
+              if (numericId) collectibleStockMap.set(numericId, info);
+            }
+
+            setProducts(
+              localProducts.map((product) => {
+                const numericId = Number(product.id.replace(/\D/g, ""));
+                if (product.type === "MANGA" || product.type === "LIGHT_NOVEL") {
+                  const live = bookStockMap.get(numericId);
+                  if (!live) return product;
+                  return {
+                    ...product,
+                    stock: live.stock,
+                    status: live.status,
+                    price: live.price > 0 ? live.price : product.price,
+                  };
+                }
+                const live =
+                  collectibleStockMap.get(product.id) ??
+                  collectibleStockMap.get(String(numericId));
+                if (!live) return product;
+                if (product.type === "GOODS" || product.type === "ACCESSORY") {
+                  return {
+                    ...product,
+                    stock: live.stock,
+                    price: live.fullPrice > 0 ? live.fullPrice : product.price,
+                  };
+                }
+                return {
+                  ...product,
+                  stockOrQuotaRemaining: live.stock,
+                  status: live.status,
+                  fullPrice: live.fullPrice > 0 ? live.fullPrice : product.fullPrice,
+                };
+              }),
+            );
+          })
+          .catch(() => {
+            // Keep local inventory snapshot as fallback if catalog API fails
+          });
+      }
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : "โหลดรายการสินค้าไม่สำเร็จ",

@@ -62,7 +62,7 @@ export default function KujiPage() {
   const { items, addItem } = useCart();
   const [config, setConfig] = useState<KujiConfig>(() => getKujiConfig());
   const [prizes, setPrizes] = useState<KujiPrize[]>(() => getKujiPrizes());
-  const [points, setPoints] = useState<number>(450);
+  const [points, setPoints] = useState<number>(0);
   const [remainingTickets, setRemainingTickets] = useState<number>(28);
   const [history, setHistory] = useState<KujiDrawResult[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -139,20 +139,56 @@ export default function KujiPage() {
       return;
     }
 
-    // Add winning merchandise to cart with price 0
-    addItem({
-      kind: "GOODS",
-      id: 99000 + Math.floor(Math.random() * 1000),
-      name: `[รางวัล Ichiban Kuji] ${prize.title}`,
-      image: prize.imageUrl,
-      coverImage: prize.imageUrl,
-      imageUrl: prize.imageUrl,
-      fullPrice: 0,
-      quantity: 1,
-      subcategory: "REWARD",
-      isReward: true,
-      pointsSpent: 0,
-    });
+    // Resolve real catalog product bound to this Kuji prize (fallback by grade)
+    const fallbackByGrade: Record<
+      string,
+      { id: number; kind: "FIGURE" | "GOODS"; slug: string }
+    > = {
+      A: { id: 2002, kind: "FIGURE", slug: "pop-up-parade-sukuna" },
+      B: { id: 7004, kind: "GOODS", slug: "anya-forger-acrylic-stand" },
+      C: { id: 7005, kind: "GOODS", slug: "frieren-acrylic-stand-mimic" },
+      D: { id: 7008, kind: "GOODS", slug: "blue-lock-chibi-badge-box" },
+    };
+    const fallback = fallbackByGrade[prize.grade] ?? fallbackByGrade.B;
+    const realVariantId = prize.productVariantId ?? fallback.id;
+    const realKind = prize.productKind ?? fallback.kind;
+    const realSlug = prize.productSlug ?? fallback.slug;
+
+    if (realKind === "FIGURE") {
+      addItem({
+        kind: "FIGURE",
+        id: realVariantId,
+        slug: realSlug,
+        productUrl: `/figures/${realSlug}`,
+        name: `[รางวัล Ichiban Kuji] ${prize.title}`,
+        image: prize.imageUrl,
+        coverImage: prize.imageUrl,
+        imageUrl: prize.imageUrl,
+        fullPrice: 0,
+        depositAmount: 0,
+        selectedPaymentType: "FULL",
+        quantity: 1,
+        boxDimensions: { widthCm: 20, lengthCm: 14, heightCm: 12 },
+        isReward: true,
+        pointsSpent: 0,
+      });
+    } else {
+      addItem({
+        kind: "GOODS",
+        id: realVariantId,
+        slug: realSlug,
+        productUrl: `/figures/${realSlug}`,
+        name: `[รางวัล Ichiban Kuji] ${prize.title}`,
+        image: prize.imageUrl,
+        coverImage: prize.imageUrl,
+        imageUrl: prize.imageUrl,
+        fullPrice: 0,
+        quantity: 1,
+        subcategory: "REWARD",
+        isReward: true,
+        pointsSpent: 0,
+      });
+    }
 
     setCurrentWinResult(null);
     setCartDrawerOpen(true);
@@ -327,6 +363,12 @@ export default function KujiPage() {
                     <img
                       src={prize.imageUrl}
                       alt={prize.title}
+                      onError={(e) => {
+                        if (!e.currentTarget.dataset.fallbackApplied) {
+                          e.currentTarget.dataset.fallbackApplied = "1";
+                          e.currentTarget.src = "/images/rewards/reward-jjk-bookmark.jpg";
+                        }
+                      }}
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       loading="lazy"
                     />

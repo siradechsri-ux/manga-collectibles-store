@@ -7,11 +7,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { z } from "zod";
-import { validatePromoCode } from "../utils/promo";
+import { validatePromoCode, type PromoCoupon } from "../utils/promo";
 import { triggerFlyToCart } from "../utils/fly-to-cart";
+import { AUTH_LOGOUT_EVENT, useAuth } from "../contexts/AuthContext";
 
 export interface FigureBoxDimensions {
   widthCm: number;
@@ -22,6 +24,8 @@ export interface FigureBoxDimensions {
 export interface MangaCartItem {
   kind: "MANGA";
   id: number;
+  seriesId?: string;
+  productUrl?: string;
   title: string;
   volume: number;
   variantLabel?: string;
@@ -36,6 +40,8 @@ export interface MangaCartItem {
 export interface LightNovelCartItem {
   kind: "LIGHT_NOVEL";
   id: number;
+  seriesId?: string;
+  productUrl?: string;
   title: string;
   volume: number;
   variantLabel?: string;
@@ -50,6 +56,8 @@ export interface LightNovelCartItem {
 export interface FigureCartItem {
   kind: "FIGURE";
   id: number;
+  slug?: string;
+  productUrl?: string;
   name: string;
   image?: string | null;
   coverImage?: string | null;
@@ -59,11 +67,15 @@ export interface FigureCartItem {
   selectedPaymentType: "FULL" | "DEPOSIT";
   quantity: number;
   boxDimensions: FigureBoxDimensions;
+  isReward?: boolean;
+  pointsSpent?: number;
 }
 
 export interface PlamoCartItem {
   kind: "PLAMO";
   id: number;
+  slug?: string;
+  productUrl?: string;
   name: string;
   image?: string | null;
   coverImage?: string | null;
@@ -74,11 +86,15 @@ export interface PlamoCartItem {
   quantity: number;
   boxDimensions: FigureBoxDimensions;
   grade?: string;
+  isReward?: boolean;
+  pointsSpent?: number;
 }
 
 export interface GoodsCartItem {
   kind: "GOODS";
   id: number;
+  slug?: string;
+  productUrl?: string;
   name: string;
   image?: string | null;
   coverImage?: string | null;
@@ -93,6 +109,8 @@ export interface GoodsCartItem {
 export interface AccessoryCartItem {
   kind: "ACCESSORY";
   id: number;
+  slug?: string;
+  productUrl?: string;
   name: string;
   image?: string | null;
   coverImage?: string | null;
@@ -101,6 +119,8 @@ export interface AccessoryCartItem {
   quantity: number;
   subcategory?: string;
   boxDimensions?: FigureBoxDimensions;
+  isReward?: boolean;
+  pointsSpent?: number;
 }
 
 export type CartItem =
@@ -122,10 +142,12 @@ export interface CartSummary {
   immediateTotal: number;
   remainingBalanceTotal: number;
   appliedPromoCode: string | null;
+  appliedPromoType: PromoCoupon["type"] | null;
   promoDiscount: number;
   promoTitle: string | null;
   discountedImmediateTotal: number;
   isFreeShipping: boolean;
+  isPromoFreeShipping: boolean;
 }
 
 export interface CartContextValue extends CartSummary {
@@ -172,6 +194,8 @@ const mangaCartItemSchema = z
   .object({
     kind: z.literal("MANGA"),
     id: z.number().int().positive().safe(),
+    seriesId: z.string().trim().min(1).max(200).optional(),
+    productUrl: z.string().trim().min(1).max(300).optional(),
     title: z.string().trim().min(1).max(300),
     volume: z.number().int().positive().safe(),
     variantLabel: z.string().trim().min(1).max(150).optional(),
@@ -188,6 +212,8 @@ const lightNovelCartItemSchema = z
   .object({
     kind: z.literal("LIGHT_NOVEL"),
     id: z.number().int().positive().safe(),
+    seriesId: z.string().trim().min(1).max(200).optional(),
+    productUrl: z.string().trim().min(1).max(300).optional(),
     title: z.string().trim().min(1).max(300),
     volume: z.number().int().positive().safe(),
     variantLabel: z.string().trim().min(1).max(150).optional(),
@@ -204,18 +230,29 @@ const figureCartItemSchema = z
   .object({
     kind: z.literal("FIGURE"),
     id: z.number().int().positive().safe(),
+    slug: z.string().trim().min(1).max(200).optional(),
+    productUrl: z.string().trim().min(1).max(300).optional(),
     name: z.string().trim().min(1).max(300),
     image: z.string().nullable().optional(),
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
-    fullPrice: z.number().finite().positive(),
+    fullPrice: z.number().finite().nonnegative(),
     depositAmount: z.number().finite().nonnegative(),
     selectedPaymentType: z.enum(["FULL", "DEPOSIT"]),
     quantity: z.number().int().positive().safe(),
     boxDimensions: boxDimensionsSchema,
+    isReward: z.boolean().optional(),
+    pointsSpent: z.number().int().nonnegative().optional(),
   })
   .strict()
   .superRefine((item, context) => {
+    if (!item.isReward && item.fullPrice <= 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["fullPrice"],
+        message: "ราคาสินค้าต้องมากกว่าศูนย์",
+      });
+    }
     if (
       item.selectedPaymentType === "DEPOSIT" &&
       (item.depositAmount <= 0 || item.depositAmount >= item.fullPrice)
@@ -232,16 +269,20 @@ const plamoCartItemSchema = z
   .object({
     kind: z.literal("PLAMO"),
     id: z.number().int().positive().safe(),
+    slug: z.string().trim().min(1).max(200).optional(),
+    productUrl: z.string().trim().min(1).max(300).optional(),
     name: z.string().trim().min(1).max(300),
     image: z.string().nullable().optional(),
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
-    fullPrice: z.number().finite().positive(),
+    fullPrice: z.number().finite().nonnegative(),
     depositAmount: z.number().finite().nonnegative(),
     selectedPaymentType: z.enum(["FULL", "DEPOSIT"]),
     quantity: z.number().int().positive().safe(),
     boxDimensions: boxDimensionsSchema,
     grade: z.string().optional(),
+    isReward: z.boolean().optional(),
+    pointsSpent: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -249,6 +290,8 @@ const goodsCartItemSchema = z
   .object({
     kind: z.literal("GOODS"),
     id: z.number().int().positive().safe(),
+    slug: z.string().trim().min(1).max(200).optional(),
+    productUrl: z.string().trim().min(1).max(300).optional(),
     name: z.string().trim().min(1).max(300),
     image: z.string().nullable().optional(),
     coverImage: z.string().nullable().optional(),
@@ -265,14 +308,18 @@ const accessoryCartItemSchema = z
   .object({
     kind: z.literal("ACCESSORY"),
     id: z.number().int().positive().safe(),
+    slug: z.string().trim().min(1).max(200).optional(),
+    productUrl: z.string().trim().min(1).max(300).optional(),
     name: z.string().trim().min(1).max(300),
     image: z.string().nullable().optional(),
     coverImage: z.string().nullable().optional(),
     imageUrl: z.string().nullable().optional(),
-    fullPrice: z.number().finite().positive(),
+    fullPrice: z.number().finite().nonnegative(),
     quantity: z.number().int().positive().safe(),
     subcategory: z.string().optional(),
     boxDimensions: boxDimensionsSchema.optional(),
+    isReward: z.boolean().optional(),
+    pointsSpent: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -290,11 +337,53 @@ const CART_STORAGE_KEY = "manga-collectibles-cart-v2";
 const LEGACY_CART_STORAGE_KEY = "manga-collectibles-cart-v1";
 const ADDON_STORAGE_KEY = "manga-collectibles-book-cover-addon";
 const SELECTED_ITEMS_STORAGE_KEY = "manga-collectibles-cart-selected-v1";
+const APPLIED_PROMO_STORAGE_KEY = "manga-collectibles-cart-promo-v1";
+
+function scopedStorageKey(base: string, scope: string): string {
+  return `${base}:${scope}`;
+}
+
+function clearGuestAndLegacyCartStorage(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(CART_STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_CART_STORAGE_KEY);
+    window.localStorage.removeItem(ADDON_STORAGE_KEY);
+    window.localStorage.removeItem(SELECTED_ITEMS_STORAGE_KEY);
+    window.localStorage.removeItem(APPLIED_PROMO_STORAGE_KEY);
+    window.localStorage.removeItem(scopedStorageKey(CART_STORAGE_KEY, "guest"));
+    window.localStorage.removeItem(scopedStorageKey(ADDON_STORAGE_KEY, "guest"));
+    window.localStorage.removeItem(scopedStorageKey(SELECTED_ITEMS_STORAGE_KEY, "guest"));
+    window.localStorage.removeItem(scopedStorageKey(APPLIED_PROMO_STORAGE_KEY, "guest"));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 export const BOOK_COVER_PRICE_PER_ITEM = 5;
 
 export function getCartItemKey(item: { kind: CartItem["kind"]; id: number }): string {
   return `${item.kind}-${item.id}`;
+}
+
+export function getCartItemHref(item: CartItem): string {
+  if (item.productUrl && item.productUrl.startsWith("/")) {
+    return item.productUrl;
+  }
+  if (item.kind === "MANGA" || item.kind === "LIGHT_NOVEL") {
+    return `/manga/${encodeURIComponent(item.seriesId || String(item.id))}`;
+  }
+  return `/figures/${encodeURIComponent(item.slug || String(item.id))}`;
+}
+
+export function isRewardCartItem(item: CartItem): boolean {
+  return (
+    (item.kind === "GOODS" ||
+      item.kind === "FIGURE" ||
+      item.kind === "PLAMO" ||
+      item.kind === "ACCESSORY") &&
+    Boolean(item.isReward)
+  );
 }
 
 function isBookItem(item: CartItem): boolean {
@@ -351,17 +440,65 @@ function validateCartItem(item: CartItem): CartItem {
 }
 
 export function CartProvider({ children }: CartProviderProps) {
+  const { user, isLoading: authLoading } = useAuth();
+  const activeScope = user ? `user-${user.id}` : "guest";
+  const loadedScopeRef = useRef<string | null>(null);
+  const prevScopeRef = useRef<string | null>(null);
+
   const [items, setItems] = useState<CartItem[]>([]);
   const [selectedCartItemKeys, setSelectedCartItemKeys] = useState<string[]>([]);
   const [bookCoverAddon, setBookCoverAddonState] = useState<boolean>(false);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
 
+  // Immediately wipe active cart state and guest/legacy keys on logout
   useEffect(() => {
+    const handleLogout = (): void => {
+      clearGuestAndLegacyCartStorage();
+      setItems([]);
+      setSelectedCartItemKeys([]);
+      setBookCoverAddonState(false);
+      setAppliedPromoCode(null);
+      loadedScopeRef.current = "guest";
+      prevScopeRef.current = "guest";
+    };
+    window.addEventListener(AUTH_LOGOUT_EVENT, handleLogout);
+    return () => {
+      window.removeEventListener(AUTH_LOGOUT_EVENT, handleLogout);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    const prevScope = prevScopeRef.current;
+    prevScopeRef.current = activeScope;
+
+    // Transitioning from authenticated account to logged-out guest: clear cart immediately
+    if (prevScope && prevScope.startsWith("user-") && activeScope === "guest") {
+      clearGuestAndLegacyCartStorage();
+      setItems([]);
+      setSelectedCartItemKeys([]);
+      setBookCoverAddonState(false);
+      setAppliedPromoCode(null);
+      loadedScopeRef.current = activeScope;
+      setIsReady(true);
+      return;
+    }
+
+    setIsReady(false);
+    loadedScopeRef.current = null;
+
     try {
-      const savedCart =
-        window.localStorage.getItem(CART_STORAGE_KEY) ??
-        window.localStorage.getItem(LEGACY_CART_STORAGE_KEY);
+      // Remove legacy global unscoped keys so carts never leak between accounts
+      window.localStorage.removeItem(CART_STORAGE_KEY);
+      window.localStorage.removeItem(LEGACY_CART_STORAGE_KEY);
+      window.localStorage.removeItem(SELECTED_ITEMS_STORAGE_KEY);
+      window.localStorage.removeItem(ADDON_STORAGE_KEY);
+
+      const savedCart = window.localStorage.getItem(
+        scopedStorageKey(CART_STORAGE_KEY, activeScope),
+      );
       let parsedItems: CartItem[] = [];
       if (savedCart) {
         const parsedJson: unknown = JSON.parse(savedCart);
@@ -375,6 +512,8 @@ export function CartProvider({ children }: CartProviderProps) {
         } else {
           setItems([]);
         }
+      } else {
+        setItems([]);
       }
 
       const validItemKeys = new Set(parsedItems.map(getCartItemKey));
@@ -392,7 +531,9 @@ export function CartProvider({ children }: CartProviderProps) {
         return validItemKeys.has(key) ? key : null;
       };
 
-      const savedSelected = window.localStorage.getItem(SELECTED_ITEMS_STORAGE_KEY);
+      const savedSelected = window.localStorage.getItem(
+        scopedStorageKey(SELECTED_ITEMS_STORAGE_KEY, activeScope),
+      );
       if (savedSelected) {
         try {
           const parsed = JSON.parse(savedSelected);
@@ -410,42 +551,69 @@ export function CartProvider({ children }: CartProviderProps) {
                 : parsedItems.map(getCartItemKey),
             );
           } else if (parsedItems.length > 0) {
-            // Default to all selected if empty
             setSelectedCartItemKeys(parsedItems.map(getCartItemKey));
+          } else {
+            setSelectedCartItemKeys([]);
           }
         } catch {
           setSelectedCartItemKeys(parsedItems.map(getCartItemKey));
         }
       } else if (parsedItems.length > 0) {
         setSelectedCartItemKeys(parsedItems.map(getCartItemKey));
+      } else {
+        setSelectedCartItemKeys([]);
       }
 
-      const savedAddon = window.localStorage.getItem(ADDON_STORAGE_KEY);
-      if (savedAddon === "true") {
-        setBookCoverAddonState(true);
-      }
+      const savedAddon = window.localStorage.getItem(
+        scopedStorageKey(ADDON_STORAGE_KEY, activeScope),
+      );
+      setBookCoverAddonState(savedAddon === "true");
+
+      const savedPromo = window.localStorage.getItem(
+        scopedStorageKey(APPLIED_PROMO_STORAGE_KEY, activeScope),
+      );
+      setAppliedPromoCode(savedPromo && savedPromo.trim() ? savedPromo.trim().toUpperCase() : null);
     } catch (error) {
       console.error("Could not restore shopping cart.", error);
       setItems([]);
       setSelectedCartItemKeys([]);
+      setBookCoverAddonState(false);
+      setAppliedPromoCode(null);
     } finally {
+      loadedScopeRef.current = activeScope;
       setIsReady(true);
     }
-  }, []);
+  }, [activeScope, authLoading]);
 
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || authLoading || loadedScopeRef.current !== activeScope) return;
     try {
-      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-      window.localStorage.setItem(ADDON_STORAGE_KEY, String(bookCoverAddon));
       window.localStorage.setItem(
-        SELECTED_ITEMS_STORAGE_KEY,
+        scopedStorageKey(CART_STORAGE_KEY, activeScope),
+        JSON.stringify(items),
+      );
+      window.localStorage.setItem(
+        scopedStorageKey(ADDON_STORAGE_KEY, activeScope),
+        String(bookCoverAddon),
+      );
+      window.localStorage.setItem(
+        scopedStorageKey(SELECTED_ITEMS_STORAGE_KEY, activeScope),
         JSON.stringify(selectedCartItemKeys),
       );
+      if (appliedPromoCode) {
+        window.localStorage.setItem(
+          scopedStorageKey(APPLIED_PROMO_STORAGE_KEY, activeScope),
+          appliedPromoCode,
+        );
+      } else {
+        window.localStorage.removeItem(
+          scopedStorageKey(APPLIED_PROMO_STORAGE_KEY, activeScope),
+        );
+      }
     } catch (error) {
       console.error("Could not persist shopping cart.", error);
     }
-  }, [bookCoverAddon, isReady, items, selectedCartItemKeys]);
+  }, [activeScope, appliedPromoCode, authLoading, bookCoverAddon, isReady, items, selectedCartItemKeys]);
 
   const addItem = useCallback(
     (
@@ -639,13 +807,17 @@ export function CartProvider({ children }: CartProviderProps) {
 
     let promoDiscount = 0;
     let promoTitle: string | null = null;
+    let appliedPromoType: PromoCoupon["type"] | null = null;
+    let isPromoFreeShipping = false;
     let isFreeShipping = selectedItems.length > 0 && immediateTotal >= 800;
     if (appliedPromoCode && selectedItems.length > 0) {
       const res = validatePromoCode(appliedPromoCode, merchandiseTotal);
       if (res.valid) {
         promoDiscount = res.discountAmount;
         promoTitle = res.coupon?.title ?? null;
+        appliedPromoType = res.coupon?.type ?? null;
         if (res.freeShipping) {
+          isPromoFreeShipping = true;
           isFreeShipping = true;
         }
       }
@@ -668,10 +840,12 @@ export function CartProvider({ children }: CartProviderProps) {
       remainingBalanceTotal:
         selectedItems.length === 0 ? 0 : Number(remainingBalanceTotal.toFixed(2)),
       appliedPromoCode,
+      appliedPromoType,
       promoDiscount,
       promoTitle,
       discountedImmediateTotal,
       isFreeShipping,
+      isPromoFreeShipping,
     };
   }, [appliedPromoCode, bookCoverAddon, items, selectedItems]);
 

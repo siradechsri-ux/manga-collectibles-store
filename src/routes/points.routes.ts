@@ -14,14 +14,8 @@ async function ensureUserPointsInDb(
 
   if (existing.rows.length === 0) {
     await pool.query(
-      `INSERT INTO user_points (user_id, points) VALUES ($1, 450) ON CONFLICT (user_id) DO NOTHING`,
+      `INSERT INTO user_points (user_id, points) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING`,
       [userId],
-    );
-    await pool.query(
-      `INSERT INTO points_ledger (id, user_id, tx_type, amount, balance_after, description)
-       VALUES ($1, $2, 'WELCOME_BONUS', 450, 450, 'แต้มต้อนรับสมาชิกใหม่')
-       ON CONFLICT (id) DO NOTHING`,
-      [`tx-init-${userId}`, userId],
     );
   }
 
@@ -29,7 +23,7 @@ async function ensureUserPointsInDb(
     `SELECT points FROM user_points WHERE user_id = $1`,
     [userId],
   );
-  const points = ptsRes.rows[0]?.points ?? 450;
+  const points = ptsRes.rows[0]?.points ?? 0;
 
   const ledgerRes = await pool.query<{
     id: string;
@@ -69,7 +63,19 @@ export function createPointsRouter(pool: Pool, _authService: AuthService): Route
    */
   router.get("/balance", async (request: Request, response: Response): Promise<void> => {
     try {
-      const userId = request.user?.id ?? 9001;
+      if (!request.user) {
+        response.json({
+          success: true,
+          data: {
+            points: 0,
+            tier: "MEMBER" as MemberTier,
+            tierInfo: MEMBER_TIERS.MEMBER,
+            ledger: [],
+          },
+        });
+        return;
+      }
+      const userId = request.user.id;
       const data = await ensureUserPointsInDb(pool, userId);
 
       let tier: MemberTier = "MEMBER";

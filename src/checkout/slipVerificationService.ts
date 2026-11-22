@@ -15,7 +15,7 @@ export const slipVerificationRequestSchema = z
   .strict();
 
 export type SlipPaymentStage = "INITIAL" | "BALANCE";
-export type SlipOrderPaymentStatus = "PAID" | "DEPOSIT_PAID";
+export type SlipOrderPaymentStatus = "PAID" | "DEPOSIT_PAID" | "PENDING_REVIEW";
 
 export interface SlipVerificationRequest {
   orderId: number;
@@ -457,7 +457,13 @@ export class SlipVerificationService {
       throw new BalancePaymentExpiredError();
     }
 
-    const slipHash = createHash("sha256").update(request.file.buffer).digest("hex");
+    const slipHashInput = this.mockSlipVerification
+      ? Buffer.concat([
+          request.file.buffer,
+          Buffer.from(`:${request.orderId}:${Date.now()}`),
+        ])
+      : request.file.buffer;
+    const slipHash = createHash("sha256").update(slipHashInput).digest("hex");
     const verifiedSlip = this.mockSlipVerification
       ? {
           transactionRef: `MOCK-${randomUUID()}`,
@@ -560,52 +566,28 @@ export class SlipVerificationService {
 
       let appliedPayment: AppliedPaymentRow;
       if (lockedStage === "BALANCE") {
-        await client.query(
-          `UPDATE order_items
-           SET balance_amount = 0,
-               remaining_balance = 0,
-               balance_paid_status = 'PAID',
-               settlement_status = 'PAID'
-           WHERE order_id = $1
-             AND payment_type = 'DEPOSIT'
-             AND balance_amount > 0`,
-          [request.orderId],
-        );
-
         const paymentResult = await client.query<AppliedPaymentRow>(
           `UPDATE orders
-           SET payment_status = 'PAID',
-               remaining_balance = 0,
-               remaining_balance_amount = 0,
-               balance_paid_status = 'PAID',
-               settlement_status = 'READY_TO_PACK',
+           SET order_status = 'PAYMENT_REVIEW_PENDING',
+               settlement_status = 'PAYMENT_REVIEW_PENDING',
                balance_payment_reference = $2,
                updated_at = CURRENT_TIMESTAMP
            WHERE id = $1
              AND payment_status = 'DEPOSIT_PAID'
-             AND settlement_status = 'AWAITING_BALANCE_PAYMENT'
            RETURNING payment_status, settlement_status`,
           [request.orderId, verifiedSlip.transactionRef],
         );
         appliedPayment = paymentResult.rows[0];
       } else {
-        const paymentStatus =
-          lockedOrder.payment_type === "DEPOSIT" ? "DEPOSIT_PAID" : "PAID";
-        const settlementStatus =
-          paymentStatus === "DEPOSIT_PAID"
-            ? "WAITING_FOR_ARRIVAL"
-            : lockedOrder.has_preorder_items
-              ? "WAITING_FOR_ARRIVAL"
-              : "READY_TO_PACK";
         const paymentResult = await client.query<AppliedPaymentRow>(
           `UPDATE orders
-           SET payment_status = $2,
-               settlement_status = $3,
+           SET order_status = 'PAYMENT_REVIEW_PENDING',
+               settlement_status = 'PAYMENT_REVIEW_PENDING',
                updated_at = CURRENT_TIMESTAMP
            WHERE id = $1
              AND payment_status = 'UNPAID'
            RETURNING payment_status, settlement_status`,
-          [request.orderId, paymentStatus, settlementStatus],
+          [request.orderId],
         );
         appliedPayment = paymentResult.rows[0];
       }
@@ -622,11 +604,11 @@ export class SlipVerificationService {
       return {
         orderId: request.orderId,
         paymentStage: lockedStage,
-        paymentStatus: appliedPayment.payment_status,
+        paymentStatus: "PENDING_REVIEW",
         transactionRef: verifiedSlip.transactionRef,
         verifiedAmount: centsToAmount(lockedAmountCents),
         verifiedAt: insertedSlip.verified_at.toISOString(),
-        settlementStatus: appliedPayment.settlement_status,
+        settlementStatus: "PAYMENT_REVIEW_PENDING",
       };
     } catch (error) {
       if (transactionStarted) {

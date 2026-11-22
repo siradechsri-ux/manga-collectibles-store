@@ -71,7 +71,9 @@ export function createUnifiedCheckoutController(
       const data = await checkoutService.createOrder(req.user.id, req.body);
       try {
         const immediateAmount = Number(data.immediateAmount);
-        data.paymentQrCodeDataUrl = await createPaymentQr(immediateAmount);
+        if (immediateAmount > 0) {
+          data.paymentQrCodeDataUrl = await createPaymentQr(immediateAmount);
+        }
       } catch (error) {
         console.error(
           `Order ${data.orderNumber} was created, but its PromptPay QR could not be generated.`,
@@ -88,10 +90,17 @@ export function createUnifiedCheckoutController(
         const orderIdNum = Number(data.orderId);
         const lineItems: OrderTrackingLineItem[] = data.items.map((item, idx) => {
           const catalogInfo = findAdminCheckoutVariant(item.productVariantId);
+          const resolvedImage =
+            item.imageUrl ||
+            catalogInfo?.figure?.images?.[0] ||
+            null;
           return {
             id: `${orderIdNum}-${idx + 1}`,
             productVariantId: item.productVariantId,
-            title: catalogInfo?.title ?? `สินค้า #${item.productVariantId}`,
+            title:
+              (item.isReward && item.rewardLabel ? item.rewardLabel : null) ??
+              catalogInfo?.title ??
+              `สินค้า #${item.productVariantId}`,
             productType: catalogInfo?.productType ?? mapProductCategory(item.productType),
             ...(catalogInfo?.volumeNumber
               ? {
@@ -100,6 +109,7 @@ export function createUnifiedCheckoutController(
                   }`,
                 }
               : {}),
+            ...(resolvedImage ? { imageUrl: resolvedImage } : {}),
             quantity: item.quantity,
             paymentType: item.paymentType,
             lineTotal: Number(item.lineTotal),
@@ -120,6 +130,17 @@ export function createUnifiedCheckoutController(
         const vatBase = vatableGross / 1.07;
         const vatAmount = vatableGross - vatBase;
 
+        const isZeroImmediate = Number(data.immediateAmount) === 0;
+        const initialStatus = isZeroImmediate
+          ? ("PAYMENT_REVIEW_PENDING" as const)
+          : ("UNPAID" as const);
+        if (isZeroImmediate) {
+          await checkoutService.pool.query(
+            `UPDATE orders SET order_status = 'PAYMENT_REVIEW_PENDING', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            [orderIdNum],
+          );
+        }
+
         const taxReq = bodyObj.taxInvoiceRequest;
         const storedOrder: MockStoredOrder = {
           ownerUserId: req.user.id,
@@ -127,9 +148,10 @@ export function createUnifiedCheckoutController(
             id: orderIdNum,
             orderNumber: data.orderNumber,
             createdAt,
-            status: "UNPAID",
+            status: initialStatus,
             timelineStage: "ORDER_PLACED",
             paymentStatus: "UNPAID",
+            financeApproved: false,
             totalAmount: Number(data.totalAmount),
             paidAmount: 0,
             remainingBalance: Number(data.remainingBalanceAmount),

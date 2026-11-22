@@ -27,10 +27,12 @@ import {
 interface PaymentResult {
   orderId: number;
   orderNumber: string;
-  paymentStatus: "PAID" | "DEPOSIT_PAID";
+  paymentStatus: "PAID" | "DEPOSIT_PAID" | "PENDING_REVIEW";
+  orderStatus?: string;
   paymentStage: "INITIAL" | "BALANCE";
   verifiedAmount: string;
   transactionRef: string;
+  slipImageUrl?: string;
   message: string;
 }
 
@@ -40,10 +42,12 @@ const slipSuccessSchema = z
     data: z
       .object({
         orderId: z.number().int().positive().safe(),
-        paymentStatus: z.enum(["PAID", "DEPOSIT_PAID"]),
+        paymentStatus: z.enum(["PAID", "DEPOSIT_PAID", "PENDING_REVIEW"]),
+        orderStatus: z.string().optional(),
         paymentStage: z.enum(["INITIAL", "BALANCE"]),
         verifiedAmount: z.string(),
         transactionRef: z.string(),
+        slipImageUrl: z.string().optional(),
         message: z.string(),
         verifiedAt: z.string().optional(),
         settlementStatus: z.string().optional(),
@@ -274,32 +278,8 @@ function CheckoutPaymentContent() {
           parsedSuccess.data.data.paymentStatus,
           parsedSuccess.data.data.transactionRef,
           parsedSuccess.data.data.paymentStage,
-        );
-
-        // Award points earned from order
-        const paidAmount = Number(paymentAmount) || 0;
-        const { totalEarnedPoints } = calculateEarnedPoints(paidAmount);
-        if (totalEarnedPoints > 0) {
-          addPoints(
-            totalEarnedPoints,
-            `รับแต้มจากการชำระเงินคำสั่งซื้อ #${displayOrderNumber || orderIdValue}`,
-            "EARN_ORDER",
-            orderIdValue,
-          );
-        }
-      }
-      if (useMockMode) {
-        router.replace(`/orders/${orderIdValue}`);
-        return;
-      }
-      const paidAmount = Number(paymentAmount || parsedSuccess.data.data.verifiedAmount) || 0;
-      const { totalEarnedPoints } = calculateEarnedPoints(paidAmount);
-      if (totalEarnedPoints > 0) {
-        addPoints(
-          totalEarnedPoints,
-          `รับแต้มจากการชำระเงินคำสั่งซื้อ #${displayOrderNumber || orderIdValue}`,
-          "EARN_ORDER",
-          orderIdValue,
+          slipFile.name,
+          parsedSuccess.data.data.slipImageUrl ?? null,
         );
       }
       setPaymentResult({
@@ -331,7 +311,7 @@ function CheckoutPaymentContent() {
     );
   }
 
-  if (!orderIdValid || (!paymentAmount && !mockOrderCancelled) || mockOrderMissing) {
+  if (!orderIdValid || (paymentAmount === "" && !mockOrderCancelled) || mockOrderMissing) {
     return (
       <main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-4 text-center">
         <AlertCircle aria-hidden="true" className="h-10 w-10 text-red-500" />
@@ -347,19 +327,66 @@ function CheckoutPaymentContent() {
     );
   }
 
-  if (paymentResult) {
+  if (Number(paymentAmount) === 0 && !paymentResult && !mockOrderCancelled) {
     return (
       <main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-4 text-center">
-        <span className="rounded-full bg-emerald-50 p-4 text-emerald-700">
+        <span className="rounded-full bg-amber-50 p-4 text-amber-700">
           <CheckCircle2 aria-hidden="true" className="h-10 w-10" />
         </span>
-        <h1 className="mt-5 text-2xl font-bold text-slate-900">ยืนยันการชำระเงินแล้ว</h1>
+        <h1 className="mt-5 text-2xl font-bold text-slate-900">
+          สร้างคำสั่งซื้อสำเร็จ (ยอดชำระ ฿0.00)
+        </h1>
+        <p className="mt-2 text-sm text-slate-600">
+          คำสั่งซื้อของรางวัล/ส่วนลดเต็มจำนวนถูกส่งไปยังฝ่ายการเงินเพื่อตรวจสอบและอนุมัติแล้ว
+        </p>
+        <div className="mt-5 w-full rounded-2xl border border-slate-200 bg-white p-5 text-left">
+          <p className="text-sm text-slate-500">คำสั่งซื้อ</p>
+          <p className="mt-1 font-semibold text-slate-900">
+            {displayOrderNumber || `#${orderIdValue}`}
+          </p>
+          <p className="mt-3 text-sm text-slate-500">สถานะปัจจุบัน</p>
+          <p className="mt-1 text-base font-bold text-amber-700">
+            รอฝ่ายการเงินตรวจสอบ (Pending Review)
+          </p>
+        </div>
+        <Link
+          href={`/orders/${orderIdValue}`}
+          className="mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+        >
+          ดูรายละเอียดคำสั่งซื้อ
+        </Link>
+      </main>
+    );
+  }
+
+  if (paymentResult) {
+    return (
+      <main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-4 py-10 text-center">
+        <span className="rounded-full bg-amber-50 p-4 text-amber-700">
+          <CheckCircle2 aria-hidden="true" className="h-10 w-10" />
+        </span>
+        <h1 className="mt-5 text-2xl font-bold text-slate-900">
+          ส่งสลิปเรียบร้อยแล้ว · รอตรวจสอบ
+        </h1>
         <p className="mt-2 text-sm text-slate-600">{paymentResult.message}</p>
         <div className="mt-5 w-full rounded-2xl border border-slate-200 bg-white p-5 text-left">
           <p className="text-sm text-slate-500">คำสั่งซื้อ</p>
           <p className="mt-1 font-semibold text-slate-900">{paymentResult.orderNumber || `#${paymentResult.orderId}`}</p>
-          <p className="mt-3 text-sm text-slate-500">ยอดที่ยืนยัน</p>
+          <p className="mt-3 text-sm text-slate-500">ยอดที่แจ้งโอน</p>
           <p className="mt-1 text-xl font-bold text-slate-900">{formatBaht(paymentResult.verifiedAmount)}</p>
+          <p className="mt-3 text-sm text-slate-500">สถานะ</p>
+          <p className="mt-1 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+            รอฝ่ายการเงินตรวจสอบสลิป
+          </p>
+          {paymentResult.slipImageUrl ? (
+            <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2">
+              <img
+                src={paymentResult.slipImageUrl}
+                alt="ภาพสลิปที่อัปโหลด"
+                className="mx-auto max-h-64 rounded-lg object-contain"
+              />
+            </div>
+          ) : null}
         </div>
         <Link
           href={`/orders/${paymentResult.orderId}`}

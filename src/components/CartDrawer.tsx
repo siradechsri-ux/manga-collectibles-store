@@ -24,7 +24,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CartItem, useCart } from "../context/CartContext";
+import {
+  CartItem,
+  getCartItemHref,
+  isRewardCartItem,
+  useCart,
+} from "../context/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import BookCoverAddonBox from "./BookCoverAddonBox";
 import PointBadge from "./PointBadge";
@@ -44,6 +49,10 @@ function CartItemThumbnail({ item }: { item: CartItem }) {
   const [hasError, setHasError] = useState(false);
   const src = item.image || item.coverImage || item.imageUrl;
   const isBook = item.kind === "MANGA" || item.kind === "LIGHT_NOVEL";
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
 
   if (src && !hasError) {
     return (
@@ -92,7 +101,7 @@ function CartItemThumbnail({ item }: { item: CartItem }) {
     );
   }
 
-  const isReward = item.kind === "GOODS" && Boolean(item.isReward);
+  const isReward = isRewardCartItem(item);
 
   // Collectible fallback thumbnail
   const CollectibleIcon =
@@ -214,9 +223,12 @@ export default function CartDrawer({
     immediateTotal,
     remainingBalanceTotal,
     appliedPromoCode,
+    appliedPromoType,
     promoDiscount,
     promoTitle,
     discountedImmediateTotal,
+    isFreeShipping,
+    isPromoFreeShipping,
     updateQuantity,
     removeItem,
     updateFigurePaymentType,
@@ -255,11 +267,13 @@ export default function CartDrawer({
   const FREE_SHIPPING_THRESHOLD = 800;
   const BONUS_GIFT_THRESHOLD = 1500;
   const activeSpendTotal = immediateTotal;
-  const isFreeShippingUnlocked = activeSpendTotal >= FREE_SHIPPING_THRESHOLD;
+  const isFreeShippingUnlocked = isFreeShipping || activeSpendTotal >= FREE_SHIPPING_THRESHOLD;
   const isBonusGiftUnlocked = activeSpendTotal >= BONUS_GIFT_THRESHOLD;
   const amountToFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - activeSpendTotal);
   const amountToBonusGift = Math.max(0, BONUS_GIFT_THRESHOLD - activeSpendTotal);
-  const freeShippingProgress = Math.min(100, Math.round((activeSpendTotal / FREE_SHIPPING_THRESHOLD) * 100));
+  const freeShippingProgress = isFreeShippingUnlocked
+    ? 100
+    : Math.min(100, Math.round((activeSpendTotal / FREE_SHIPPING_THRESHOLD) * 100));
 
   const [deleteConfirmTarget, setDeleteConfirmTarget] =
     useState<DeleteConfirmTarget | null>(null);
@@ -510,12 +524,23 @@ export default function CartDrawer({
                       >
                         <Check size={12} strokeWidth={3} aria-hidden="true" />
                       </button>
-                      <CartItemThumbnail item={item} />
+                      <Link
+                        href={getCartItemHref(item)}
+                        onClick={onClose}
+                        className="shrink-0 transition hover:opacity-85"
+                        aria-label={`ดูรายละเอียด ${itemTitle(item)}`}
+                      >
+                        <CartItemThumbnail item={item} />
+                      </Link>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="line-clamp-2 text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                          <Link
+                            href={getCartItemHref(item)}
+                            onClick={onClose}
+                            className="line-clamp-2 text-xs font-bold text-zinc-900 transition hover:text-orange-600 hover:underline dark:text-zinc-100 dark:hover:text-orange-400"
+                          >
                             {itemTitle(item)}
-                          </h3>
+                          </Link>
                           <button
                             type="button"
                             onClick={() =>
@@ -531,10 +556,10 @@ export default function CartDrawer({
                           <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
                             {itemKindLabel(item)}
                           </p>
-                          {item.kind === "GOODS" && item.isReward ? (
+                          {isRewardCartItem(item) ? (
                             <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-extrabold text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
                               <PointBadge size="xs" />
-                              <span>แลกด้วยแต้ม (฿0)</span>
+                              <span>ของรางวัลฟรี (฿0)</span>
                             </span>
                           ) : null}
                         </div>
@@ -543,7 +568,7 @@ export default function CartDrawer({
                             <button
                               type="button"
                               onClick={() => handleDecreaseQuantity(item)}
-                              disabled={item.kind === "GOODS" && Boolean(item.isReward)}
+                              disabled={isRewardCartItem(item)}
                               aria-label="ลดจำนวน"
                               className="p-1 text-zinc-600 hover:text-zinc-950 disabled:opacity-30 dark:text-zinc-300 dark:hover:text-white"
                             >
@@ -562,7 +587,7 @@ export default function CartDrawer({
                                 )
                               }
                               disabled={
-                                (item.kind === "GOODS" && Boolean(item.isReward)) ||
+                                isRewardCartItem(item) ||
                                 item.quantity >= 99
                               }
                               aria-label="เพิ่มจำนวน"
@@ -571,7 +596,7 @@ export default function CartDrawer({
                               <Plus size={13} aria-hidden="true" />
                             </button>
                           </div>
-                          {item.kind === "GOODS" && item.isReward ? (
+                          {isRewardCartItem(item) ? (
                             <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
                               แลกฟรี (0 บาท)
                             </span>
@@ -638,7 +663,9 @@ export default function CartDrawer({
                       {appliedPromoCode} · {promoTitle}
                     </p>
                     <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                      ลดทันที ฿{promoDiscount.toLocaleString("th-TH")}
+                      {isPromoFreeShipping || appliedPromoType === "FREE_SHIPPING"
+                        ? "รับสิทธิ์จัดส่งฟรี (หักค่าจัดส่งในหน้าชำระเงิน)"
+                        : `ลดทันที ฿${promoDiscount.toLocaleString("th-TH")}`}
                     </p>
                   </div>
                   <button
@@ -749,7 +776,12 @@ export default function CartDrawer({
                   </span>
                 </div>
               ) : null}
-              {promoDiscount > 0 ? (
+              {isPromoFreeShipping || appliedPromoType === "FREE_SHIPPING" ? (
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                  <span className="font-semibold">สิทธิ์จัดส่งฟรี ({appliedPromoCode})</span>
+                  <span className="font-bold">ฟรีค่าจัดส่ง</span>
+                </div>
+              ) : promoDiscount > 0 ? (
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                   <span className="font-semibold">ส่วนลดโปรโมชัน ({appliedPromoCode})</span>
                   <span className="font-bold">

@@ -84,6 +84,9 @@ const checkoutInputSchema = z
               "GOODS_INSTOCK",
               "ACCESSORY_INSTOCK",
             ]),
+            isReward: z.boolean().optional(),
+            rewardLabel: z.string().trim().max(300).optional(),
+            imageUrl: z.string().trim().max(500).nullable().optional(),
           })
           .strict(),
       )
@@ -108,6 +111,15 @@ const checkoutInputSchema = z
     taxInvoiceRequest: taxInvoiceRequestSchema.optional(),
     catalogSnapshot: catalogSnapshotSchema.optional(),
     promoCode: z.string().trim().optional(),
+    promoCoupon: z
+      .object({
+        code: z.string().trim().min(1).max(60),
+        type: z.enum(["PERCENTAGE", "FIXED", "FREE_SHIPPING"]),
+        value: z.number().finite().nonnegative(),
+        minSpend: z.number().finite().nonnegative().optional(),
+      })
+      .strict()
+      .optional(),
     redeemedPoints: z.number().int().nonnegative().optional(),
   })
   .strict();
@@ -333,22 +345,24 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
       throw new MockCheckoutError(409, "สินค้ามีจำนวนไม่เพียงพอ");
     }
 
-    const fullUnitCents = toCents(variant.price);
+    const fullUnitCents = item.isReward ? 0 : toCents(variant.price);
     const depositUnitCents =
-      isDepositType && variant.figure
+      !item.isReward && isDepositType && variant.figure
         ? toCents(variant.figure.depositAmount)
         : fullUnitCents;
     const balanceUnitCents =
-      isDepositType
+      !item.isReward && isDepositType
         ? fullUnitCents - depositUnitCents
         : 0;
     const lineFullCents = fullUnitCents * item.quantity;
     const lineImmediateCents = depositUnitCents * item.quantity;
     const lineBalanceCents = balanceUnitCents * item.quantity;
     const unitPriceCents = fullUnitCents;
-    const title = `${variant.title}${
-      variant.volumeNumber ? ` เล่ม ${variant.volumeNumber}` : ""
-    }${variant.variantLabel ? ` (${variant.variantLabel})` : ""}`;
+    const title = item.isReward && item.rewardLabel
+      ? item.rewardLabel
+      : `${variant.title}${
+          variant.volumeNumber ? ` เล่ม ${variant.volumeNumber}` : ""
+        }${variant.variantLabel ? ` (${variant.variantLabel})` : ""}`;
 
     fullMerchandiseCents += lineFullCents;
     immediateMerchandiseCents += lineImmediateCents;
@@ -406,7 +420,7 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
   if (parsed.data.promoCode) {
     const promoRes = validatePromoCode(
       parsed.data.promoCode,
-      immediateMerchandiseCents / 100,
+      fullMerchandiseCents / 100,
       rawShippingFeeCents / 100,
     );
     if (promoRes.valid) {
@@ -414,6 +428,24 @@ export async function createMockCheckout(input: unknown): Promise<MockCheckoutRe
         finalShippingFeeCents = 0;
       } else {
         promoDiscountCents = toCents(promoRes.discountAmount);
+      }
+    } else if (
+      parsed.data.promoCoupon &&
+      parsed.data.promoCoupon.code.trim().toUpperCase() ===
+        parsed.data.promoCode.trim().toUpperCase()
+    ) {
+      const minSpendCents = toCents(parsed.data.promoCoupon.minSpend ?? 0);
+      if (fullMerchandiseCents >= minSpendCents) {
+        if (parsed.data.promoCoupon.type === "FREE_SHIPPING") {
+          finalShippingFeeCents = 0;
+        } else if (parsed.data.promoCoupon.type === "PERCENTAGE") {
+          promoDiscountCents = Math.round(
+            (fullMerchandiseCents * Math.min(100, Math.max(0, parsed.data.promoCoupon.value))) /
+              100,
+          );
+        } else {
+          promoDiscountCents = toCents(parsed.data.promoCoupon.value);
+        }
       }
     }
   }

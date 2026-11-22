@@ -222,6 +222,12 @@ export default function CalendarPage() {
                       <img
                         src={item.imageUrl}
                         alt={item.title}
+                        onError={(e) => {
+                          if (!e.currentTarget.dataset.fallbackApplied) {
+                            e.currentTarget.dataset.fallbackApplied = "1";
+                            e.currentTarget.src = "/images/products/jjk-vol-01.jpg";
+                          }
+                        }}
                         className="h-full w-full object-cover"
                       />
                     </div>

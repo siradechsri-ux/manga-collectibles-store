@@ -39,22 +39,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      const redirectPath = searchParams.get("redirect");
-      const safeRedirect =
-        redirectPath?.startsWith("/") && !redirectPath.startsWith("//")
-          ? redirectPath
-          : null;
-      const defaultPath =
-        user?.role === "ADMIN"
-          ? "/admin"
-          : user?.role === "STAFF"
-            ? "/staff/packing"
-            : user?.role === "FINANCE"
-              ? "/finance/slips"
-              : "/account/orders";
-      router.replace(safeRedirect ?? defaultPath);
+      router.replace("/");
     }
-  }, [isAuthenticated, isLoading, router, searchParams, user?.role]);
+  }, [isAuthenticated, isLoading, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,27 +55,14 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      const user = await login(parsed.data);
+      await login(parsed.data);
       if (rememberMe) {
         window.localStorage.setItem(rememberEmailKey, parsed.data.email);
       } else {
         window.localStorage.removeItem(rememberEmailKey);
       }
 
-      const redirectPath = searchParams.get("redirect");
-      const safeRedirect =
-        redirectPath?.startsWith("/") && !redirectPath.startsWith("//")
-          ? redirectPath
-          : null;
-      const defaultPath =
-        user.role === "ADMIN"
-          ? "/admin"
-          : user.role === "STAFF"
-            ? "/staff/packing"
-            : user.role === "FINANCE"
-              ? "/finance/slips"
-              : "/account/orders";
-      router.replace(safeRedirect ?? defaultPath);
+      router.replace("/");
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่",

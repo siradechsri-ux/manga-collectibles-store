@@ -35,9 +35,20 @@ async function loadKujiBoxFromDb(pool: Pool): Promise<{
     );
     return { config, prizes, history };
   }
+  const defaultByGrade = new Map(DEFAULT_KUJI_PRIZES.map((p) => [p.grade, p]));
+  const hydratedPrizes = (res.rows[0].prizes_json ?? []).map((p) => {
+    const def = defaultByGrade.get(p.grade);
+    if (!def) return p;
+    return {
+      ...p,
+      ...(p.productVariantId ? {} : def.productVariantId ? { productVariantId: def.productVariantId } : {}),
+      ...(p.productKind ? {} : def.productKind ? { productKind: def.productKind } : {}),
+      ...(p.productSlug ? {} : def.productSlug ? { productSlug: def.productSlug } : {}),
+    };
+  });
   return {
     config: res.rows[0].config_json,
-    prizes: res.rows[0].prizes_json,
+    prizes: hydratedPrizes,
     history: res.rows[0].history_json,
   };
 }

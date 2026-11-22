@@ -41,7 +41,12 @@ export default function FinanceSlipsPage() {
   const [orders, setOrders] = useState<MockStoredOrder[]>([]);
   const [activeTab, setActiveTab] = useState<SlipTab>("PENDING");
   const [selectedSlipOrder, setSelectedSlipOrder] = useState<MockStoredOrder | null>(null);
+  const [slipImageError, setSlipImageError] = useState(false);
   const [rejectionTarget, setRejectionTarget] = useState<MockStoredOrder | null>(null);
+
+  useEffect(() => {
+    setSlipImageError(false);
+  }, [selectedSlipOrder?.detail.id, selectedSlipOrder?.detail.paymentSlipImageUrl]);
   const [rejectionReason, setRejectionReason] =
     useState<MockPaymentRejectionReason>(MOCK_PAYMENT_REJECTION_REASONS[0]);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -96,7 +101,9 @@ export default function FinanceSlipsPage() {
 
   // Filter orders by tab status
   const pendingOrders = orders.filter(
-    (order) => order.detail.status === "PAYMENT_REVIEW_PENDING",
+    (order) =>
+      order.detail.status === "PAYMENT_REVIEW_PENDING" ||
+      order.detail.status === "UNPAID",
   );
 
   const approvedOrders = orders.filter(
@@ -105,10 +112,12 @@ export default function FinanceSlipsPage() {
       order.detail.status !== "PAYMENT_REJECTED" &&
       order.detail.status !== "UNPAID" &&
       order.detail.status !== "CANCELLED" &&
-      (order.detail.paymentStatus === "PAID" ||
+      (order.detail.financeApproved === true ||
+        order.detail.paymentStatus === "PAID" ||
         order.detail.paymentStatus === "DEPOSIT_PAID" ||
         order.detail.status === "PACKING" ||
-        order.detail.status === "SHIPPED"),
+        order.detail.status === "SHIPPED" ||
+        order.detail.status === "DELIVERED"),
   );
 
   const rejectedOrders = orders.filter(
@@ -344,12 +353,19 @@ export default function FinanceSlipsPage() {
             const customerName =
               order.shippingAddress?.recipientName ??
               order.taxSummary?.taxInvoiceCustomer?.companyOrName ??
-              "ลูกค้าทั่วไป (Prototype)";
-            const customerPhone = order.shippingAddress?.recipientPhone ?? "081-xxx-xxxx";
+              "ลูกค้าทั่วไป";
+            const customerPhone = order.shippingAddress?.recipientPhone ?? "-";
             const itemCount = order.detail.items.reduce((sum, item) => sum + item.quantity, 0);
-            const isPending = order.detail.status === "PAYMENT_REVIEW_PENDING";
+            const isAwaitingSlip = order.detail.status === "UNPAID";
+            const isPending =
+              order.detail.status === "PAYMENT_REVIEW_PENDING" || isAwaitingSlip;
             const isApproved =
-              order.detail.paymentStatus === "PAID" || order.detail.paymentStatus === "DEPOSIT_PAID";
+              !isPending &&
+              order.detail.status !== "PAYMENT_REJECTED" &&
+              order.detail.status !== "CANCELLED" &&
+              (order.detail.financeApproved === true ||
+                order.detail.paymentStatus === "PAID" ||
+                order.detail.paymentStatus === "DEPOSIT_PAID");
             const isRejected = order.detail.status === "PAYMENT_REJECTED";
 
             return (
@@ -375,12 +391,17 @@ export default function FinanceSlipsPage() {
                       </span>
 
                       {/* Status Badges */}
-                      {isPending && (
+                      {isAwaitingSlip ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-700 dark:bg-zinc-800 dark:text-zinc-300">
+                          <Clock size={10} aria-hidden="true" />
+                          รอดำเนินการ • รอลูกค้าแนบสลิป
+                        </span>
+                      ) : isPending ? (
                         <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                           <Clock size={10} aria-hidden="true" />
                           รอตรวจสอบสลิป
                         </span>
-                      )}
+                      ) : null}
                       {isApproved && (
                         <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                           <BadgeCheck size={10} aria-hidden="true" />
@@ -477,20 +498,31 @@ export default function FinanceSlipsPage() {
       )}
 
       {/* ===================== [Slip Preview Modal] ===================== */}
-      {selectedSlipOrder ? (
+      {selectedSlipOrder ? (() => {
+        const slipImageSrc =
+          selectedSlipOrder.detail.paymentSlipImageUrl ||
+          (process.env.NEXT_PUBLIC_USE_MOCK !== "true" &&
+          selectedSlipOrder.detail.paymentSlipFileName
+            ? `/api/orders/${selectedSlipOrder.detail.id}/slip-image`
+            : null);
+        const canReviewSelected =
+          selectedSlipOrder.detail.status === "PAYMENT_REVIEW_PENDING" ||
+          selectedSlipOrder.detail.status === "UNPAID";
+
+        return (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4 backdrop-blur-xs"
           role="dialog"
           aria-modal="true"
           aria-labelledby="slip-preview-title"
         >
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-zinc-800">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900">
               <div className="flex items-center gap-2">
                 <Receipt className="text-emerald-600 dark:text-emerald-400" size={18} />
                 <h3 id="slip-preview-title" className="text-sm font-black text-slate-900 dark:text-zinc-100">
-                  สลิปโอนเงินจำลอง (Mock Slip)
+                  หลักฐานสลิปโอนเงิน ({selectedSlipOrder.detail.orderNumber})
                 </h3>
               </div>
               <button
@@ -503,91 +535,75 @@ export default function FinanceSlipsPage() {
               </button>
             </div>
 
-            {/* Mock Slip Graphic Card */}
+            {/* Real Slip Image Viewer */}
             <div className="p-5">
-              <div className="rounded-2xl border border-emerald-100 bg-gradient-to-b from-emerald-50/60 to-white p-5 shadow-xs dark:border-emerald-950/50 dark:from-emerald-950/30 dark:to-zinc-900">
-                {/* Bank Header */}
-                <div className="flex items-center justify-between border-b border-emerald-100/80 pb-3 dark:border-emerald-950/80">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white font-black text-xs">
-                      KB
-                    </div>
-                    <div>
-                      <p className="text-xs font-black text-slate-900 dark:text-zinc-100">
-                        ธนาคารกสิกรไทย (K-Plus)
-                      </p>
-                      <p className="text-[10px] text-slate-500 dark:text-zinc-400">
-                        โอนเงินสำเร็จ • PromptPay
-                      </p>
-                    </div>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
+                {slipImageSrc && !slipImageError ? (
+                  <div className="flex flex-col items-center">
+                    <img
+                      src={slipImageSrc}
+                      alt={`ภาพสลิปโอนเงินของคำสั่งซื้อ ${selectedSlipOrder.detail.orderNumber}`}
+                      onError={() => setSlipImageError(true)}
+                      className="max-h-[48vh] w-auto max-w-full rounded-xl object-contain shadow-sm"
+                    />
+                    {slipImageSrc.startsWith("/") ? (
+                      <a
+                        href={slipImageSrc}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2.5 text-xs font-bold text-emerald-700 hover:underline dark:text-emerald-400"
+                      >
+                        เปิดดูรูปภาพขนาดเต็ม ↗
+                      </a>
+                    ) : null}
                   </div>
-                  <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                    MATCHED
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <AlertTriangle size={28} className="text-amber-500" aria-hidden="true" />
+                    <p className="mt-2 text-sm font-bold text-slate-800 dark:text-zinc-200">
+                      {selectedSlipOrder.detail.status === "UNPAID"
+                        ? "ลูกค้ายังไม่ได้อัปโหลดไฟล์ภาพสลิป"
+                        : "ไม่พบไฟล์ภาพสลิปที่อัปโหลด"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                      {selectedSlipOrder.detail.paymentSlipFileName
+                        ? `ชื่อไฟล์ที่บันทึก: ${selectedSlipOrder.detail.paymentSlipFileName}`
+                        : "กรุณารอลูกค้าแนบหลักฐานการโอนเงิน"}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Actual Order Payment Details */}
+              <div className="mt-4 space-y-2 rounded-xl border border-slate-100 bg-slate-50/80 p-3.5 text-xs dark:border-zinc-800 dark:bg-zinc-800/60">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-slate-500 dark:text-zinc-400">ยอดที่ต้องชำระ:</span>
+                  <span className="text-base font-black text-emerald-700 dark:text-emerald-400">
+                    ฿{Number(selectedSlipOrder.immediateAmount || selectedSlipOrder.detail.totalAmount).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-
-                {/* Amount */}
-                <div className="my-4 text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                    จำนวนเงินที่โอน
-                  </p>
-                  <p className="text-3xl font-black text-emerald-700 dark:text-emerald-400">
-                    ฿{selectedSlipOrder.detail.totalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="mt-1 text-[10px] text-slate-400 dark:text-zinc-500">
-                    {new Date(selectedSlipOrder.detail.createdAt).toLocaleDateString("th-TH", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })} น.
-                  </p>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-slate-500 dark:text-zinc-400">ผู้สั่งซื้อ:</span>
+                  <span className="font-bold text-slate-800 dark:text-zinc-200 text-right">
+                    {selectedSlipOrder.shippingAddress?.recipientName ?? "ลูกค้าทั่วไป"}
+                  </span>
                 </div>
-
-                {/* Sender & Receiver Info */}
-                <div className="space-y-2.5 rounded-xl bg-slate-50/80 p-3 text-xs dark:bg-zinc-800/60">
-                  <div className="flex items-start justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">ผู้โอน:</span>
-                    <span className="font-bold text-slate-800 dark:text-zinc-200 text-right">
-                      {selectedSlipOrder.shippingAddress?.recipientName ?? "ลูกค้าทั่วไป"} (xxx-xxx-1234)
-                    </span>
-                  </div>
-                  <div className="flex items-start justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">ผู้รับเงิน:</span>
-                    <span className="font-bold text-slate-800 dark:text-zinc-200 text-right">
-                      บจก. มังงะ แอนด์ คอลเลกทิเบิลส์
-                    </span>
-                  </div>
-                  <div className="flex items-start justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">เลขที่รายการ:</span>
-                    <span className="font-mono text-[11px] text-slate-600 dark:text-zinc-400">
-                      20261012{String(selectedSlipOrder.detail.id).slice(-4)}8904
-                    </span>
-                  </div>
-                  <div className="flex items-start justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">เลขอ้างอิงออเดอร์:</span>
-                    <span className="font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                      {selectedSlipOrder.detail.orderNumber}
-                    </span>
-                  </div>
-                  <div className="flex items-start justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">ชื่อไฟล์สลิป:</span>
-                    <span className="font-mono text-[10px] text-slate-500 dark:text-zinc-400 truncate max-w-[180px]">
-                      {selectedSlipOrder.detail.paymentSlipFileName ?? "slip_kbank_transfer.jpg"}
-                    </span>
-                  </div>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-slate-500 dark:text-zinc-400">เลขอ้างอิงออเดอร์:</span>
+                  <span className="font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                    {selectedSlipOrder.detail.orderNumber}
+                  </span>
                 </div>
-
-                {/* Footer verification note */}
-                <div className="mt-3 flex items-center justify-center gap-1.5 text-[10px] font-medium text-slate-400 dark:text-zinc-500">
-                  <QrCode size={12} />
-                  <span>สแกน QR Code ตรวจสอบข้อมูลในระบบธนาคารแล้ว</span>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-slate-500 dark:text-zinc-400">ชื่อไฟล์สลิป:</span>
+                  <span className="font-mono text-[11px] text-slate-600 dark:text-zinc-300 truncate max-w-[220px]">
+                    {selectedSlipOrder.detail.paymentSlipFileName ?? "ยังไม่ได้แนบไฟล์"}
+                  </span>
                 </div>
               </div>
 
               {/* Action Buttons inside Modal for Pending orders */}
-              {selectedSlipOrder.detail.status === "PAYMENT_REVIEW_PENDING" ? (
+              {canReviewSelected ? (
                 <div className="mt-5 flex gap-2">
                   <button
                     type="button"
@@ -604,7 +620,7 @@ export default function FinanceSlipsPage() {
                     onClick={() => handleApprove(selectedSlipOrder)}
                     className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                   >
-                    อนุมัติสลิปทันที
+                    อนุมัติสลิปและส่งต่อคลัง
                   </button>
                 </div>
               ) : (
@@ -621,7 +637,8 @@ export default function FinanceSlipsPage() {
             </div>
           </div>
         </div>
-      ) : null}
+        );
+      })() : null}
 
       {/* ===================== [Rejection Reason Modal] ===================== */}
       {rejectionTarget ? (

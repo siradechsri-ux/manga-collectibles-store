@@ -125,6 +125,10 @@ export class AuthService {
       if (!user) {
         throw new Error("Database did not return the newly registered user.");
       }
+      await this.pool.query(
+        `INSERT INTO user_points (user_id, points) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING`,
+        [user.id],
+      ).catch(() => {});
       return this.toPublicUser(user);
     } catch (error) {
       if (this.isPostgresError(error, "23505")) {

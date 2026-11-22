@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Request, RequestHandler, Response } from "express";
 import { z } from "zod";
 import {
@@ -9,16 +11,36 @@ import {
 } from "../checkout/slipVerificationService";
 import { getOrderSnapshotFromDb, saveOrderSnapshotToDb } from "../db/database";
 
+const SLIPS_UPLOAD_DIR = path.resolve(process.cwd(), "uploads", "slips");
+
+function extensionForMime(mimeType: string): string {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  return "jpg";
+}
+
+function saveSlipImageToDisk(orderId: number, file: Express.Multer.File): string {
+  fs.mkdirSync(SLIPS_UPLOAD_DIR, { recursive: true });
+  const timestamp = Date.now();
+  const ext = extensionForMime(file.mimetype);
+  const fileName = `order-${orderId}-${timestamp}.${ext}`;
+  const fullPath = path.join(SLIPS_UPLOAD_DIR, fileName);
+  fs.writeFileSync(fullPath, file.buffer);
+  return `/api/orders/${orderId}/slip-image?v=${timestamp}`;
+}
+
 export interface SlipUploadSuccessResponse {
   success: true;
   data: {
     orderId: number;
     paymentStage: "INITIAL" | "BALANCE";
-    paymentStatus: "PAID" | "DEPOSIT_PAID";
+    paymentStatus: "PAID" | "DEPOSIT_PAID" | "PENDING_REVIEW";
+    orderStatus: "PAYMENT_REVIEW_PENDING";
     transactionRef: string;
     verifiedAmount: string;
     verifiedAt: string;
     settlementStatus: string;
+    slipImageUrl: string;
     message: string;
   };
 }
@@ -52,12 +74,9 @@ const orderParamsSchema = z
 
 function paymentMessage(result: SlipVerificationResponse): string {
   if (result.paymentStage === "BALANCE") {
-    return "ยืนยันการชำระยอดคงเหลือแล้ว คำสั่งซื้อพร้อมเข้าสู่กระบวนการจัดส่ง";
+    return "ส่งสลิปชำระยอดคงเหลือเรียบร้อยแล้ว อยู่ระหว่างรอฝ่ายการเงินตรวจสอบ";
   }
-  if (result.paymentStatus === "DEPOSIT_PAID") {
-    return "ยืนยันการชำระมัดจำแล้ว";
-  }
-  return "ยืนยันการชำระเงินแล้ว";
+  return "ส่งสลิปเรียบร้อยแล้ว อยู่ระหว่างรอฝ่ายการเงินตรวจสอบ";
 }
 
 function sendVerificationError(
@@ -142,7 +161,9 @@ export function createSlipUploadController(
         file,
       });
 
-      // Synchronize order_snapshots in PostgreSQL
+      const slipImageUrl = saveSlipImageToDisk(parsedParams.data.orderId, file);
+
+      // Synchronize order_snapshots in PostgreSQL -> send to Finance in PAYMENT_REVIEW_PENDING
       try {
         const existingSnap = await getOrderSnapshotFromDb(
           slipVerificationService.pool,
@@ -150,37 +171,25 @@ export function createSlipUploadController(
         );
         if (existingSnap) {
           const isBalance = result.paymentStage === "BALANCE";
-          const isDeposit = result.paymentStatus === "DEPOSIT_PAID";
           const updatedSnap = {
             ...existingSnap,
             detail: {
               ...existingSnap.detail,
-              status: isBalance ? ("PAID" as const) : result.paymentStatus,
-              paymentStatus: result.paymentStatus,
-              timelineStage: "DEPOSIT_PAID" as const,
-              paidAmount: isBalance
-                ? existingSnap.detail.totalAmount
-                : Number(existingSnap.immediateAmount),
-              remainingBalance: isBalance
-                ? 0
-                : isDeposit
-                  ? existingSnap.detail.remainingBalance
-                  : 0,
-              ...(isBalance ? { balanceDueDate: null } : {}),
+              status: "PAYMENT_REVIEW_PENDING" as const,
+              paymentStatus: isBalance
+                ? ("DEPOSIT_PAID" as const)
+                : ("UNPAID" as const),
+              paymentReviewStage: result.paymentStage,
+              financeApproved: false,
               paymentRejectionReason: null,
-              paymentSlipFileName: file.originalname || "verified_slip.jpg",
-              items: isBalance
-                ? existingSnap.detail.items.map((item) => ({
-                    ...item,
-                    remainingBalance: 0,
-                  }))
-                : existingSnap.detail.items,
+              paymentSlipFileName: file.originalname || "uploaded_slip.jpg",
+              paymentSlipImageUrl: slipImageUrl,
               timeline: existingSnap.detail.timeline.map((event) =>
-                event.stage === "DEPOSIT_PAID"
+                event.stage === "ORDER_PLACED"
                   ? {
                       ...event,
-                      label: `ยืนยันการชำระเงิน (${result.transactionRef})`,
-                      occurredAt: result.verifiedAt,
+                      label: "ส่งสลิปแล้ว · รอฝ่ายการเงินตรวจสอบ",
+                      occurredAt: event.occurredAt ?? result.verifiedAt,
                     }
                   : event,
               ),
@@ -189,13 +198,15 @@ export function createSlipUploadController(
           await saveOrderSnapshotToDb(slipVerificationService.pool, updatedSnap);
         }
       } catch (snapErr) {
-        console.warn("Could not update order snapshot after slip verification:", snapErr);
+        console.warn("Could not update order snapshot after slip upload:", snapErr);
       }
 
       response.status(200).json({
         success: true,
         data: {
           ...result,
+          orderStatus: "PAYMENT_REVIEW_PENDING",
+          slipImageUrl,
           message: paymentMessage(result),
         },
       });

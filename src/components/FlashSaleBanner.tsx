@@ -307,6 +307,12 @@ export default function FlashSaleBanner() {
                   <img
                     src={deal.imageUrl}
                     alt={deal.title}
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fallbackApplied) {
+                        e.currentTarget.dataset.fallbackApplied = "1";
+                        e.currentTarget.src = "/images/products/jjk-vol-01.jpg";
+                      }
+                    }}
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     loading="lazy"
                   />

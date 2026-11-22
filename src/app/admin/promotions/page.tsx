@@ -542,14 +542,14 @@ export default function AdminPromotionsPage() {
         collectible.coverUrl ||
         collectible.coverImage ||
         collectible.images?.[0] ||
-        "/images/rewards/reward-default.jpg";
+        "/images/rewards/reward-jjk-bookmark.jpg";
     } else if (manga) {
       if (!title) title = `${manga.title} (ของรางวัลพิเศษ)`;
       imageUrl =
         manga.coverUrl ||
         manga.coverImage ||
         manga.volumes?.[0]?.coverUrl ||
-        "/images/rewards/reward-default.jpg";
+        "/images/rewards/reward-jjk-bookmark.jpg";
     } else {
       alert("ไม่พบข้อมูลสินค้าที่เลือก");
       return;

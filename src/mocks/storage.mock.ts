@@ -78,6 +78,9 @@ const mockStoredOrderSchema = z
         paymentRejectionReason: z.string().nullable().optional(),
         paymentReviewStage: z.enum(["INITIAL", "BALANCE"]).optional(),
         paymentSlipFileName: z.string().nullable().optional(),
+        paymentSlipImageUrl: z.string().nullable().optional(),
+        financeApproved: z.boolean().optional(),
+        financeApprovedAt: z.string().nullable().optional(),
         totalAmount: z.number().finite().nonnegative(),
         paidAmount: z.number().finite().nonnegative(),
         remainingBalance: z.number().finite().nonnegative(),
@@ -507,6 +510,13 @@ function createDemoOrder(input: DemoOrderInput): MockStoredOrder {
       occurredAt: shippedAt,
     },
   ];
+  const isFinanceApprovedDemo =
+    input.status === "PAID" ||
+    input.status === "DEPOSIT_PAID" ||
+    input.status === "AWAITING_BALANCE_PAYMENT" ||
+    input.status === "PACKING" ||
+    input.status === "SHIPPED" ||
+    input.status === "DELIVERED";
   const detail: OrderTrackingDetail = {
     id: input.id,
     orderNumber: input.orderNumber,
@@ -517,6 +527,8 @@ function createDemoOrder(input: DemoOrderInput): MockStoredOrder {
     paymentRejectionReason: input.paymentRejectionReason ?? null,
     paymentReviewStage: input.paymentReviewStage,
     paymentSlipFileName: input.paymentSlipFileName ?? null,
+    financeApproved: isFinanceApprovedDemo,
+    financeApprovedAt: isFinanceApprovedDemo ? paidAt : null,
     totalAmount: input.totalAmount,
     paidAmount: input.paidAmount,
     remainingBalance: input.remainingBalance,
@@ -1478,13 +1490,15 @@ export function saveMockOrder(
     remainingBalance: Number(item.balanceAmount),
     isPreorder: item.isPreorder,
   }));
+  const isZeroImmediate = Number(response.immediateAmount) === 0;
   const detail: OrderTrackingDetail = {
     id: response.orderId,
     orderNumber: response.orderNumber,
     createdAt,
-    status: "UNPAID",
+    status: isZeroImmediate ? "PAYMENT_REVIEW_PENDING" : "UNPAID",
     timelineStage: "ORDER_PLACED",
     paymentStatus: "UNPAID",
+    financeApproved: false,
     totalAmount: Number(response.totalAmount),
     paidAmount: 0,
     remainingBalance: Number(response.remainingBalanceAmount),
@@ -1550,9 +1564,11 @@ export function listMockOrders(ownerUserId?: number): MockStoredOrder[] {
 
 export function updateMockOrderPayment(
   orderId: number,
-  paymentStatus: "PAID" | "DEPOSIT_PAID",
+  _paymentStatus: "PAID" | "DEPOSIT_PAID" | "PENDING_REVIEW",
   transactionRef: string,
   paymentStage: "INITIAL" | "BALANCE" = "INITIAL",
+  slipFileName?: string | null,
+  slipImageUrl?: string | null,
 ): MockStoredOrder {
   const orders = readAllOrders();
   const orderIndex = orders.findIndex((order) => order.detail.id === orderId);
@@ -1564,40 +1580,26 @@ export function updateMockOrderPayment(
     throw new Error("คำสั่งซื้อนี้ถูกยกเลิกแล้วและไม่สามารถชำระเงินได้");
   }
 
-  const paidAt = new Date().toISOString();
-  const isDepositPayment = paymentStatus === "DEPOSIT_PAID";
+  const submittedAt = new Date().toISOString();
   const isBalancePayment = paymentStage === "BALANCE";
   if (isBalancePayment && existingOrder.detail.status !== "AWAITING_BALANCE_PAYMENT") {
     throw new Error("คำสั่งซื้อนี้ยังไม่เปิดรับชำระยอดคงเหลือ");
   }
   const updatedDetail: OrderTrackingDetail = {
     ...existingOrder.detail,
-    status: isBalancePayment ? "PAID" : paymentStatus,
-    paymentStatus,
-    timelineStage: "DEPOSIT_PAID",
-    paidAmount: isBalancePayment
-      ? existingOrder.detail.totalAmount
-      : Number(existingOrder.immediateAmount),
-    remainingBalance: isBalancePayment
-      ? 0
-      : isDepositPayment
-        ? existingOrder.detail.remainingBalance
-        : 0,
-    items: isBalancePayment
-      ? existingOrder.detail.items.map((item) => ({
-          ...item,
-          remainingBalance: 0,
-        }))
-      : existingOrder.detail.items,
-    ...(isBalancePayment ? { balanceDueDate: null } : {}),
+    status: "PAYMENT_REVIEW_PENDING",
+    paymentStatus: isBalancePayment ? "DEPOSIT_PAID" : "UNPAID",
+    paymentReviewStage: paymentStage,
+    financeApproved: false,
     paymentRejectionReason: null,
-    paymentSlipFileName: null,
+    paymentSlipFileName: slipFileName ?? existingOrder.detail.paymentSlipFileName ?? "uploaded_slip.jpg",
+    paymentSlipImageUrl: slipImageUrl ?? existingOrder.detail.paymentSlipImageUrl ?? null,
     timeline: existingOrder.detail.timeline.map((event) =>
-      event.stage === "DEPOSIT_PAID"
+      event.stage === "ORDER_PLACED"
         ? {
             ...event,
-            label: `ยืนยันการชำระเงิน (${transactionRef})`,
-            occurredAt: paidAt,
+            label: `ส่งสลิปแล้ว · รอฝ่ายการเงินตรวจสอบ (${transactionRef})`,
+            occurredAt: event.occurredAt ?? submittedAt,
           }
         : event,
     ),
@@ -2278,6 +2280,7 @@ export function rejectMockOrderPayment(
       detail: {
         ...existingOrder.detail,
         status: "PAYMENT_REJECTED",
+        financeApproved: false,
         paymentRejectionReason: reason,
         paymentReviewStage,
       },
@@ -2291,6 +2294,7 @@ export function resubmitMockOrderSlip(
     orderId: number,
     ownerUserId: number,
     fileName: string,
+    slipImageDataUrl?: string,
   ): MockStoredOrder {
     const orders = readAllOrders();
     const orderIndex = orders.findIndex((order) => order.detail.id === orderId);
@@ -2310,7 +2314,10 @@ export function resubmitMockOrderSlip(
       detail: {
         ...existingOrder.detail,
         status: "PAYMENT_REVIEW_PENDING",
+        financeApproved: false,
+        paymentRejectionReason: null,
         paymentSlipFileName: normalizedFileName,
+        ...(slipImageDataUrl ? { paymentSlipImageUrl: slipImageDataUrl } : {}),
       },
     };
     orders[orderIndex] = updatedOrder;
@@ -2322,7 +2329,11 @@ export function approveMockOrderPaymentReview(orderId: number): MockStoredOrder 
     const orders = readAllOrders();
     const orderIndex = orders.findIndex((order) => order.detail.id === orderId);
     const existingOrder = orders[orderIndex];
-    if (!existingOrder || existingOrder.detail.status !== "PAYMENT_REVIEW_PENDING") {
+    if (
+      !existingOrder ||
+      (existingOrder.detail.status !== "PAYMENT_REVIEW_PENDING" &&
+        existingOrder.detail.status !== "UNPAID")
+    ) {
       throw new Error("ไม่พบสลิปที่รอการตรวจสอบ");
     }
     const stage = existingOrder.detail.paymentReviewStage ?? "INITIAL";
@@ -2338,6 +2349,8 @@ export function approveMockOrderPaymentReview(orderId: number): MockStoredOrder 
         ...existingOrder.detail,
         status: paymentStatus,
         paymentStatus,
+        financeApproved: true,
+        financeApprovedAt: now,
         paidAmount:
           stage === "BALANCE"
             ? existingOrder.detail.totalAmount
@@ -2350,7 +2363,7 @@ export function approveMockOrderPaymentReview(orderId: number): MockStoredOrder 
         paymentSlipFileName: existingOrder.detail.paymentSlipFileName ?? "slip_verified.jpg",
         timeline: existingOrder.detail.timeline.map((event) =>
           event.stage === "DEPOSIT_PAID"
-            ? { ...event, label: "ฝ่ายการเงินอนุมัติสลิปจำลอง", occurredAt: now }
+            ? { ...event, label: "ฝ่ายการเงินอนุมัติสลิปแล้ว", occurredAt: now }
             : event,
         ),
       },

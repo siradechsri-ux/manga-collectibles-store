@@ -38,7 +38,12 @@ import { useEffect, useRef, useState, FormEvent, KeyboardEvent as ReactKeyboardE
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useWishlist } from "../../contexts/WishlistContext";
-import { getUserPoints, subscribeUserPoints } from "../../mocks/points.mock";
+import {
+  getUserPoints,
+  resetLocalPointsToZero,
+  subscribeUserPoints,
+  syncUserPointsFromServer,
+} from "../../mocks/points.mock";
 import type { CatalogData } from "../../lib/catalog-client";
 import { ProductService } from "../../services/product.service";
 import CartDrawer from "../CartDrawer";
@@ -352,6 +357,9 @@ function SearchSuggestionList({
                   <img
                     src={suggestion.image}
                     alt=""
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                     className="h-12 w-9 shrink-0 rounded-md border border-zinc-200 object-cover dark:border-zinc-700"
                   />
                 ) : (
@@ -420,7 +428,7 @@ export default function Navbar() {
   const { user, logout, isLoading } = useAuth();
 
   const [mounted, setMounted] = useState(false);
-  const [userPoints, setUserPoints] = useState<number>(450);
+  const [userPoints, setUserPoints] = useState<number>(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
@@ -446,7 +454,6 @@ export default function Navbar() {
   // Sync user points and search query from URL if available
   useEffect(() => {
     setMounted(true);
-    setUserPoints(getUserPoints());
     setRecentSearches(getRecentSearches());
     const unsubscribe = subscribeUserPoints((points) => {
       setUserPoints(points);
@@ -464,6 +471,21 @@ export default function Navbar() {
       unsubscribe();
     };
   }, []);
+
+  // Re-sync points whenever authenticated user changes or logs out
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      resetLocalPointsToZero();
+      setUserPoints(0);
+      return;
+    }
+    if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
+      setUserPoints(getUserPoints());
+    } else {
+      void syncUserPointsFromServer().then((pts) => setUserPoints(pts));
+    }
+  }, [user?.id, isLoading, user]);
 
   useEffect(() => {
     const query = searchQuery.trim();
@@ -600,13 +622,14 @@ export default function Navbar() {
 
   async function handleLogout() {
     try {
+      setCartDrawerOpen(false);
+      setUserMenuOpen(false);
+      setMobileMenuOpen(false);
+      resetLocalPointsToZero();
+      setUserPoints(0);
       await logout();
       if (typeof window !== "undefined") {
         window.localStorage.setItem("mock_current_role", "GUEST");
-      }
-      setUserMenuOpen(false);
-      setMobileMenuOpen(false);
-      if (typeof window !== "undefined") {
         window.location.href = "/login";
       } else {
         router.replace("/login");
@@ -1138,87 +1161,9 @@ export default function Navbar() {
           <div className="relative mx-auto flex min-h-10 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
             {/* 1. CUSTOMER: Full Store Discovery Links & Activity Features */}
             {isCustomer && (
-              <nav className="flex flex-1 items-center justify-between gap-2 py-1 text-xs font-bold text-zinc-700 dark:text-zinc-300 overflow-x-auto scrollbar-none">
-                <div className="flex items-center gap-1 shrink-0">
-                  {/* Manga */}
-                  <Link
-                    href="/collections/manga"
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
-                      pathname === "/collections/manga"
-                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
-                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
-                    }`}
-                  >
-                    <BookOpen size={13} className="text-orange-600 dark:text-orange-400" />
-                    <span>มังงะ</span>
-                  </Link>
-
-                  {/* Light Novel */}
-                  <Link
-                    href="/collections/light-novel"
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
-                      pathname === "/collections/light-novel"
-                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
-                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
-                    }`}
-                  >
-                    <BookMarked size={13} className="text-sky-600 dark:text-sky-400" />
-                    <span>ไลท์โนเวล</span>
-                  </Link>
-
-                  {/* Figures */}
-                  <Link
-                    href="/collections/figures"
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
-                      pathname === "/collections/figures"
-                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
-                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
-                    }`}
-                  >
-                    <Boxes size={13} className="text-blue-600 dark:text-blue-400" />
-                    <span>ฟิกเกอร์</span>
-                  </Link>
-
-                  {/* Plamo */}
-                  <Link
-                    href="/collections/gunpla"
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
-                      pathname === "/collections/gunpla" || pathname === "/collections/plamo"
-                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
-                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
-                    }`}
-                  >
-                    <Layers size={13} className="text-indigo-600 dark:text-indigo-400" />
-                    <span>กันพลา / พลาโม</span>
-                  </Link>
-
-                  {/* Goods */}
-                  <Link
-                    href="/collections/goods"
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
-                      pathname === "/collections/goods"
-                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
-                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
-                    }`}
-                  >
-                    <Package size={13} className="text-emerald-600 dark:text-emerald-400" />
-                    <span>ของสะสม</span>
-                  </Link>
-
-                  {/* Accessories */}
-                  <Link
-                    href="/collections/accessories"
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
-                      pathname === "/collections/accessories"
-                        ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
-                        : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
-                    }`}
-                  >
-                    <Sparkles size={13} className="text-teal-600 dark:text-teal-400" />
-                    <span>อุปกรณ์ดูแล</span>
-                  </Link>
-
-                  {/* Category Mega Dropdown Menu */}
+              <nav className="flex flex-1 items-center justify-between gap-2 py-1 text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                <div className="flex min-w-0 items-center gap-1">
+                  {/* Category Mega Dropdown Menu (outside overflow-x-auto so dropdown never clips) */}
                   <div className="relative shrink-0" ref={categoryDropdownRef}>
                     <button
                       type="button"
@@ -1226,7 +1171,7 @@ export default function Navbar() {
                       className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
                         categoryDropdownOpen
                           ? "bg-purple-100 text-purple-900 font-black dark:bg-purple-950/80 dark:text-purple-200 shadow-2xs"
-                          : "text-zinc-700 hover:bg-zinc-200/60 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                          : "bg-zinc-200/70 text-zinc-900 hover:bg-zinc-200 dark:bg-zinc-800/80 dark:text-zinc-100 dark:hover:bg-zinc-800"
                       }`}
                       aria-expanded={categoryDropdownOpen}
                       aria-haspopup="menu"
@@ -1242,7 +1187,7 @@ export default function Navbar() {
                     {categoryDropdownOpen && (
                       <div
                         role="menu"
-                        className="absolute left-0 top-full mt-2 z-50 w-80 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 animate-in fade-in zoom-in-95 duration-100"
+                        className="absolute left-0 top-full mt-2 z-50 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3.5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
                       >
                         <div className="grid gap-2.5 text-xs">
                           {/* Books & Manga */}
@@ -1268,7 +1213,7 @@ export default function Navbar() {
                                 className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-zinc-700 hover:bg-orange-50 hover:text-orange-700 dark:text-zinc-200 dark:hover:bg-orange-950/40 dark:hover:text-orange-300 font-semibold transition"
                               >
                                 <span className="flex items-center gap-2">
-                                  <BookOpen size={13} className="text-amber-600" />
+                                  <BookMarked size={13} className="text-sky-600" />
                                   <span>ไลท์โนเวลแปลไทย</span>
                                 </span>
                                 <span className="text-[10px] font-bold text-zinc-400">Light Novel</span>
@@ -1329,8 +1274,8 @@ export default function Navbar() {
                             </div>
                           </div>
 
-                          {/* Best Sellers shortcut */}
-                          <div>
+                          {/* Filter Shortcuts */}
+                          <div className="space-y-1">
                             <Link
                               href="/collections/manga?filter=best-seller"
                               onClick={() => setCategoryDropdownOpen(false)}
@@ -1342,13 +1287,104 @@ export default function Navbar() {
                               </span>
                               <span>→</span>
                             </Link>
+                            <Link
+                              href="/collections/figures?status=PREORDER"
+                              onClick={() => setCategoryDropdownOpen(false)}
+                              className="flex items-center justify-between rounded-lg bg-amber-50 px-2.5 py-2 font-bold text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-950/70 transition"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <Sparkles size={14} className="text-amber-600 dark:text-amber-400" />
+                                <span>ดูสินค้าเปิดพรีออเดอร์</span>
+                              </span>
+                              <span>→</span>
+                            </Link>
                           </div>
                         </div>
                       </div>
                     )}
                   </div>
 
-                                  </div>
+                  {/* Scrollable Category Strip */}
+                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+                    {/* Manga */}
+                    <Link
+                      href="/collections/manga"
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                        pathname === "/collections/manga"
+                          ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                          : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      <BookOpen size={13} className="text-orange-600 dark:text-orange-400" />
+                      <span>มังงะ</span>
+                    </Link>
+
+                    {/* Light Novel */}
+                    <Link
+                      href="/collections/light-novel"
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                        pathname === "/collections/light-novel"
+                          ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                          : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      <BookMarked size={13} className="text-sky-600 dark:text-sky-400" />
+                      <span>ไลท์โนเวล</span>
+                    </Link>
+
+                    {/* Figures */}
+                    <Link
+                      href="/collections/figures"
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                        pathname === "/collections/figures"
+                          ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                          : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      <Boxes size={13} className="text-blue-600 dark:text-blue-400" />
+                      <span>ฟิกเกอร์</span>
+                    </Link>
+
+                    {/* Plamo */}
+                    <Link
+                      href="/collections/gunpla"
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                        pathname === "/collections/gunpla" || pathname === "/collections/plamo"
+                          ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                          : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      <Layers size={13} className="text-indigo-600 dark:text-indigo-400" />
+                      <span>กันพลา / พลาโม</span>
+                    </Link>
+
+                    {/* Goods */}
+                    <Link
+                      href="/collections/goods"
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                        pathname === "/collections/goods"
+                          ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                          : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      <Package size={13} className="text-emerald-600 dark:text-emerald-400" />
+                      <span>ของสะสม</span>
+                    </Link>
+
+                    {/* Accessories */}
+                    <Link
+                      href="/collections/accessories"
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 transition ${
+                        pathname === "/collections/accessories"
+                          ? "bg-zinc-200/80 font-black text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
+                          : "hover:bg-zinc-200/60 hover:text-zinc-950 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      <Sparkles size={13} className="text-teal-600 dark:text-teal-400" />
+                      <span>อุปกรณ์ดูแล</span>
+                    </Link>
+                  </div>
+                </div>
 
                 {/* Right Feature Shortcuts */}
                 <div className="flex items-center gap-1 shrink-0">

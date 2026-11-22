@@ -96,8 +96,8 @@ const slipUpload = multer({
   limits: {
     fileSize: MAX_SLIP_SIZE_BYTES,
     files: 1,
-    fields: 0,
-    parts: 1,
+    fields: 10,
+    parts: 11,
   },
   fileFilter: (_request, file, callback) => {
     if (!ALLOWED_SLIP_MIME_TYPES.has(file.mimetype)) {

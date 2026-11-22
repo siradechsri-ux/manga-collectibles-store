@@ -21,6 +21,9 @@ export interface KujiPrize {
   stockCount: number; // จำนวนชิ้นในตู้
   isDiscountCode?: boolean;
   discountCode?: string;
+  productVariantId?: number;
+  productKind?: "FIGURE" | "PLAMO" | "GOODS" | "ACCESSORY";
+  productSlug?: string;
 }
 
 export interface KujiConfig {
@@ -48,49 +51,61 @@ export const DEFAULT_KUJI_CONFIG: KujiConfig = {
 export const DEFAULT_KUJI_PRIZES: KujiPrize[] = [
   {
     grade: "A",
-    title: "ฟิกเกอร์สเกล 1/7 Satoru Gojo Shibuya Incident Ver. (งานแท้)",
-    categoryName: "รางวัลระดับมาสเตอร์ (Master Scale Figure)",
-    description: "ฟิกเกอร์ลงสีสำเร็จรูป สเกล 1/7 พร้อมเอฟเฟกต์อาณาจักรไร้มาตรการ กล่องแท้นำเข้าจากญี่ปุ่น",
+    title: "Pop Up Parade Sukuna · รางวัลพิเศษ Ichiban Kuji (งานแท้)",
+    categoryName: "รางวัลระดับมาสเตอร์ (Master Figure)",
+    description: "ฟิกเกอร์ลงสีสำเร็จรูป Pop Up Parade Sukuna ลิขสิทธิ์แท้จาก Good Smile Company พร้อมจัดส่งทันที",
     imageUrl: "/images/products/figure-2002.jpg",
-    valueBaht: 2890,
+    valueBaht: 1400,
     weight: 6,
     stockCount: 1,
+    productVariantId: 2002,
+    productKind: "FIGURE",
+    productSlug: "pop-up-parade-sukuna",
   },
   {
     grade: "B",
-    title: "สแตนดี้อะคริลิกจิบิ Anya Forger Mini Stand (Spy x Family)",
+    title: "สแตนดี้อะคริลิก อาเนีย ฟอร์เจอร์ (Spy x Family Anya Forger Acrylic Stand 14cm)",
     categoryName: "สแตนดี้อะคริลิกพรีเมียม",
-    description: "อะคริลิกใสหนา 3 มม. ลายเส้นจิบิลิขสิทธิ์แท้พร้อมฐานเสียบลายพิเศษ",
+    description: "อะคริลิกใสหนา 3 มม. ลายเส้นลิขสิทธิ์แท้พร้อมฐานเสียบลายพิเศษ",
     imageUrl: "/images/rewards/reward-anya-standee.jpg",
-    valueBaht: 450,
+    valueBaht: 390,
     weight: 14,
     stockCount: 2,
+    productVariantId: 7004,
+    productKind: "GOODS",
+    productSlug: "anya-forger-acrylic-stand",
   },
   {
     grade: "C",
-    title: "โปสการ์ดฟอยล์ทอง Frieren & Fern Memorial Art Collection",
-    categoryName: "อาร์ตเวิร์กพิมพ์ฟอยล์ทอง",
-    description: "ภาพพิมพ์กระดาษนำเข้า 350 แกรม เคลือบขอบทองพิเศษสำหรับนักสะสม",
+    title: "สแตนดี้อะคริลิก ฟรีเรนกับหีบมิมิค (Frieren Mimic Acrylic Stand 14cm)",
+    categoryName: "อาร์ตเวิร์กและสแตนดี้สะสม",
+    description: "สแตนดี้ลิขสิทธิ์แท้ลาย Frieren & Mimic สำหรับนักสะสม พร้อมส่งทันที",
     imageUrl: "/images/rewards/reward-frieren-postcard.jpg",
-    valueBaht: 250,
+    valueBaht: 380,
     weight: 25,
     stockCount: 5,
+    productVariantId: 7005,
+    productKind: "GOODS",
+    productSlug: "frieren-acrylic-stand-mimic",
   },
   {
     grade: "D",
-    title: "พวงกุญแจอะคริลิกไดคัท Yoichi Isagi (Blue Lock)",
-    categoryName: "พวงกุญแจอะคริลิกสองด้าน",
-    description: "พวงกุญแจสองด้านพร้อมห่วงคล้องรมดำ แข็งแรง ทนทานต่อรอยขีดข่วน",
+    title: "บ็อกซ์เซ็ตเข็มกลัดจิบิ ขังดวลแข้ง (Blue Lock Chibi Badge Box)",
+    categoryName: "กู้ดส์และเข็มกลัดสะสมลิขสิทธิ์แท้",
+    description: "กู้ดส์ลิขสิทธิ์แท้จาก Blue Lock พร้อมส่งถึงบ้าน",
     imageUrl: "/images/rewards/reward-blue-lock-keychain.jpg",
-    valueBaht: 180,
+    valueBaht: 1200,
     weight: 30,
     stockCount: 12,
+    productVariantId: 7008,
+    productKind: "GOODS",
+    productSlug: "blue-lock-chibi-badge-box",
   },
   {
     grade: "E",
     title: "คูปองส่วนลดเงินสด ฿50 สำหรับคำสั่งซื้อถัดไป",
     categoryName: "โค้ดส่วนลดคำสั่งซื้อ",
-    description: "ใช้เป็นส่วนลดท้ายบิลเมื่อสั่งซื้อมังงะและของสะสมครบ 200 บาท",
+    description: "ใช้เป็นส่วนลดท้ายบิลทันที 50 บาท ด้วยโค้ด KUJI50",
     imageUrl: "/images/rewards/reward-tanjiro-badge.jpg",
     valueBaht: 50,
     weight: 25,
@@ -158,9 +173,20 @@ export function getKujiPrizes(): KujiPrize[] {
       return [...DEFAULT_KUJI_PRIZES];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0
-      ? parsed
-      : [...DEFAULT_KUJI_PRIZES];
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const defByGrade = new Map(DEFAULT_KUJI_PRIZES.map((p) => [p.grade, p]));
+      return parsed.map((p: KujiPrize) => {
+        const def = defByGrade.get(p.grade);
+        if (!def) return p;
+        return {
+          ...p,
+          ...(p.productVariantId ? {} : def.productVariantId ? { productVariantId: def.productVariantId } : {}),
+          ...(p.productKind ? {} : def.productKind ? { productKind: def.productKind } : {}),
+          ...(p.productSlug ? {} : def.productSlug ? { productSlug: def.productSlug } : {}),
+        };
+      });
+    }
+    return [...DEFAULT_KUJI_PRIZES];
   } catch {
     return [...DEFAULT_KUJI_PRIZES];
   }

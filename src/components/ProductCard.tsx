@@ -139,6 +139,10 @@ export function BookCoverImage({
   const [hasError, setHasError] = useState(false);
   const ratioClass = aspectRatio === "3/4" ? "aspect-[3/4]" : "aspect-[2/3]";
 
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
   return (
     <div
       className={`relative ${ratioClass} w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 ${className}`}
@@ -184,6 +188,10 @@ export function CollectibleCoverImage({
   className = "",
 }: CollectibleCoverImageProps) {
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
   const isPlamo = category === "PLAMO";
   const isGoods = category === "GOODS";
   const isAccessory = category === "ACCESSORY";
@@ -574,6 +582,14 @@ export function MangaShowcaseCard({ series }: { series: CatalogMangaSeries }) {
             <img
               src={images[activeIndex]}
               alt={`${series.title} ปกหนังสือ`}
+              onError={(e) => {
+                if (!e.currentTarget.dataset.fallbackApplied) {
+                  e.currentTarget.dataset.fallbackApplied = "1";
+                  e.currentTarget.src = isNovel
+                    ? "/images/products/konosuba-vol-01.jpg"
+                    : "/images/products/jjk-vol-01.jpg";
+                }
+              }}
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
               loading="lazy"
             />
@@ -582,6 +598,9 @@ export function MangaShowcaseCard({ series }: { series: CatalogMangaSeries }) {
                 src={images[nextIndex]}
                 alt={`${series.title} ภาพปกเพิ่มเติม`}
                 aria-hidden="true"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
                 className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${isFading ? "opacity-100" : "opacity-0"}`}
                 loading="lazy"
               />

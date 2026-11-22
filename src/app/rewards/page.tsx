@@ -149,7 +149,7 @@ export default function RewardsPage() {
 
   const [activeTab, setActiveTab] = useState<RewardTab>("CATALOG");
   const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>("ALL");
-  const [points, setPoints] = useState<number>(450);
+  const [points, setPoints] = useState<number>(0);
   const [ledger, setLedger] = useState<PointsLedgerEntry[]>([]);
   const [mounted, setMounted] = useState(false);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
@@ -212,10 +212,14 @@ export default function RewardsPage() {
     );
 
     if (success) {
-      // Add reward item to cart with price 0, isReward: true, and taxRate: 0
+      // Add reward item to cart bound to a real catalog variant with price 0, isReward: true
+      const realVariantId = reward.productVariantId ?? 7001;
+      const realSlug = reward.productSlug ?? String(realVariantId);
       addItem({
-        kind: "GOODS",
-        id: getRewardNumericId(reward.id),
+        kind: reward.category === "ACCESSORY" ? "ACCESSORY" : "GOODS",
+        id: realVariantId,
+        slug: realSlug,
+        productUrl: `/figures/${realSlug}`,
         name: `[แลกแต้มฟรี] ${reward.title}`,
         image: reward.imageUrl,
         coverImage: reward.imageUrl,
@@ -473,6 +477,12 @@ export default function RewardsPage() {
                             <img
                               src={reward.imageUrl}
                               alt={reward.title}
+                              onError={(e) => {
+                                if (!e.currentTarget.dataset.fallbackApplied) {
+                                  e.currentTarget.dataset.fallbackApplied = "1";
+                                  e.currentTarget.src = "/images/rewards/reward-jjk-bookmark.jpg";
+                                }
+                              }}
                               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                               loading="lazy"
                             />

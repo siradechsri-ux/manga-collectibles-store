@@ -20,6 +20,7 @@ import {
 } from "../mocks/auth.mock";
 
 export type AuthRole = "CUSTOMER" | "STAFF" | "FINANCE" | "ADMIN";
+export const AUTH_LOGOUT_EVENT = "manga-store-auth-logout";
 
 export interface AuthUser {
   id: number;
@@ -319,6 +320,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
           accessTokenRef.current = null;
           setUser(null);
           if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
             window.localStorage.setItem("mock_current_role", "GUEST");
             window.dispatchEvent(new StorageEvent("storage", { key: "mock_current_role" }));
           }
@@ -341,6 +343,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
         logoutMockUser();
         setUser(null);
         if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
           window.localStorage.setItem("mock_current_role", "GUEST");
           window.dispatchEvent(
             new StorageEvent("storage", { key: "manga-collectibles-mock-user-v1" }),
@@ -498,6 +501,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
     if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
       logoutMockUser();
       if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
         window.localStorage.setItem("mock_current_role", "GUEST");
         window.dispatchEvent(
           new StorageEvent("storage", { key: "manga-collectibles-mock-user-v1" }),
@@ -521,6 +525,9 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
       }
     } finally {
       accessTokenRef.current = null;
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
+      }
       setUser(null);
     }
   }, [apiBase]);

@@ -174,6 +174,12 @@ export default function ProductBundleDeal({
             <img
               src={mainProduct.imageUrl}
               alt={mainProduct.title}
+              onError={(e) => {
+                if (!e.currentTarget.dataset.fallbackApplied) {
+                  e.currentTarget.dataset.fallbackApplied = "1";
+                  e.currentTarget.src = "/images/products/jjk-vol-01.jpg";
+                }
+              }}
               className="h-full w-full object-cover"
             />
           </div>
@@ -211,6 +217,12 @@ export default function ProductBundleDeal({
                   <img
                     src={comp.imageUrl}
                     alt={comp.title}
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fallbackApplied) {
+                        e.currentTarget.dataset.fallbackApplied = "1";
+                        e.currentTarget.src = "/images/products/acc-8001.jpg";
+                      }
+                    }}
                     className="h-full w-full object-cover"
                   />
                 </div>

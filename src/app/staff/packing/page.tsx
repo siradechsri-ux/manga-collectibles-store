@@ -28,9 +28,9 @@ export default function StaffPackingPage() {
         setOrders(
           all.filter(
             (order) =>
+              (order.detail.status === "PAID" || order.detail.status === "PACKING") &&
               order.detail.paymentStatus === "PAID" &&
-              order.detail.status !== "SHIPPED" &&
-              order.detail.status !== "DELIVERED",
+              order.detail.financeApproved !== false,
           ),
         );
       });
@@ -62,32 +62,23 @@ export default function StaffPackingPage() {
     currentOrdersPage * ordersPerPage,
   );
 
-  function scanOrder(orderId: number): void {
+  function scanOrder(orderId: number, orderNumber?: string): void {
     setError(null);
-    setNotice(null);
     setScannedOrderIds((current) =>
       current.includes(orderId) ? current : [...current, orderId],
     );
-    setNotice(`สแกนบาร์โค้ดคำสั่งซื้อ #${orderId} ผ่านแล้ว`);
+    setNotice(`สแกนบาร์โค้ดคำสั่งซื้อ ${orderNumber ?? `#${orderId}`} ผ่านแล้ว`);
   }
 
   function printShippingLabel(order: MockStoredOrder): void {
     setError(null);
     setNotice(null);
-    if (!scannedOrderIds.includes(order.detail.id)) {
-      setError("กรุณาสแกนบาร์โค้ดให้ผ่านก่อนพิมพ์ใบปะหน้า");
-      return;
-    }
     setLabelOrder(order);
   }
 
   function shipOrder(orderId: number): void {
     setError(null);
     setNotice(null);
-    if (!scannedOrderIds.includes(orderId)) {
-      setError("ต้องสแกนบาร์โค้ดก่อนอัปเดตสถานะจัดส่ง");
-      return;
-    }
     setShippingCarrier("FLASH");
     setShippingOrderId(orderId);
   }
@@ -179,7 +170,7 @@ export default function StaffPackingPage() {
             คลังสินค้าและจัดส่ง
           </h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
-            รายการที่แสดงเป็น Mock Order ที่ชำระครบและรอแพ็กจัดส่ง
+            แสดงเฉพาะคำสั่งซื้อที่ฝ่ายการเงินอนุมัติสลิปเรียบร้อยแล้วและพร้อมแพ็กจัดส่ง
           </p>
         </div>
         <div className="rounded-xl bg-orange-50 px-4 py-3 text-sm font-bold text-orange-900 dark:bg-orange-950/40 dark:text-orange-200">
@@ -203,7 +194,7 @@ export default function StaffPackingPage() {
           <PackageCheck className="mx-auto h-10 w-10 text-slate-400" aria-hidden="true" />
           <h2 className="mt-3 font-bold text-slate-900 dark:text-zinc-100">ไม่มีคำสั่งซื้อรอแพ็ก</h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
-            เมื่อมีคำสั่งซื้อที่ชำระครบ รายการจะแสดงในหน้านี้
+            คำสั่งซื้อจะแสดงในหน้านี้หลังจากฝ่ายการเงินตรวจสอบและกดอนุมัติสลิปแล้วเท่านั้น
           </p>
         </section>
       ) : (
@@ -223,8 +214,13 @@ export default function StaffPackingPage() {
                         {order.detail.orderNumber}
                       </h2>
                       <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                        PAID
+                        อนุมัติแล้ว · พร้อมแพ็ก
                       </span>
+                      {scanned ? (
+                        <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-extrabold text-sky-800 dark:bg-sky-950/60 dark:text-sky-300">
+                          สแกนบาร์โค้ดผ่านแล้ว
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-1 text-sm text-slate-500 dark:text-zinc-400">
                       Order ID {order.detail.id} · {order.detail.items.length} รายการ
@@ -256,6 +252,9 @@ export default function StaffPackingPage() {
                                   <img
                                     src={thumb}
                                     alt={item.title}
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = "none";
+                                    }}
                                     className="h-10 w-8 shrink-0 rounded object-cover border border-zinc-200 dark:border-zinc-700"
                                   />
                                 ) : (
@@ -283,18 +282,20 @@ export default function StaffPackingPage() {
                   <div className="grid shrink-0 gap-2 sm:grid-cols-3 lg:w-[34rem]">
                     <button
                       type="button"
-                      onClick={() => scanOrder(order.detail.id)}
-                      disabled={scanned}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 text-sm font-bold text-orange-900 hover:bg-orange-100 disabled:border-emerald-200 disabled:bg-emerald-50 disabled:text-emerald-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-200 dark:hover:bg-orange-950/70 disabled:dark:border-emerald-900 disabled:dark:bg-emerald-950/40 disabled:dark:text-emerald-300"
+                      onClick={() => scanOrder(order.detail.id, order.detail.orderNumber)}
+                      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold transition ${
+                        scanned
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          : "border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-200 dark:hover:bg-orange-950/70"
+                      }`}
                     >
                       {scanned ? <Check size={17} /> : <ScanLine size={17} />}
-                      {scanned ? "สแกนผ่านแล้ว" : "สแกนบาร์โค้ดผ่าน"}
+                      {scanned ? "สแกนผ่านแล้ว" : "สแกนบาร์โค้ด"}
                     </button>
                     <button
                       type="button"
                       onClick={() => printShippingLabel(order)}
-                      disabled={!scanned}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
                     >
                       <Printer size={17} />
                       พิมพ์ใบปะหน้า
@@ -302,8 +303,7 @@ export default function StaffPackingPage() {
                     <button
                       type="button"
                       onClick={() => shipOrder(order.detail.id)}
-                      disabled={!scanned}
-                      className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-3 text-sm font-bold text-white hover:bg-slate-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
                     >
                       จัดส่งแล้ว
                     </button>

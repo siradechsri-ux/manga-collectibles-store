@@ -9,6 +9,8 @@ export interface RewardItem {
   imageUrl: string;
   category: "BOOKMARK" | "POSTCARD" | "ACRYLIC" | "ACCESSORY" | "BADGE";
   badge?: string;
+  productVariantId?: number;
+  productSlug?: string;
 }
 
 export type MockRewardItem = RewardItem;
@@ -23,6 +25,8 @@ export const MOCK_REWARDS: RewardItem[] = [
     imageUrl: "/images/rewards/reward-jjk-bookmark.jpg",
     category: "BOOKMARK",
     badge: "EXCLUSIVE REWARD",
+    productVariantId: 7001,
+    productSlug: "gojo-satoru-acrylic-stand",
   },
   {
     id: "rew-002",
@@ -33,6 +37,8 @@ export const MOCK_REWARDS: RewardItem[] = [
     imageUrl: "/images/rewards/reward-frieren-postcard.jpg",
     category: "POSTCARD",
     badge: "EXCLUSIVE REWARD",
+    productVariantId: 7005,
+    productSlug: "frieren-acrylic-stand-mimic",
   },
   {
     id: "rew-003",
@@ -43,6 +49,8 @@ export const MOCK_REWARDS: RewardItem[] = [
     imageUrl: "/images/rewards/reward-anya-standee.jpg",
     category: "ACRYLIC",
     badge: "EXCLUSIVE REWARD",
+    productVariantId: 7004,
+    productSlug: "anya-forger-acrylic-stand",
   },
   {
     id: "rew-004",
@@ -53,6 +61,8 @@ export const MOCK_REWARDS: RewardItem[] = [
     imageUrl: "/images/rewards/reward-manga-sleeves.jpg",
     category: "ACCESSORY",
     badge: "EXCLUSIVE REWARD",
+    productVariantId: 8001,
+    productSlug: "manga-cover-standard-pack",
   },
   {
     id: "rew-005",
@@ -63,6 +73,8 @@ export const MOCK_REWARDS: RewardItem[] = [
     imageUrl: "/images/rewards/reward-blue-lock-keychain.jpg",
     category: "ACRYLIC",
     badge: "EXCLUSIVE REWARD",
+    productVariantId: 7008,
+    productSlug: "blue-lock-chibi-badge-box",
   },
   {
     id: "rew-006",
@@ -73,6 +85,8 @@ export const MOCK_REWARDS: RewardItem[] = [
     imageUrl: "/images/rewards/reward-tanjiro-badge.jpg",
     category: "BADGE",
     badge: "EXCLUSIVE REWARD",
+    productVariantId: 7002,
+    productSlug: "sukuna-metal-badge",
   },
 ];
 
@@ -104,7 +118,16 @@ export function listRewards(): RewardItem[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      const defById = new Map(MOCK_REWARDS.map((r) => [r.id, r]));
+      return parsed.map((r: RewardItem) => {
+        const def = defById.get(r.id);
+        if (!def) return r;
+        return {
+          ...r,
+          ...(r.productVariantId ? {} : def.productVariantId ? { productVariantId: def.productVariantId } : {}),
+          ...(r.productSlug ? {} : def.productSlug ? { productSlug: def.productSlug } : {}),
+        };
+      });
     }
     return [...MOCK_REWARDS];
   } catch {

@@ -178,6 +178,12 @@ export default function HeroProductShowcase() {
         <img
           src={currentItem.image}
           alt={currentItem.title}
+          onError={(e) => {
+            if (!e.currentTarget.dataset.fallbackApplied) {
+              e.currentTarget.dataset.fallbackApplied = "1";
+              e.currentTarget.src = "/images/products/jjk-vol-01.jpg";
+            }
+          }}
           className={`max-h-[300px] sm:max-h-[360px] lg:max-h-[400px] w-auto max-w-[95%] object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.85)] transition-all duration-500 ease-out group-hover:scale-105 ${
             isTransitioning
               ? "opacity-0 scale-95 blur-xs"

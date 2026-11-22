@@ -246,10 +246,15 @@ export class ProductService {
       if (matched) return matched;
     }
 
-    // 4. Numeric 4-digit code match (2001, 6001, 7001, 8001)
-    const codeMatch = decoded.match(/\d{4}/)?.[0];
+    // 4. Numeric code match (e.g. 2001, 6001, 7001, 8001, 50001)
+    const codeMatch = decoded.match(/\d{4,}/)?.[0];
     if (codeMatch) {
-      matched = all.find((item) => item.id === codeMatch || item.slug.includes(codeMatch));
+      matched = all.find(
+        (item) =>
+          item.id === codeMatch ||
+          item.id.replace(/\D/g, "") === codeMatch ||
+          item.slug.includes(codeMatch),
+      );
       if (matched) return matched;
     }
 

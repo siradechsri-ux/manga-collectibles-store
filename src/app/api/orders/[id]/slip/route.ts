@@ -187,19 +187,21 @@ export async function POST(
       parsedStatus.data,
       parsedStage.data,
     );
+    const buffer = Buffer.from(await fileEntry.arrayBuffer());
+    const mimeType = fileEntry.type || "image/jpeg";
+    const slipImageUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
     return NextResponse.json(
       {
         success: true,
         data: {
           orderId,
-          paymentStatus: data.paymentStatus,
+          paymentStatus: "PENDING_REVIEW",
+          orderStatus: "PAYMENT_REVIEW_PENDING",
           paymentStage: data.paymentStage,
           verifiedAmount: data.verifiedAmount,
           transactionRef: data.transactionRef,
-          message:
-            data.paymentStatus === "DEPOSIT_PAID"
-              ? "ยืนยันการชำระมัดจำจำลองสำเร็จ"
-              : "ยืนยันการชำระเงินจำลองสำเร็จ",
+          slipImageUrl,
+          message: "ส่งสลิปเรียบร้อยแล้ว อยู่ระหว่างรอฝ่ายการเงินตรวจสอบ",
         },
       },
       { status: 200 },

@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Request, Response, Router } from "express";
 import { Pool } from "pg";
 import { z } from "zod";
@@ -9,6 +11,47 @@ import {
 } from "../db/database";
 import { generatePromptPayQrDataUrl } from "../services/paymentQr.service";
 import { AuthService } from "../auth/auth.service";
+
+const SLIPS_UPLOAD_DIR = path.resolve(process.cwd(), "uploads", "slips");
+
+function saveDataUrlSlipToDisk(orderId: number, dataUrl: string): string | null {
+  const match = /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i.exec(
+    dataUrl.trim(),
+  );
+  if (!match) return null;
+  const rawExt = match[1].toLowerCase();
+  const ext = rawExt === "jpeg" ? "jpg" : rawExt;
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length === 0 || buffer.length > 5 * 1024 * 1024) return null;
+  fs.mkdirSync(SLIPS_UPLOAD_DIR, { recursive: true });
+  const timestamp = Date.now();
+  const filePath = path.join(SLIPS_UPLOAD_DIR, `order-${orderId}-${timestamp}.${ext}`);
+  fs.writeFileSync(filePath, buffer);
+  return `/api/orders/${orderId}/slip-image?v=${timestamp}`;
+}
+
+function findLatestSlipImageFile(orderId: number): { filePath: string; contentType: string } | null {
+  if (!fs.existsSync(SLIPS_UPLOAD_DIR)) return null;
+  const prefix = `order-${orderId}-`;
+  const candidates = fs
+    .readdirSync(SLIPS_UPLOAD_DIR)
+    .filter((name) => name.startsWith(prefix))
+    .map((name) => {
+      const fullPath = path.join(SLIPS_UPLOAD_DIR, name);
+      const stat = fs.statSync(fullPath);
+      return { name, fullPath, mtimeMs: stat.mtimeMs };
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const latest = candidates[0];
+  if (!latest) return null;
+  const lower = latest.name.toLowerCase();
+  const contentType = lower.endsWith(".png")
+    ? "image/png"
+    : lower.endsWith(".webp")
+      ? "image/webp"
+      : "image/jpeg";
+  return { filePath: latest.fullPath, contentType };
+}
 
 const positiveIntegerSchema = z
   .string()
@@ -106,6 +149,46 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
         .json({ success: false, error: { message: "ไม่สามารถอัปเดตสถานะสินค้าเข้าคลังได้" } });
     }
   });
+
+  /**
+   * GET /api/orders/:orderId/slip-image
+   * Serves the actual uploaded payment slip image for Finance review.
+   */
+  router.get(
+    "/:orderId/slip-image",
+    async (request: Request, response: Response): Promise<void> => {
+      const parsedId = positiveIntegerSchema.safeParse(request.params.orderId);
+      if (!parsedId.success) {
+        response.status(400).json({ success: false, error: { message: "หมายเลขคำสั่งซื้อไม่ถูกต้อง" } });
+        return;
+      }
+      const orderId = parsedId.data;
+      try {
+        const diskFile = findLatestSlipImageFile(orderId);
+        if (diskFile) {
+          response.setHeader("Content-Type", diskFile.contentType);
+          response.setHeader("Cache-Control", "no-store");
+          response.sendFile(diskFile.filePath);
+          return;
+        }
+        const snap = await getOrderSnapshotFromDb(pool, orderId);
+        const dataUrl = snap?.detail?.paymentSlipImageUrl;
+        if (typeof dataUrl === "string" && dataUrl.startsWith("data:image/")) {
+          const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+          if (match) {
+            response.setHeader("Content-Type", match[1]);
+            response.setHeader("Cache-Control", "no-store");
+            response.send(Buffer.from(match[2], "base64"));
+            return;
+          }
+        }
+        response.status(404).json({ success: false, error: { message: "ยังไม่มีภาพสลิปสำหรับคำสั่งซื้อนี้" } });
+      } catch (error) {
+        console.error("Failed to serve slip image:", error);
+        response.status(500).json({ success: false, error: { message: "ไม่สามารถโหลดภาพสลิปได้" } });
+      }
+    },
+  );
 
   /**
    * GET /api/orders/:orderId
@@ -272,6 +355,8 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
             ...existing.detail,
             status: nextStatus,
             paymentStatus: nextPaymentStatus,
+            financeApproved: true,
+            financeApprovedAt: approvedAt,
             timelineStage: "DEPOSIT_PAID" as const,
             paidAmount: hasRemainingDeposit
               ? Number(existing.immediateAmount)
@@ -280,6 +365,14 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
               ? existing.detail.remainingBalance
               : 0,
             ...(hasRemainingDeposit ? {} : { balanceDueDate: null }),
+            ...(isBalanceReview
+              ? {
+                  items: existing.detail.items.map((item) => ({
+                    ...item,
+                    remainingBalance: 0,
+                  })),
+                }
+              : {}),
             paymentRejectionReason: null,
             timeline: existing.detail.timeline.map((event) =>
               event.stage === "DEPOSIT_PAID"
@@ -293,6 +386,18 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
           },
         };
 
+        if (isBalanceReview) {
+          await pool.query(
+            `UPDATE order_items
+             SET balance_amount = 0,
+                 remaining_balance = 0,
+                 balance_paid_status = 'PAID',
+                 settlement_status = 'PAID'
+             WHERE order_id = $1`,
+            [orderId],
+          );
+        }
+
         await pool.query(
           `UPDATE orders
            SET order_status = $2,
@@ -300,6 +405,7 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
                settlement_status = $4,
                remaining_balance = $5,
                remaining_balance_amount = $5,
+               balance_paid_status = $6,
                updated_at = CURRENT_TIMESTAMP
            WHERE id = $1`,
           [
@@ -308,9 +414,53 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
             nextPaymentStatus,
             hasRemainingDeposit ? "WAITING_FOR_ARRIVAL" : "READY_TO_PACK",
             updatedOrder.detail.remainingBalance.toFixed(2),
+            hasRemainingDeposit ? "PENDING" : "PAID",
           ],
         );
         await saveOrderSnapshotToDb(pool, updatedOrder);
+
+        // Award loyalty points upon Finance approval (idempotent by tx id)
+        try {
+          const customerId = existing.ownerUserId;
+          const paidAmount = updatedOrder.detail.paidAmount;
+          const earnedPoints = Math.floor(Math.max(0, paidAmount) / 50);
+          if (customerId && earnedPoints > 0) {
+            const txId = `tx-earn-order-${orderId}`;
+            const existingTx = await pool.query(
+              `SELECT id FROM points_ledger WHERE id = $1`,
+              [txId],
+            );
+            if (existingTx.rows.length === 0) {
+              await pool.query(
+                `INSERT INTO user_points (user_id, points) VALUES ($1, 0) ON CONFLICT (user_id) DO NOTHING`,
+                [customerId],
+              );
+              const ptsRes = await pool.query<{ points: number }>(
+                `UPDATE user_points
+                 SET points = points + $2, updated_at = CURRENT_TIMESTAMP
+                 WHERE user_id = $1
+                 RETURNING points`,
+                [customerId, earnedPoints],
+              );
+              const nextBalance = Number(ptsRes.rows[0]?.points ?? earnedPoints);
+              await pool.query(
+                `INSERT INTO points_ledger (id, user_id, tx_type, amount, balance_after, description, reference_id)
+                 VALUES ($1, $2, 'EARN_ORDER', $3, $4, $5, $6)
+                 ON CONFLICT (id) DO NOTHING`,
+                [
+                  txId,
+                  customerId,
+                  earnedPoints,
+                  nextBalance,
+                  `รับแต้มจากคำสั่งซื้อ ${updatedOrder.detail.orderNumber} (อนุมัติโดยฝ่ายการเงิน)`,
+                  String(orderId),
+                ],
+              );
+            }
+          }
+        } catch (pointsErr) {
+          console.warn("Could not credit earned points on slip approval:", pointsErr);
+        }
         await recordAuditLog(pool, {
           performedByUserId: request.user?.id ?? 9004,
           action: "MANUAL_SLIP_APPROVE",
@@ -363,6 +513,11 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
           detail: {
             ...existing.detail,
             status: "PAYMENT_REJECTED" as const,
+            paymentStatus:
+              existing.detail.paymentReviewStage === "BALANCE"
+                ? ("DEPOSIT_PAID" as const)
+                : ("UNPAID" as const),
+            financeApproved: false,
             paymentRejectionReason: String(reason),
           },
         };
@@ -413,18 +568,28 @@ export function createOrderRouter(pool: Pool, _authService: AuthService): Router
         }
 
         const fileName = String(request.body.fileName || "resubmitted_slip.jpg");
+        const slipImageDataUrl =
+          typeof request.body.slipImageDataUrl === "string"
+            ? request.body.slipImageDataUrl
+            : null;
+        const savedSlipImageUrl = slipImageDataUrl
+          ? saveDataUrlSlipToDisk(orderId, slipImageDataUrl)
+          : null;
+
         const updatedOrder = {
           ...existing,
           detail: {
             ...existing.detail,
             status: "PAYMENT_REVIEW_PENDING" as const,
+            financeApproved: false,
             paymentRejectionReason: null,
             paymentSlipFileName: fileName,
+            ...(savedSlipImageUrl ? { paymentSlipImageUrl: savedSlipImageUrl } : {}),
           },
         };
 
         await pool.query(
-          `UPDATE orders SET order_status = 'PAYMENT_REVIEW_PENDING', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          `UPDATE orders SET order_status = 'PAYMENT_REVIEW_PENDING', settlement_status = 'PAYMENT_REVIEW_PENDING', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
           [orderId],
         );
         await saveOrderSnapshotToDb(pool, updatedOrder);

@@ -37,6 +37,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CollectibleProductCard, MangaSeriesCard } from "./ProductCard";
 import { useCart } from "../context/CartContext";
@@ -143,6 +144,8 @@ export default function CollectionListing({
   collection: StoreCollection;
   initialStatus?: StoreStatus;
 }) {
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
   const { addItem } = useCart();
   const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -214,28 +217,39 @@ export default function CollectionListing({
     setStatus(initialStatus);
   }, [initialStatus]);
 
-  // Read URL query params on load (genre, filter, sort)
+  // Read URL query params on load and whenever query params change (q, genre, filter, sort, status)
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const g = params.get("genre");
-      if (g) setSelectedGenre(g);
-      const f = params.get("filter");
-      const bs = params.get("bestSeller");
-      if (f === "best-seller" || bs === "true") {
-        setOnlyBestSeller(true);
-        setSortBy("BEST_SELLER");
-      } else if (f === "new" || f === "new-arrivals") {
+    const params = new URLSearchParams(searchParamsKey);
+    const q = params.get("q") ?? params.get("search") ?? "";
+    setQuery(q);
+
+    const g = params.get("genre");
+    setSelectedGenre(g || "all");
+
+    const st = params.get("status");
+    if (st === "PREORDER" || st === "IN_STOCK" || st === "ALL") {
+      setStatus(st);
+    } else {
+      setStatus(initialStatus);
+    }
+
+    const f = params.get("filter");
+    const bs = params.get("bestSeller");
+    const s = params.get("sort");
+    if (f === "best-seller" || bs === "true") {
+      setOnlyBestSeller(true);
+      setSortBy("BEST_SELLER");
+    } else {
+      setOnlyBestSeller(false);
+      if (f === "new" || f === "new-arrivals" || s === "new" || s === "NEW_ARRIVALS" || s === "new-arrivals") {
         setSortBy("NEW_ARRIVALS");
-      }
-      const s = params.get("sort");
-      if (s === "best-seller" || s === "BEST_SELLER") {
+      } else if (s === "best-seller" || s === "BEST_SELLER") {
         setSortBy("BEST_SELLER");
-      } else if (s === "new" || s === "NEW_ARRIVALS" || s === "new-arrivals") {
-        setSortBy("NEW_ARRIVALS");
+      } else {
+        setSortBy("POPULAR");
       }
     }
-  }, []);
+  }, [searchParamsKey, initialStatus]);
 
   useEffect(() => {
     void loadCatalog();

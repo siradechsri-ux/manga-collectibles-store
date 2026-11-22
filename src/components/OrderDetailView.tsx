@@ -65,45 +65,74 @@ export interface OrderTrackingLineItem {
 export function resolveOrderItemImage(item: { title?: string; imageUrl?: string; productType?: string }): string | null {
   if (item.imageUrl) return item.imageUrl;
   const t = (item.title || "").toLowerCase();
-  if (t.includes("มหาเวทย์") || t.includes("jujutsu") || t.includes("jjk")) {
+  if (t.includes("มหาเวทย์") || t.includes("มหาเวท") || t.includes("jujutsu") || t.includes("จูจุทสึ") || t.includes("jjk")) {
     const vol = t.match(/เล่ม\s*(\d+)/)?.[1] || "01";
     return `/images/products/jjk-vol-${String(vol).padStart(2, "0")}.jpg`;
   }
   if (t.includes("chainsaw") || t.includes("เลื่อยยนต์")) {
+    if (t.includes("denji") || t.includes("figma")) return "/images/products/figure-2008.jpg";
+    if (t.includes("pochita") || t.includes("โพชิตะ")) return "/images/products/goods-7006.jpg";
     const vol = t.match(/เล่ม\s*(\d+)/)?.[1] || "01";
     return `/images/products/chainsaw-vol-${String(vol).padStart(2, "0")}.jpg`;
   }
-  if (t.includes("spy")) {
+  if (t.includes("anya") || t.includes("อาเนีย")) {
+    if (t.includes("สแตนดี้") || t.includes("stand")) return "/images/products/goods-7004.jpg";
+    return "/images/products/figure-2003.jpg";
+  }
+  if (t.includes("spy") || t.includes("สปาย")) {
     const vol = t.match(/เล่ม\s*(\d+)/)?.[1] || "01";
     return `/images/products/spy-family-vol-${String(vol).padStart(2, "0")}.jpg`;
   }
+  if (t.includes("fern") || t.includes("เฟิร์น")) {
+    return "/images/products/figure-2007.jpg";
+  }
   if (t.includes("frieren") || t.includes("ฟรีเรน") || t.includes("คำอธิษฐาน")) {
+    if (t.includes("สแตนดี้") || t.includes("stand") || t.includes("มิมิค")) return "/images/products/goods-7005.jpg";
+    if (t.includes("nendoroid")) return "/images/products/figure-2006.jpg";
     return "/images/products/frieren-vol-01.jpg";
   }
+  if (t.includes("blue lock") || t.includes("ขังดวลแข้ง")) {
+    if (t.includes("เข็มกลัด") || t.includes("badge") || t.includes("พวงกุญแจ")) return "/images/products/goods-7008.jpg";
+    return "/images/products/bluelock-vol-01.jpg";
+  }
   if (t.includes("gojo") || t.includes("โกโจ")) {
+    if (t.includes("สแตนดี้") || t.includes("stand")) return "/images/products/goods-7001.jpg";
     return "/images/products/figure-2001.jpg";
   }
   if (t.includes("sukuna") || t.includes("สุคุนะ")) {
+    if (t.includes("เข็มกลัด") || t.includes("badge")) return "/images/products/goods-7002.jpg";
     return "/images/products/figure-2002.jpg";
   }
-  if (t.includes("tanjiro") || t.includes("ทันจิโร่")) {
+  if (t.includes("tanjiro") || t.includes("ทันจิโร่") || t.includes("ดาบพิฆาตอสูร")) {
     return "/images/products/figure-2004.jpg";
+  }
+  if (t.includes("barbatos") || t.includes("6003")) {
+    return "/images/products/plamo-6003.jpg";
   }
   if (t.includes("hi-nu") || t.includes("6005")) {
     return "/images/products/plamo-6005.jpg";
   }
-  if (t.includes("gundam") || t.includes("rx-78")) {
+  if (t.includes("gundam") || t.includes("กันดั้ม") || t.includes("rx-78")) {
     return "/images/products/plamo-6001.jpg";
   }
-  if (t.includes("ซองใส") || t.includes("8001")) {
+  if (t.includes("แปรงปัดฝุ่น") || t.includes("8006")) {
+    return "/images/products/acc-8006.jpg";
+  }
+  if (t.includes("ซองใส") || t.includes("ปกพลาสติก") || t.includes("8001")) {
     return "/images/products/acc-8001.jpg";
   }
-  if (t.includes("กล่องอะคริลิก") || t.includes("8002")) {
-    return "/images/products/acc-8002.jpg";
+  if (t.includes("กล่องอะคริลิก") || t.includes("8002") || t.includes("8003")) {
+    return "/images/products/acc-8003.jpg";
   }
   if (t.includes("สแตนดี้") || t.includes("7001")) {
     return "/images/products/goods-7001.jpg";
   }
+  if (item.productType === "MANGA") return "/images/products/jjk-vol-01.jpg";
+  if (item.productType === "LIGHT_NOVEL") return "/images/products/konosuba-vol-01.jpg";
+  if (item.productType === "FIGURE") return "/images/products/figure-2001.jpg";
+  if (item.productType === "PLAMO") return "/images/products/plamo-6001.jpg";
+  if (item.productType === "GOODS") return "/images/products/goods-7001.jpg";
+  if (item.productType === "ACCESSORY") return "/images/products/acc-8001.jpg";
   return null;
 }
 
@@ -139,6 +168,9 @@ export interface OrderTrackingDetail {
   paymentRejectionReason?: string | null;
   paymentReviewStage?: "INITIAL" | "BALANCE";
   paymentSlipFileName?: string | null;
+  paymentSlipImageUrl?: string | null;
+  financeApproved?: boolean;
+  financeApprovedAt?: string | null;
   totalAmount: number;
   paidAmount: number;
   remainingBalance: number;
@@ -724,15 +756,15 @@ export default function OrderDetailView({
       return (
       <article
         key={shipment.id}
-        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        className="rounded-2xl border border-slate-200 bg-slate-50/40 p-4 shadow-2xs sm:p-5 dark:border-zinc-800 dark:bg-zinc-950/50"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
             <span
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                 shipment.shipmentType === "IN_STOCK"
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                  : "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                  : "bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
               }`}
             >
               {shipment.shipmentType === "IN_STOCK" ? (
@@ -741,9 +773,9 @@ export default function OrderDetailView({
                 <Package size={20} aria-hidden="true" />
               )}
             </span>
-            <div>
+            <div className="min-w-0">
               <h4 className="font-bold text-slate-900 dark:text-zinc-100">{shipment.label}</h4>
-              <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">
                 {shipment.shipmentType === "IN_STOCK"
                   ? "กล่องสินค้าพร้อมส่ง"
                   : "กล่องสินค้าพรีออเดอร์"}
@@ -751,48 +783,63 @@ export default function OrderDetailView({
             </div>
           </div>
           <span
-            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${display.badgeClass}`}
+            className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold ${display.badgeClass}`}
           >
             {display.badgeLabel}
           </span>
         </div>
 
         {display.statusNote ? (
-          <p className={`mt-3 rounded-xl border px-3 py-2 text-xs leading-5 ${display.noteClass}`}>
+          <p className={`mt-3 rounded-xl border px-3.5 py-2.5 text-xs leading-5 ${display.noteClass}`}>
             {display.statusNote}
           </p>
         ) : null}
 
-        <ul className="mt-4 space-y-2 border-t border-slate-100 pt-3 dark:border-zinc-800">
+        <ul className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200/80 bg-white px-3.5 py-1 dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
           {shipment.items.map((item) => (
             <li
               key={item.id}
-              className="flex items-start justify-between gap-3 text-sm"
+              className="flex items-start justify-between gap-3 py-2 text-sm"
             >
-              <span className="text-slate-700 dark:text-zinc-300">{item.title}</span>
-              <span className="shrink-0 text-slate-500 dark:text-zinc-400">x{item.quantity}</span>
+              <span className="min-w-0 text-slate-700 dark:text-zinc-300">{item.title}</span>
+              <span className="shrink-0 font-semibold text-slate-500 dark:text-zinc-400">x{item.quantity}</span>
             </li>
           ))}
         </ul>
 
         <section
-          className="mt-4 border-t border-slate-100 pt-4 dark:border-zinc-700"
+          className="mt-4 rounded-xl border border-slate-200/80 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
           aria-label="ไทม์ไลน์สถานะจัดส่ง"
         >
-          <ol className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-zinc-500">
+            สถานะการจัดส่งพัสดุ
+          </p>
+          <ol className="relative grid grid-cols-1 gap-3 md:grid-cols-5 md:gap-2">
             {shippingSteps.map((step, index) => {
               const isComplete = currentStep >= 0 && index <= currentStep;
+              const isCurrent = currentStep === index;
+              const isNextComplete = currentStep >= 0 && index < currentStep;
               return (
                 <li
                   key={step}
-                  className="flex items-center gap-2 sm:flex-col sm:items-start"
+                  className="relative flex items-center gap-3 md:flex-col md:items-center md:text-center"
                 >
+                  {index < shippingSteps.length - 1 ? (
+                    <span
+                      aria-hidden="true"
+                      className={`hidden md:block absolute top-3.5 left-[calc(50%+16px)] right-[calc(-50%+16px)] h-0.5 ${
+                        isNextComplete
+                          ? "bg-sky-600 dark:bg-sky-500"
+                          : "bg-slate-200 dark:bg-zinc-700"
+                      }`}
+                    />
+                  ) : null}
                   <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${
                       isComplete
-                        ? "bg-sky-600 text-white"
-                        : "bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400"
-                    }`}
+                        ? "bg-sky-600 text-white shadow-xs"
+                        : "border border-slate-200 bg-slate-100 text-slate-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                    } ${isCurrent ? "ring-4 ring-sky-100 dark:ring-sky-950/80" : ""}`}
                   >
                     {isComplete ? (
                       <Check size={13} strokeWidth={3} aria-hidden="true" />
@@ -801,7 +848,7 @@ export default function OrderDetailView({
                     )}
                   </span>
                   <span
-                    className={`text-xs font-semibold ${
+                    className={`text-xs leading-snug font-semibold ${
                       isComplete
                         ? "text-sky-800 dark:text-sky-300"
                         : "text-slate-500 dark:text-zinc-400"
@@ -1090,55 +1137,62 @@ export default function OrderDetailView({
         <div className="space-y-6">
           <section
             aria-labelledby="order-items-heading"
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900"
           >
-            <h2 id="order-items-heading" className="text-lg font-bold text-slate-900">
+            <h2 id="order-items-heading" className="text-lg font-bold text-slate-900 dark:text-zinc-50">
               รายการสินค้า
             </h2>
 
             {categoryGroups.map((group) => (
               <div key={group.key} className="mt-5">
-                <h3 className="mb-3 text-sm font-bold text-slate-700">{group.title}</h3>
+                <h3 className="mb-3 text-sm font-bold text-slate-700 dark:text-zinc-300">{group.title}</h3>
                 <ul className="space-y-3">
-                  {group.items.map((item) => (
+                  {group.items.map((item) => {
+                    const imgSrc = item.imageUrl || resolveOrderItemImage(item);
+                    return (
                     <li
                       key={item.id}
-                      className="flex gap-3 rounded-xl border border-slate-100 p-3"
+                      className="flex gap-3 rounded-xl border border-slate-100 p-3 dark:border-zinc-800 dark:bg-zinc-950/40"
                     >
-                      <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                        {item.imageUrl || resolveOrderItemImage(item) ? (
+                      <div className="relative flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-400 dark:bg-zinc-800 dark:text-zinc-500">
+                        {imgSrc ? (
                           <img
-                            src={item.imageUrl || resolveOrderItemImage(item)!}
+                            src={imgSrc}
                             alt={item.title}
                             referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const fallback = e.currentTarget.nextElementSibling;
+                              if (fallback) fallback.classList.remove("hidden");
+                            }}
                             className="h-full w-full object-cover"
                           />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-slate-400">
-                            <Package size={22} aria-hidden="true" />
-                          </div>
-                        )}
+                        ) : null}
+                        <div className={`flex h-full w-full items-center justify-center ${imgSrc ? "hidden" : ""}`}>
+                          <Package size={22} aria-hidden="true" />
+                        </div>
                       </div>
                       <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 sm:flex-row sm:items-center">
                         <div>
-                          <p className="font-semibold text-slate-900">{item.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="font-semibold text-slate-900 dark:text-zinc-100">{item.title}</p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
                             {item.volumeLabel ? `${item.volumeLabel} · ` : ""}
                             {item.isPreorder ? "พรีออเดอร์" : "พร้อมส่ง"} · จำนวน{" "}
                             {item.quantity}
                           </p>
                           {item.paymentType === "DEPOSIT" ? (
-                            <span className="mt-2 inline-flex rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800">
+                            <span className="mt-2 inline-flex rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800 dark:bg-orange-950/60 dark:text-orange-300">
                               {`วางมัดจำ · คงเหลือ ${currencyFormatter.format(item.remainingBalance)}`}
                             </span>
                           ) : null}
                         </div>
-                        <p className="shrink-0 text-sm font-bold text-slate-900">
+                        <p className="shrink-0 text-sm font-bold text-slate-900 dark:text-zinc-100">
                           {currencyFormatter.format(item.lineTotal)}
                         </p>
                       </div>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </div>
             ))}
@@ -1146,28 +1200,41 @@ export default function OrderDetailView({
 
           <section
             aria-labelledby="shipments-heading"
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900"
           >
-            <h2 id="shipments-heading" className="flex items-center gap-2 text-lg font-bold text-slate-900">
-              <Truck size={20} aria-hidden="true" />
-              การจัดส่ง
-            </h2>
-            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <div>
-                <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-emerald-800">
-                  <PackageCheck size={17} aria-hidden="true" />
-                  กล่องสินค้าพร้อมส่ง
-                </h3>
-                <div className="space-y-3">{renderShipmentCards(inStockShipments)}</div>
-              </div>
-              <div>
-                <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-violet-800">
-                  <Package size={17} aria-hidden="true" />
-                  กล่องพรีออเดอร์
-                </h3>
-                <div className="space-y-3">{renderShipmentCards(preorderShipments)}</div>
-              </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4 dark:border-zinc-800">
+              <h2 id="shipments-heading" className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-zinc-50">
+                <Truck size={20} className="text-sky-600 dark:text-sky-400" aria-hidden="true" />
+                การจัดส่ง
+              </h2>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-zinc-800 dark:text-zinc-300">
+                ทั้งหมด {order.shipments.length} กล่องพัสดุ
+              </span>
             </div>
+            {inStockShipments.length === 0 && preorderShipments.length === 0 ? (
+              <div className="mt-4">{renderShipmentCards([])}</div>
+            ) : (
+              <div className="mt-5 space-y-6">
+                {inStockShipments.length > 0 ? (
+                  <div>
+                    <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                      <PackageCheck size={17} aria-hidden="true" />
+                      กล่องสินค้าพร้อมส่ง ({inStockShipments.length})
+                    </h3>
+                    <div className="space-y-4">{renderShipmentCards(inStockShipments)}</div>
+                  </div>
+                ) : null}
+                {preorderShipments.length > 0 ? (
+                  <div>
+                    <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-violet-800 dark:text-violet-300">
+                      <Package size={17} aria-hidden="true" />
+                      กล่องพรีออเดอร์ ({preorderShipments.length})
+                    </h3>
+                    <div className="space-y-4">{renderShipmentCards(preorderShipments)}</div>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </section>
         </div>
 
