@@ -43,6 +43,7 @@ export default function FinanceSlipsPage() {
   const [selectedSlipOrder, setSelectedSlipOrder] = useState<MockStoredOrder | null>(null);
   const [slipImageError, setSlipImageError] = useState(false);
   const [rejectionTarget, setRejectionTarget] = useState<MockStoredOrder | null>(null);
+  const [approvalTarget, setApprovalTarget] = useState<MockStoredOrder | null>(null);
 
   useEffect(() => {
     setSlipImageError(false);
@@ -82,6 +83,13 @@ export default function FinanceSlipsPage() {
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "อนุมัติสลิปไม่สำเร็จ");
     }
+  }
+
+  async function handleConfirmApprove(): Promise<void> {
+    if (!approvalTarget) return;
+    const target = approvalTarget;
+    setApprovalTarget(null);
+    await handleApprove(target);
   }
 
   async function handleReject(): Promise<void> {
@@ -460,7 +468,7 @@ export default function FinanceSlipsPage() {
                         <>
                           <button
                             type="button"
-                            onClick={() => handleApprove(order)}
+                            onClick={() => setApprovalTarget(order)}
                             className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                           >
                             <Check size={14} aria-hidden="true" />
@@ -617,7 +625,7 @@ export default function FinanceSlipsPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleApprove(selectedSlipOrder)}
+                    onClick={() => setApprovalTarget(selectedSlipOrder)}
                     className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                   >
                     อนุมัติสลิปและส่งต่อคลัง
@@ -697,6 +705,70 @@ export default function FinanceSlipsPage() {
                 className="rounded-xl bg-red-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
               >
                 ยืนยันปฏิเสธสลิป
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {/* ===================== [Approval Confirmation Modal] ===================== */}
+      {approvalTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="approve-slip-title"
+        >
+          <section className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+              <CheckCircle2 size={22} aria-hidden="true" />
+            </div>
+            <h2 id="approve-slip-title" className="mt-3 text-base font-black text-slate-900 dark:text-zinc-100">
+              ยืนยันอนุมัติสลิป • {approvalTarget.detail.orderNumber}
+            </h2>
+            <p className="mt-1 text-xs text-slate-600 dark:text-zinc-400">
+              กรุณาตรวจสอบว่ายอดเงินในบัญชีธนาคารตรงกับสลิปโอนเงิน เมื่ออนุมัติแล้วระบบจะส่งต่อรายการให้ฝ่ายคลังแพ็กของทันที
+            </p>
+
+            <div className="mt-4 space-y-2 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-zinc-400">ยอดเงินที่ต้องตรวจสอบ:</span>
+                <span className="text-sm font-black text-emerald-700 dark:text-emerald-400">
+                  ฿{approvalTarget.detail.totalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-zinc-400">ชื่อผู้สั่งซื้อ:</span>
+                <span className="font-bold text-slate-800 dark:text-zinc-200">
+                  {approvalTarget.shippingAddress?.recipientName ??
+                    approvalTarget.taxSummary?.taxInvoiceCustomer?.companyOrName ??
+                    "ลูกค้าทั่วไป"}
+                </span>
+              </div>
+              {approvalTarget.detail.paymentSlipFileName && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500 dark:text-zinc-400">ไฟล์สลิป:</span>
+                  <span className="max-w-[200px] truncate font-mono text-[11px] text-slate-600 dark:text-zinc-400">
+                    {approvalTarget.detail.paymentSlipFileName}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setApprovalTarget(null)}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmApprove}
+                className="rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+              >
+                ยืนยันอนุมัติสลิป
               </button>
             </div>
           </section>
