@@ -27,6 +27,7 @@ import {
 } from "../services/new-arrivals.service";
 import { getMockCatalog } from "../mocks/products.mock";
 import { ProductService } from "../services/product.service";
+import { ADMIN_PRODUCTS_UPDATED_EVENT } from "../mocks/admin-products.mock";
 
 export type ShowcaseTab = "all-time" | "weekly" | "new-arrivals";
 
@@ -224,7 +225,7 @@ export default function FeaturedShowcaseSection() {
 
     // Immediate initial load to prevent blank or delayed content
     try {
-      const initCatalog = getMockCatalog();
+      const initCatalog = ProductService.filterPublicCatalog(getMockCatalog());
       cachedCatalog = initCatalog;
       refreshData(initCatalog);
     } catch {
@@ -254,9 +255,25 @@ export default function FeaturedShowcaseSection() {
       }
     });
 
+    const handleProductsUpdated = () => {
+      ProductService.getProducts()
+        .then((cat: CatalogData) => {
+          if (mounted) {
+            cachedCatalog = cat;
+            refreshData(cat);
+          }
+        })
+        .catch(() => {});
+    };
+
+    window.addEventListener(ADMIN_PRODUCTS_UPDATED_EVENT, handleProductsUpdated);
+    window.addEventListener("storage", handleProductsUpdated);
+
     return () => {
       mounted = false;
       unsubscribe();
+      window.removeEventListener(ADMIN_PRODUCTS_UPDATED_EVENT, handleProductsUpdated);
+      window.removeEventListener("storage", handleProductsUpdated);
     };
   }, []);
 

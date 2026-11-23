@@ -221,7 +221,12 @@ export type ProductCategoryFilter =
   | "GOODS"
   | "ACCESSORY";
 
-export type ProductStatusFilter = "ALL" | "IN_STOCK" | "PREORDER" | "OUT_OF_STOCK";
+export type ProductStatusFilter =
+  | "ALL"
+  | "LOW_STOCK"
+  | "IN_STOCK"
+  | "PREORDER"
+  | "OUT_OF_STOCK";
 
 export const MOCK_VERSION = "v9_100pct_accurate_images_verified";
 export const MOCK_DATA_VERSION_KEY = "MOCK_DATA_VERSION";

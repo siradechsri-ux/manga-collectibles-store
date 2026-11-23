@@ -13,6 +13,10 @@ import {
   getWeeklyNewArrivals,
   type NewArrivalProductItem,
 } from "./new-arrivals.service";
+import {
+  isProductVisibleToPublic,
+  listAdminProducts,
+} from "../mocks/admin-products.mock";
 
 export type BestSellerCalculationMode = "HYBRID" | "AUTO" | "MANUAL";
 
@@ -236,6 +240,41 @@ export function subscribeBestSellerSettings(
   };
 }
 
+function getAdminHiddenIdentifiers(): Set<string> {
+  const hidden = new Set<string>();
+  if (typeof window === "undefined") return hidden;
+  try {
+    const allProducts = listAdminProducts();
+    const seriesVolumes = new Map<string, { total: number; hidden: number }>();
+    for (const p of allProducts) {
+      if (!isProductVisibleToPublic(p)) {
+        hidden.add(p.id.toLowerCase());
+      }
+      if ((p.type === "MANGA" || p.type === "LIGHT_NOVEL") && p.seriesId) {
+        const entry = seriesVolumes.get(p.seriesId) || { total: 0, hidden: 0 };
+        entry.total += 1;
+        if (!isProductVisibleToPublic(p)) entry.hidden += 1;
+        seriesVolumes.set(p.seriesId, entry);
+      }
+    }
+    for (const [seriesId, counts] of seriesVolumes.entries()) {
+      if (counts.total > 0 && counts.hidden >= counts.total) {
+        hidden.add(seriesId.toLowerCase());
+      }
+    }
+  } catch {}
+  return hidden;
+}
+
+function isItemHidden(hiddenIds: Set<string>, id?: string, href?: string): boolean {
+  if (hiddenIds.size === 0) return false;
+  const lowerId = (id || "").toLowerCase();
+  const lowerHref = (href || "").toLowerCase();
+  return Array.from(hiddenIds).some(
+    (h) => (lowerId && lowerId.includes(h)) || (lowerHref && lowerHref.includes(h)),
+  );
+}
+
 /**
  * Returns the effective Best Sellers list based on the active mode:
  * - AUTO: 100% computed from sales stats/catalog
@@ -246,11 +285,13 @@ export function getEffectiveBestSellers(
   catalog: CatalogData,
   settings: BestSellerSettings = getBestSellerSettings(),
 ): BestSellerProductItem[] {
+  const hiddenIds = getAdminHiddenIdentifiers();
   const autoList = getAllBestSellers(catalog);
 
   // If AUTO mode: return purely auto-calculated list
   if (settings.mode === "AUTO") {
     return autoList
+      .filter((item) => !isItemHidden(hiddenIds, item.id, item.href))
       .slice(0, TOP_ITEMS_LIMIT)
       .map((item, idx) => ({
         ...item,
@@ -327,6 +368,7 @@ export function getEffectiveBestSellers(
       }
     }
     return result
+      .filter((item) => !isItemHidden(hiddenIds, item.id, item.href))
       .sort((a, b) => a.rank - b.rank)
       .slice(0, TOP_ITEMS_LIMIT)
       .map((item, idx) => ({
@@ -427,6 +469,7 @@ export function getEffectiveBestSellers(
   }
 
   return Array.from(hybridMap.values())
+    .filter((item) => !isItemHidden(hiddenIds, item.id, item.href))
     .sort((a, b) => a.rank - b.rank)
     .slice(0, TOP_ITEMS_LIMIT)
     .map((item, idx) => ({
@@ -444,26 +487,29 @@ export function getEffectiveRecommended(
   settings: BestSellerSettings = getBestSellerSettings(),
 ): RecommendedProductItem[] {
   const defaultList = getRecommendedProducts(catalog);
+  const hiddenIds = getAdminHiddenIdentifiers();
 
   if (settings.mode === "AUTO") {
-    return defaultList;
+    return defaultList.filter((item) => !isItemHidden(hiddenIds, item.id, item.href));
   }
 
   // In MANUAL or HYBRID: apply any custom highlights
-  return defaultList.map((item) => {
-    const cleanId = cleanProductId(item.id);
-    const pinned = settings.pinnedRecommended.find(
-      (p) => cleanProductId(p.id) === cleanId,
-    );
-    if (pinned) {
-      return {
-        ...item,
-        highlightText: pinned.highlightText || item.highlightText,
-        badgeText: pinned.badgeText || item.badgeText,
-      };
-    }
-    return item;
-  });
+  return defaultList
+    .filter((item) => !isItemHidden(hiddenIds, item.id, item.href))
+    .map((item) => {
+      const cleanId = cleanProductId(item.id);
+      const pinned = settings.pinnedRecommended.find(
+        (p) => cleanProductId(p.id) === cleanId,
+      );
+      if (pinned) {
+        return {
+          ...item,
+          highlightText: pinned.highlightText || item.highlightText,
+          badgeText: pinned.badgeText || item.badgeText,
+        };
+      }
+      return item;
+    });
 }
 
 /**
@@ -538,6 +584,9 @@ export function getEffectiveAllTimeBestSellers(
     }
   }
 
+  // Filter any items that are hidden by admin
+  const hiddenIdentifiers = getAdminHiddenIdentifiers();
+
   // Fallback defaults to ensure 5 complete cards even if custom items fail to resolve
   if (result.length < TOP_ITEMS_LIMIT) {
     const fallbacks: AllTimeBestSellerItem[] = [
@@ -548,6 +597,7 @@ export function getEffectiveAllTimeBestSellers(
       { id: "alltime-gojo", rank: 5, title: "Nendoroid Satoru Gojo: JJK 0 Ver.", subtitle: "Good Smile Company · ของแท้ล็อต JP", priceFormatted: "฿1,850", numericPrice: 1850, imageUrl: "/images/products/figure-2001.jpg", salesMilestone: "อันดับ #1 ยอดจอง", salesRecord: "เนนโดรอยด์ยอดสั่งจองสูงสุดตลอดกาล", rating: 5.0, reviewCount: 410, href: "/figures/2001", categoryTab: "figure" },
     ];
     for (const fb of fallbacks) {
+      if (isItemHidden(hiddenIdentifiers, fb.id, fb.href)) continue;
       if (!result.some((r) => r.rank === fb.rank || r.id === fb.id)) {
         result.push(fb);
         if (result.length >= TOP_ITEMS_LIMIT) break;
@@ -556,6 +606,7 @@ export function getEffectiveAllTimeBestSellers(
   }
 
   return result
+    .filter((item) => !isItemHidden(hiddenIdentifiers, item.id, item.href))
     .sort((a, b) => a.rank - b.rank)
     .slice(0, TOP_ITEMS_LIMIT)
     .map((item, idx) => ({ ...item, rank: idx + 1 }));
@@ -570,7 +621,10 @@ export function getEffectiveNewArrivalsList(
 ): NewArrivalProductItem[] {
   const defaultList = getWeeklyNewArrivals(catalog);
   if (!settings.pinnedNewArrivals || settings.pinnedNewArrivals.length === 0) {
-    return defaultList.slice(0, TOP_ITEMS_LIMIT);
+    const hidden = getAdminHiddenIdentifiers();
+    return defaultList
+      .filter((item) => !isItemHidden(hidden, item.id, (item as any).href))
+      .slice(0, TOP_ITEMS_LIMIT);
   }
 
   const result: NewArrivalProductItem[] = [];
@@ -645,7 +699,12 @@ export function getEffectiveNewArrivalsList(
     }
   }
 
-  return result.slice(0, TOP_ITEMS_LIMIT);
+  // Filter hidden products from new arrivals
+  const hiddenIdsNA = getAdminHiddenIdentifiers();
+
+  return result
+    .filter((item) => !isItemHidden(hiddenIdsNA, item.id, (item as any).href))
+    .slice(0, TOP_ITEMS_LIMIT);
 }
 
 /**

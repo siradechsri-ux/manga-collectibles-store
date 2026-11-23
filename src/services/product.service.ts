@@ -5,7 +5,11 @@ import type {
   CatalogMangaSeries,
 } from "../lib/catalog-client";
 import { catalogResponseSchema } from "../lib/catalog-client";
-import { getAdminProductsCatalog } from "../mocks/admin-products.mock";
+import {
+  getAdminProductsCatalog,
+  isProductVisibleToPublic,
+  listAdminProducts,
+} from "../mocks/admin-products.mock";
 import { getMockCatalog } from "../mocks/products.mock";
 import {
   initializeMasterStorage,
@@ -21,51 +25,106 @@ export interface ResolvedProductResult {
 
 export class ProductService {
   /**
+   * Filters a catalog so that hidden products and future-scheduled products are removed from customer view.
+   */
+  static filterPublicCatalog(catalog: CatalogData): CatalogData {
+    if (typeof window === "undefined") return catalog;
+    try {
+      const adminProducts = listAdminProducts();
+      const hiddenProductIds = new Set<string>();
+
+      for (const p of adminProducts) {
+        if (!isProductVisibleToPublic(p)) {
+          hiddenProductIds.add(p.id.toLowerCase());
+          const numericId = p.id.replace(/\D/g, "");
+          if (numericId) hiddenProductIds.add(numericId);
+        }
+      }
+
+      const mangaSeries = (catalog.mangaSeries || [])
+        .map((series) => ({
+          ...series,
+          volumes: (series.volumes || []).filter(
+            (v) =>
+              !hiddenProductIds.has(String(v.id)) &&
+              !hiddenProductIds.has(`manga-${v.id}`),
+          ),
+        }))
+        .filter((series) => series.volumes.length > 0);
+
+      const lightNovelSeries = (catalog.lightNovelSeries || [])
+        .map((series) => ({
+          ...series,
+          volumes: (series.volumes || []).filter(
+            (v) =>
+              !hiddenProductIds.has(String(v.id)) &&
+              !hiddenProductIds.has(`lightnovel-${v.id}`),
+          ),
+        }))
+        .filter((series) => series.volumes.length > 0);
+
+      const filterCollectibles = (items?: CatalogFigure[]) =>
+        (items || []).filter((item) => {
+          const id = item.id.toLowerCase();
+          const slug = (item.slug || "").toLowerCase();
+          return !hiddenProductIds.has(id) && !hiddenProductIds.has(slug);
+        });
+
+      return {
+        ...catalog,
+        mangaSeries,
+        lightNovelSeries,
+        figures: filterCollectibles(catalog.figures),
+        plamo: filterCollectibles(catalog.plamo),
+        goods: filterCollectibles(catalog.goods),
+        accessories: filterCollectibles(catalog.accessories),
+      };
+    } catch {
+      return catalog;
+    }
+  }
+
+  /**
    * Retrieves the catalog containing manga, light novels, figures, plamo, goods, accessories.
    * In mock mode, pulls from local memory/localStorage; otherwise fetches the live API.
    */
   static async getProducts(): Promise<CatalogData> {
+    let catalog: CatalogData;
     if (IS_MOCK_MODE) {
       if (typeof window !== "undefined") {
         initializeMasterStorage();
-        return getAdminProductsCatalog();
+        catalog = getAdminProductsCatalog();
+      } else {
+        catalog = getMockCatalog();
       }
-      return getMockCatalog();
+    } else {
+      try {
+        const response = await fetch("/api/catalog", {
+          headers: { Accept: "application/json" },
+        });
+        if (response.ok) {
+          const json = await response.json();
+          catalog = json.data;
+        } else {
+          catalog =
+            typeof window !== "undefined"
+              ? getAdminProductsCatalog()
+              : getMockCatalog();
+        }
+      } catch {
+        catalog =
+          typeof window !== "undefined"
+            ? getAdminProductsCatalog()
+            : getMockCatalog();
+      }
     }
 
-    const response = await fetch("/api/catalog", {
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) {
-      throw new Error(`ไม่สามารถโหลดรายการสินค้าได้ (${response.statusText})`);
-    }
-    const json = await response.json();
-    return json.data;
+    return this.filterPublicCatalog(catalog);
   }
 
   static async getMangaSeries(): Promise<CatalogMangaSeries[]> {
-    if (IS_MOCK_MODE) {
-      if (typeof window !== "undefined") {
-        initializeMasterStorage();
-        return getAdminProductsCatalog().mangaSeries;
-      }
-      return getMockCatalog().mangaSeries;
-    }
-
-    const response = await fetch("/api/catalog?category=MANGA", {
-      headers: { Accept: "application/json" },
-    });
-    let body: unknown;
-    try {
-      body = await response.json();
-    } catch {
-      throw new Error("เซิร์ฟเวอร์ส่งข้อมูลมังงะไม่ถูกต้อง");
-    }
-    const parsed = catalogResponseSchema.safeParse(body);
-    if (!response.ok || !parsed.success) {
-      throw new Error("ไม่สามารถโหลดรายการมังงะได้");
-    }
-    return parsed.data.data.mangaSeries;
+    const catalog = await this.getProducts();
+    return catalog.mangaSeries;
   }
 
   /**

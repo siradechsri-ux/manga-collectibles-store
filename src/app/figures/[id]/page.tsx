@@ -68,7 +68,6 @@ export default function FigureProductPage() {
 
   useEffect(() => {
     void loadFigure();
-    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") return;
     const refresh = (): void => {
       void loadFigure();
     };

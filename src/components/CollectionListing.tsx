@@ -253,7 +253,6 @@ export default function CollectionListing({
 
   useEffect(() => {
     void loadCatalog();
-    if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") return;
     const refresh = (): void => {
       void loadCatalog();
     };

@@ -139,7 +139,7 @@ export default function AdminDashboardPage() {
             : typeof p.stockOrQuotaRemaining === "number"
               ? p.stockOrQuotaRemaining
               : 0;
-        return stock <= 5;
+        return stock > 0 && stock <= 5;
       }).length;
     } catch {
       return 0;
@@ -452,9 +452,13 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* KPI 4: Low Stock Alert */}
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs transition hover:border-rose-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-rose-700">
+        <Link
+          href="/admin/products?filter=low-stock"
+          className="group block rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs transition hover:border-rose-400 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-rose-600"
+          title="คลิกเพื่อดูรายการสินค้าใกล้หมดสต็อกในคลัง"
+        >
           <div className="flex items-center justify-between">
-            <span className="rounded-xl bg-rose-50 p-2.5 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400">
+            <span className="rounded-xl bg-rose-50 p-2.5 text-rose-600 transition group-hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-400 dark:group-hover:bg-rose-900/50">
               <Boxes size={22} aria-hidden="true" />
             </span>
             <span
@@ -464,16 +468,23 @@ export default function AdminDashboardPage() {
                   : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
               }`}
             >
-              {lowStockCount > 0 ? "สต็อกเหลือน้อย" : "พร้อมจำหน่าย"}
+              {lowStockCount > 0 ? "สต็อกเหลือน้อย (คลิกเพื่อดู)" : "พร้อมจำหน่าย"}
             </span>
           </div>
           <p className="mt-4 text-xs font-bold text-zinc-500 dark:text-zinc-400">
             สินค้าใกล้หมดสต็อก (Low Stock Alert)
           </p>
-          <p className="mt-1 text-2xl font-black text-zinc-950 dark:text-zinc-100">
-            {lowStockCount} <span className="text-sm font-semibold text-zinc-500">รายการ</span>
-          </p>
-        </div>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-2xl font-black text-zinc-950 dark:text-zinc-100">
+              {lowStockCount} <span className="text-sm font-semibold text-zinc-500">รายการ</span>
+            </p>
+            {lowStockCount > 0 ? (
+              <span className="text-xs font-bold text-rose-600 group-hover:underline dark:text-rose-400">
+                จัดการสต็อก &rarr;
+              </span>
+            ) : null}
+          </div>
+        </Link>
       </section>
 
       {/* Subsystem Navigation Shortcut Buttons */}
@@ -621,10 +632,11 @@ export default function AdminDashboardPage() {
                       <td className="py-3 px-3 text-right">
                         <Link
                           href={`/orders/${order.detail.id}`}
-                          className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-750 transition"
+                          title="ดูรายละเอียดออเดอร์"
+                          aria-label={`ดูรายละเอียดออเดอร์ ${order.detail.orderNumber}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-orange-500/50 dark:hover:bg-zinc-750 dark:hover:text-orange-400"
                         >
-                          <Eye size={13} aria-hidden="true" />
-                          <span>ดูออเดอร์</span>
+                          <Eye size={15} aria-hidden="true" />
                         </Link>
                       </td>
                     </tr>

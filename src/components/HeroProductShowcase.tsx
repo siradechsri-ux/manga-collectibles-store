@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import {
+  ADMIN_PRODUCTS_UPDATED_EVENT,
+  isProductVisibleToPublic,
+  listAdminProducts,
+} from "../mocks/admin-products.mock";
 
 export interface HeroFeaturedProduct {
   id: string;
@@ -107,25 +112,75 @@ const FEATURED_HERO_PRODUCTS: HeroFeaturedProduct[] = [
 ];
 
 export default function HeroProductShowcase() {
+  const [productsList, setProductsList] = useState<HeroFeaturedProduct[]>(FEATURED_HERO_PRODUCTS);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const currentItem = FEATURED_HERO_PRODUCTS[currentIndex];
+  useEffect(() => {
+    const filterVisible = () => {
+      try {
+        const adminProducts = listAdminProducts();
+        const hiddenIds = new Set<string>();
+        for (const p of adminProducts) {
+          if (!isProductVisibleToPublic(p)) {
+            hiddenIds.add(p.id.toLowerCase());
+            if (p.type === "MANGA" || p.type === "LIGHT_NOVEL") {
+              if (p.volumeNumber === 1 && p.seriesId === "jujutsu-kaisen") {
+                hiddenIds.add("jjk-01");
+              }
+              if (p.volumeNumber === 1 && p.seriesId === "frieren") {
+                hiddenIds.add("frieren-01");
+              }
+              if (p.volumeNumber === 1 && p.seriesId === "spy-x-family") {
+                hiddenIds.add("spy-01");
+              }
+              if (p.volumeNumber === 1 && p.seriesId === "chainsaw-man") {
+                hiddenIds.add("csm-01");
+              }
+              if (p.volumeNumber === 1 && p.seriesId === "mushoku-tensei-novel") {
+                hiddenIds.add("mushoku-01");
+              }
+              if (p.volumeNumber === 1 && p.seriesId === "rezero-novel") {
+                hiddenIds.add("rezero-01");
+              }
+            }
+          }
+        }
+        const filtered = FEATURED_HERO_PRODUCTS.filter((item) => {
+          return !hiddenIds.has(item.id.toLowerCase()) && !Array.from(hiddenIds).some((h) => item.href.toLowerCase().includes(h));
+        });
+        setProductsList(filtered.length > 0 ? filtered : FEATURED_HERO_PRODUCTS);
+      } catch {
+        setProductsList(FEATURED_HERO_PRODUCTS);
+      }
+    };
+
+    filterVisible();
+    window.addEventListener(ADMIN_PRODUCTS_UPDATED_EVENT, filterVisible);
+    window.addEventListener("storage", filterVisible);
+    return () => {
+      window.removeEventListener(ADMIN_PRODUCTS_UPDATED_EVENT, filterVisible);
+      window.removeEventListener("storage", filterVisible);
+    };
+  }, []);
+
+  const safeIndex = currentIndex >= productsList.length ? 0 : currentIndex;
+  const currentItem = productsList[safeIndex] || productsList[0];
 
   // Preload images
   useEffect(() => {
-    FEATURED_HERO_PRODUCTS.forEach((p) => {
+    productsList.forEach((p) => {
       const img = new Image();
       img.src = p.image;
     });
-  }, []);
+  }, [productsList]);
 
   const nextProduct = () => {
     setIsTransitioning(true);
     setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % FEATURED_HERO_PRODUCTS.length);
+      setCurrentIndex((prev) => (prev + 1) % productsList.length);
       setIsTransitioning(false);
     }, 280);
   };
@@ -134,7 +189,7 @@ export default function HeroProductShowcase() {
     setIsTransitioning(true);
     setTimeout(() => {
       setCurrentIndex((prev) =>
-        prev === 0 ? FEATURED_HERO_PRODUCTS.length - 1 : prev - 1,
+        prev === 0 ? productsList.length - 1 : prev - 1,
       );
       setIsTransitioning(false);
     }, 280);
@@ -213,7 +268,7 @@ export default function HeroProductShowcase() {
 
         {/* 4. Sleek Dots Indicator */}
         <div className="flex items-center gap-1.5" role="tablist" aria-label="เลือกลำดับสินค้า">
-          {FEATURED_HERO_PRODUCTS.map((item, idx) => (
+          {productsList.map((item, idx) => (
             <button
               key={item.id}
               type="button"
