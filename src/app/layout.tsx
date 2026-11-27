@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ReactNode, Suspense } from "react";
 import RouteGuard from "../components/auth/RouteGuard";
 import Navbar from "../components/layout/Navbar";
+import Footer from "../components/layout/Footer";
 import FlyToCartOverlay from "../components/FlyToCartOverlay";
 import Providers from "./providers";
 import "./globals.css";
@@ -23,14 +24,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           rel="stylesheet"
         />
       </head>
-      <body suppressHydrationWarning>
+      <body suppressHydrationWarning className="flex min-h-screen flex-col">
         <Providers>
           <RouteGuard>
             <Suspense fallback={null}>
               <Navbar />
             </Suspense>
             <FlyToCartOverlay />
-            {children}
+            <div className="flex-1">{children}</div>
+            <Footer />
           </RouteGuard>
         </Providers>
       </body>
